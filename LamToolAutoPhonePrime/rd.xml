@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+	<Application>
+
+		<!-- ResourceManager support -->
+		<Assembly Name="System.Resources.Extensions">
+			<Type Name="System.Resources.Extensions.RuntimeResourceSet" Dynamic="Required All" />
+			<Type Name="System.Resources.Extensions.DeserializingResourceReader" Dynamic="Required All" />
+		</Assembly>
+
+		<!-- Core reflection -->
+		<Assembly Name="System.Private.CoreLib" Dynamic="Required All">
+			<Type Name="System.Delegate" Dynamic="Required All" />
+			<Type Name="System.MulticastDelegate" Dynamic="Required All" />
+			<Type Name="System.Action" Dynamic="Required All" />
+			<Type Name="System.Func`1" Dynamic="Required All" />
+			<Type Name="System.Func`2" Dynamic="Required All" />
+		</Assembly>
+		<Assembly Name="mscorlib" Dynamic="Required All" />
+		<Assembly Name="System.Reflection" Dynamic="Required All"/>
+		<Assembly Name="System.Runtime" Dynamic="Required All"/>
+		<Assembly Name="System.ComponentModel" Dynamic="Required All" />
+		<Assembly Name="System.ComponentModel.TypeConverter" Dynamic="Required All" />
+		<Assembly Name="System.Globalization">
+			<Type Name="System.Globalization.CultureInfo" Dynamic="Required All"/>
+		</Assembly>
+		<Assembly Name="System.Drawing" Dynamic="Required All" />
+
+		<!-- WinForms binding + runtime -->
+		<Assembly Name="System.Windows.Forms">
+			<Type Name="System.Windows.Forms.Form" Dynamic="Required All" Preserve="All" />
+			<Type Name="System.Windows.Forms.UserControl" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Control" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Application" Dynamic="Required All" />
+		</Assembly>
+
+		<!-- Project assemblies -->
+		<Assembly Name="AntdUI" Dynamic="Required All" />
+		<Assembly Name="AutoAndroid" Dynamic="Required All" />
+		<Assembly Name="Sunny.Subd.Core" Dynamic="Required All" />
+		<Assembly Name="Sunny.Subdy.Common" Dynamic="Required All" />
+		<Assembly Name="Sunny.Subdy.Data" Dynamic="Required All" />
+		<Assembly Name="Sunny.Subdy.Server" Dynamic="Required All" />
+
+		<!-- Models sử dụng binding (chỉ rõ kiểu cần giữ metadata) -->
+		<Assembly Name="AutoAndroid">
+			<Type Name="AutoAndroid.DeviceModel" DynamicallyAccessedMemberTypes="All" />
+		</Assembly>
+		<Assembly Name="Sunny.Subdy.Data">
+			<Type Name="Sunny.Subdy.Data.Models.Account" DynamicallyAccessedMemberTypes="All" />
+		</Assembly>
+		<Assembly Name="BouncyCastle.Crypto">
+			<Type Name="Org.BouncyCastle.Security.DigestUtilities" Dynamic="Required All" />
+			<Type Name="Org.BouncyCastle.Security.DigestUtilities+DigestAlgorithm" Dynamic="Required All" />
+		</Assembly>
+	</Application>
+</Directives>

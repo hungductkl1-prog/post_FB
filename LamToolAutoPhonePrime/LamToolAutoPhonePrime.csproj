@@ -1,0 +1,170 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+
+
+	  <!-- Debug settings -->
+	  <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+	  <DebugType>portable</DebugType>
+	  <DebugSymbols>true</DebugSymbols>
+	  <Optimize>false</Optimize>
+
+	  <!-- Native AOT -->
+	  <!--<PublishTrimmed>false</PublishTrimmed>-->
+	  <PublishAot>true</PublishAot>
+	  <InvariantGlobalization>false</InvariantGlobalization>
+	  <_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>
+	  <UseWindowsForms>true</UseWindowsForms>
+	  <CustomResourceTypesSupport>true</CustomResourceTypesSupport>
+	  <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+	  <WindowsSupportedOSPlatformVersion>5.1</WindowsSupportedOSPlatformVersion>
+	  <TargetPlatformMinVersion>5.1</TargetPlatformMinVersion>
+	  <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+	  <PublishTrimmed>false</PublishTrimmed>
+	  <OptimizationPreference>Size</OptimizationPreference>
+	  <PublishLzmaCompressed>true</PublishLzmaCompressed>
+	  <!-- Auto Versioning -->
+	  <CurrentTime>$([System.DateTime]::Now.ToString("HH.dd.MM.yyyy"))</CurrentTime>
+	  <Version>$(CurrentTime)</Version>
+	  <AssemblyVersion>$(CurrentTime)</AssemblyVersion>
+	  <FileVersion>$(CurrentTime)</FileVersion>
+	  <AssemblyName>LamToolAutoPhoneFarm$(CurrentTime)</AssemblyName>
+	  <Product>LamToolAutoPhoneFarm</Product>
+	  <Company>LamToolAutoPhoneFarm</Company>
+	  <Copyright>LamToolAutoPhoneFarm</Copyright>
+	  <PackageId>LamToolAutoPhoneFarm</PackageId>
+	  <Title>LamToolAutoPhoneFarm</Title>
+	  <PackageProjectUrl>https://lamtool.net/</PackageProjectUrl>
+	  <ApplicationIcon>Resources\logo_lamtool_v3_dark_16.ico</ApplicationIcon>
+	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Form1.cs~RF5742302.TMP" />
+    <None Remove="Form1.Designer.cs~RF55c9fe8.TMP" />
+    <None Remove="fShowDevice.resx~RF58355c2.TMP" />
+    <None Remove="Resources\icons8_facebook_40.png" />
+    <None Remove="Resources\icons8_telegram_48.png" />
+    <None Remove="Resources\icons8_tiktok_40.png" />
+    <None Remove="Resources\icons8_youtube_40.png" />
+    <None Remove="Resources\icons8_zalo_40.png" />
+    <None Remove="Resources\logo_lamtool_v3_dark_16.png" />
+    <None Remove="ucThongBaoDeviceView.resx~RFa4f8141.TMP" />
+    <None Remove="Utils\ucNotificationMessage.cs~RF13fe9d1c.TMP" />
+    <None Remove="Views\Controls\obntibxz.ejt~" />
+    <None Remove="Views\Controls\ucdgvAccount.resx~RF151a5754.TMP" />
+    <None Remove="Views\Controls\ucManagerDevices.cs~RF14b2b155.TMP" />
+    <None Remove="Views\Controls\yeakuel5.214~" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\logo_lamtool_v3_dark_16.ico" />
+  </ItemGroup>
+	
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Views\Forms\fAddUsercontrol.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Views\Forms\fSelectBrandModel.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Views\Forms\fSettingRegsiner.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Views\Forms\fSettingJob.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Views\Forms\fSettingDefault.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Views\Forms\fShowThongBao.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Update="Views\Forms\fViewDataGridView.cs">
+      <SubType>Form</SubType>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DeviceId.Windows" Version="6.9.0" />
+    <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
+    <PackageReference Include="PublishAotCompressed" Version="1.0.5" />
+    <PackageReference Include="VC-LTL" Version="5.2.2" />
+    <PackageReference Include="WinFormsComInterop" Version="0.5.0" />
+    <PackageReference Include="YY-Thunks" Version="1.1.7" />
+  </ItemGroup>
+	<!-- COM Interop -->
+	<ItemGroup>
+		<COMReference Include="IWshRuntimeLibrary">
+			<WrapperTool>tlbimp</WrapperTool>
+			<VersionMajor>1</VersionMajor>
+			<VersionMinor>0</VersionMinor>
+			<Lcid>0</Lcid>
+			<Isolated>false</Isolated>
+			<EmbedInteropTypes>true</EmbedInteropTypes>
+			<Guid>f935dc20-1cf0-11d0-adb9-00c04fd58a0b</Guid>
+		</COMReference>
+	</ItemGroup>
+	<!-- Trimming Rules -->
+	<ItemGroup>
+		<TrimmerRootAssembly Include="System.Drawing.Common" />
+		<TrimmerRootAssembly Include="System.Resources.Extensions" />
+		<TrimmerRootAssembly Include="mscorlib" />
+		<TrimmableAssembly Include="System.Windows.Forms" />
+	</ItemGroup>
+	<!-- AOT Reflection Config -->
+	<ItemGroup>
+		<RdXmlFile Include="rd.xml" />
+		<RdXmlFile Include="Forms.xml" />
+	</ItemGroup>
+
+	<Target Name="PreserveReflectionForAutoAndroid" BeforeTargets="PrepareForILLink">
+		<ItemGroup>
+			<DynamicDependency Include="AutoAndroid.DeviceModel" DynamicallyAccessedMemberTypes="All" />
+		</ItemGroup>
+	</Target>
+	<!-- Optional: workaround for crash in parallel merge sort -->
+	<ItemGroup>
+		<IlcCompileInput Include="--parallelism:1" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\AntdUI.EmojiFluentFlat\AntdUI.EmojiFluentFlat.csproj" />
+	  <ProjectReference Include="..\AntdUI\AntdUI.csproj" />
+	  <ProjectReference Include="..\AutoAndroid\AutoAndroid.csproj" />
+	  <ProjectReference Include="..\ScrcpyNet\ScrcpyNet.csproj" />
+	  <ProjectReference Include="..\Sunny.Subd.Core\Sunny.Subd.Core.csproj" />
+	  <ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
+	  <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
+	  <ProjectReference Include="..\Sunny.Subdy.Server\Sunny.Subdy.Server.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Resource Include="Resources\logo_lamtool_v3_dark_16.png">
+	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+	  </Resource>
+	</ItemGroup>
+
+	<Target Name="CleanObjWhenRun" AfterTargets="Build" Condition="'$(RunConfiguration)' != ''">
+		<Message Text="🧹 Dọn thư mục obj sau khi chạy build..." Importance="high" />
+		<RemoveDir Directories="$(BaseIntermediateOutputPath)" />
+	</Target>
+</Project>

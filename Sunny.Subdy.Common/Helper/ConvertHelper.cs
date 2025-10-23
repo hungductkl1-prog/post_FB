@@ -1,0 +1,90 @@
+﻿using Sunny.Subdy.Common.ControlMethod;
+using AntdUI;
+using System.Windows.Forms;
+using CommonMethod = AntdUI.CommonMethod;
+
+namespace Sunny.Subdy.Common.Helper
+{
+    public static class ConvertHelper
+    {
+        public static string ToMoneyString(this double value)
+        {
+            return value.ToString("#,0.###");
+        }
+        public static string ToMoneyString(this int value)
+        {
+            return value.ToString("#,0.###");
+        }
+        public static string CapitalizeEachWord(this string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return input;
+
+            return string.Join(" ", input
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Select(word =>
+                    char.ToUpper(word[0]) + word.Substring(1).ToLower()
+                ));
+        }
+        public static void CopyFormat(string type, DataGridView data)
+        {
+            List<string> lines = new List<string>();
+            string[] splitTypes = type.Split('|');
+
+            try
+            {
+                foreach (DataGridViewRow row in data.SelectedRows)
+                {
+                    List<string> fields = new List<string>();
+
+                    foreach (string typeItem in splitTypes)
+                    {
+                        if (string.IsNullOrEmpty(typeItem))
+                        {
+                            fields.Add(typeItem);
+                            continue;
+                        }
+                        string cellValue = "";
+
+                        // Tìm cột có DataPropertyName khớp với typeItem
+                        var column = data.Columns
+                            .Cast<DataGridViewColumn>()
+                            .FirstOrDefault(c => c.DataPropertyName.ToLower() == typeItem.ToLower());
+
+                        if (column != null)
+                        {
+                            cellValue = Convert.ToString(row.Cells[column.Index].Value);
+                        }
+
+                        fields.Add(cellValue);
+                    }
+
+                    lines.Add(string.Join("|", fields));
+                }
+
+                string result = string.Join("\n", lines);
+                Clipboard.SetText(result);
+                CommonMethod.ShowMessageSuccess($"Copy thành công {lines.Count} tài khoản.");
+            }
+            catch (Exception ex)
+            {
+                CommonMethod.ShowConfirmWarning($"Có lỗi xảy ra, vui lòng báo admin! [{ex.Message}]");
+            }
+        }
+    }
+    public enum CopyType
+    {
+        Empty,
+        Custum,
+        Uid,
+        Password,
+        _2FA,
+        Token,
+        Cookie,
+        Proxy,
+        Email,
+        PassMail,
+        MailAdress,
+        Status,
+    }
+}
