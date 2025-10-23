@@ -1,6 +1,8 @@
 ﻿using AntdUI;
 using AutoAndroid;
+using LamToolAutoPhonePrime.Utils;
 using ScrcpyNet;
+using SharpAdbClient;
 using System.Collections.Concurrent;
 using System.Reflection;
 
@@ -8,9 +10,7 @@ namespace LamToolAutoPhonePrime
 {
     public partial class Form1 : AntdUI.Window
     {
-        private readonly ConcurrentDictionary<string, Scrcpy> instances = new();
-
-
+        private readonly ScrcpyManager manager = new ScrcpyManager();
 
 
         private List<DeviceModel> devices = new List<DeviceModel>();
@@ -20,11 +20,14 @@ namespace LamToolAutoPhonePrime
         private readonly List<Control> selectedControls = new List<Control>();
         public Form1(List<DeviceModel> devices)
         {
+            AdbServer.Instance.StartServer(Path.Combine(ProcessHelper.ADBPath, "adb.exe"), false);
+            FFmpeg.AutoGen.ffmpeg.RootPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ScrcpyNet");
             InitializeComponent();
+            ucThongBao = new ucThongBaoDeviceView();
             childFormDevice = new fShowDevice(this);
             childFormDevice.SettingsButtonClicked += ucMenuscripDevice_HideForm;
-            ucThongBao = new ucThongBaoDeviceView();
             this.devices = devices;
+
             this.Load += Form1_Load;
             // enable double buffering to reduce flicker when many controls are present
             TryEnableDoubleBuffering(flowLayoutPanel1);
@@ -48,6 +51,8 @@ namespace LamToolAutoPhonePrime
         private async Task LoadData()
         {
             if (devices == null || devices.Count == 0) return;
+            manager.StartAll(devices);
+
 
             int batchSize = DefaultBatchSize;
             var batch = new List<DeviceModel>(batchSize);
@@ -55,6 +60,7 @@ namespace LamToolAutoPhonePrime
             // Add in batches to keep UI responsive
             foreach (var device in devices)
             {
+
                 batch.Add(device);
                 if (batch.Count >= batchSize)
                 {
@@ -86,7 +92,8 @@ namespace LamToolAutoPhonePrime
                     {
                         foreach (var device in models)
                         {
-                            var ucDevice = new ucDeviceView(device, true, "");
+
+                            var ucDevice = new ucDeviceView(device, true, "", manager.StartForDevice(device.Serial));
                             ucDevice.SettingsButtonClicked += UcDevice_SettingsButtonClicked;
                             flowLayoutPanel1.Controls.Add(ucDevice);
                         }
@@ -104,7 +111,7 @@ namespace LamToolAutoPhonePrime
                 // fallback (designer/runtime edge cases)
                 foreach (var device in models)
                 {
-                    var ucDevice = new ucDeviceView(device, true, "");
+                    var ucDevice = new ucDeviceView(device, true, "", manager.StartForDevice(device.Serial));
                     ucDevice.SettingsButtonClicked += UcDevice_SettingsButtonClicked;
                     flowLayoutPanel1.Controls.Add(ucDevice);
                 }
@@ -124,7 +131,7 @@ namespace LamToolAutoPhonePrime
                 // Xóa control cũ (thiết bị)
                 flowLayoutPanel1.Controls.Remove(deviceView);
                 deviceView.Dispose();
-                ucDeviceView ucNew = new ucDeviceView(deviceView.device, false, "");
+                ucDeviceView ucNew = new ucDeviceView(deviceView.device, false, "", manager.StartForDevice(deviceView.device.Serial));
                 // Tạo ucThongBao (hoặc lấy sẵn từ instance)
                 ucThongBao.Width = deviceView.Width;
                 ucThongBao.Height = deviceView.Height;
@@ -156,11 +163,13 @@ namespace LamToolAutoPhonePrime
             }
 
         }
-        private void Form1_Load(object? sender, EventArgs e)
+        private async void Form1_Load(object? sender, EventArgs e)
         {
+            CreateLoadingOverlay();
             InitSelectionFeature();
             // Fire-and-forget load; keep UI responsive
-            _ = LoadData();
+            await LoadData();
+            HideLoading();
         }
         private void SetRenderSize(int size)
         {
@@ -214,7 +223,7 @@ namespace LamToolAutoPhonePrime
                 flowLayoutPanel1.Controls.Remove(ucThongBao);
                 ucDeviceView uc = fshow.ucDevice;
                 fshow.ucDevice.Dispose();
-                ucDeviceView ucNew = new ucDeviceView(uc.device, true, "");
+                ucDeviceView ucNew = new ucDeviceView(uc.device, true, "", manager.StartForDevice(uc.device.Serial));
                 ucNew.SettingsButtonClicked += UcDevice_SettingsButtonClicked;
                 ucNew.Dock = DockStyle.None;
                 ucNew.Width = ucThongBao.Width;
@@ -269,5 +278,79 @@ namespace LamToolAutoPhonePrime
         {
             // Khi thả chuột: có thể xử lý gì thêm
         }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            manager.StopAll();
+        }
+
+
+
+        private void CreateLoadingOverlay()
+        {
+            _loadingOverlay = new System.Windows.Forms.Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(240, 255, 255, 255),
+                Cursor = Cursors.WaitCursor
+            };
+
+            var spin = new AntdUI.Spin
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font(FontUtil._fontSemiBold, 16f),
+                Text = "Đang khởi động...",
+                ForeColor = Color.FromArgb(70, 70, 70)
+            };
+
+            _loadingOverlay.Controls.Add(spin);
+            Controls.Add(_loadingOverlay);
+            _loadingOverlay.BringToFront();
+
+            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "LamTool xin chào!" };
+
+            _loadingCts = new CancellationTokenSource();
+            var token = _loadingCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    int i = 0;
+                    while (!token.IsCancellationRequested)
+                    {
+                        if (!spin.IsHandleCreated)
+                        {
+                            await Task.Delay(100, token);
+                            continue;
+                        }
+
+                        spin.Invoke(new Action(() =>
+                        {
+                            if (!spin.IsDisposed)
+                                spin.Text = messages[i];
+                        }));
+
+                        i = (i + 1) % messages.Length;
+                        await Task.Delay(500, token); // tăng delay cho dễ đọc
+                    }
+                }
+                catch (TaskCanceledException)
+                {
+                    // bỏ qua khi overlay bị hủy
+                }
+            });
+        }
+
+        private void HideLoading()
+        { 
+            if (_loadingOverlay == null) return;
+            _loadingOverlay.Visible = false;
+            _loadingCts?.Cancel();
+            this.panel1.Enabled = true;
+        }
+
+        private CancellationTokenSource _loadingCts;
+        private System.Windows.Forms.Panel _loadingOverlay;
     }
 }

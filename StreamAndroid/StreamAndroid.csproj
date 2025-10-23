@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FFmpeg.AutoGen" Version="4.4.1.1" />
+    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="sharpadbclient" Version="2.3.23" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AntdUI\AntdUI.csproj" />
+    <ProjectReference Include="..\AutoAndroid\AutoAndroid.csproj" />
+    <ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
+  </ItemGroup>
+
+</Project>

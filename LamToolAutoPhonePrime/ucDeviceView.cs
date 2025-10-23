@@ -1,16 +1,10 @@
-﻿using AntdUI;
-using AutoAndroid;
+﻿using AutoAndroid;
 using FFmpeg.AutoGen;
 using ScrcpyNet;
 using SDL2;
-using SharpAdbClient;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using static System.Net.Mime.MediaTypeNames;
 using Font = System.Drawing.Font;
 using Point = System.Drawing.Point;
 
@@ -18,12 +12,7 @@ namespace LamToolAutoPhonePrime
 {
     public partial class ucDeviceView : UserControl
     {
-
-
-
-        private static ScrcpyManager manager = new ScrcpyManager();
         private Scrcpy? instance;
-
         private IntPtr sdlWinPtr;
         private IntPtr sdlRender;
         private IntPtr sdlTexture;
@@ -38,7 +27,6 @@ namespace LamToolAutoPhonePrime
         private bool isResize;
         private static readonly object locker = new object();
 
-        private readonly DeviceData deviceData;
         public readonly DeviceModel device;
 
         private static int sdlInitCount = 0;
@@ -66,15 +54,13 @@ namespace LamToolAutoPhonePrime
 
         public event EventHandler? SettingsButtonClicked;
         public event EventHandler? InfoButtonClicked;
-        public ucDeviceView(DeviceModel device, bool showOverlayText, string textRender)
+        public ucDeviceView(DeviceModel device, bool showOverlayText, string textRender, Scrcpy scrcpy)
         {
             InitializeComponent();
             this.device = device;
             this.textRender = textRender;
             this.showOverlayText = showOverlayText;
-            deviceData = manager.adb.GetDevices().FirstOrDefault(d => d.Serial == device.Serial)
-                ?? throw new ArgumentException("Device not found: " + device.Serial);
-
+            instance = scrcpy;
             this.Load += UcDeviceView_Load;
             this.Disposed += UcDeviceView_Disposed;
             this.VisibleChanged += UcDeviceView_VisibleChanged;
@@ -104,9 +90,36 @@ namespace LamToolAutoPhonePrime
             pictureBox1.PreviewKeyDown += PictureBox1_PreviewKeyDown;
         }
 
-        private void PictureBox1_PreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
+        private async void PictureBox1_PreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
         {
-            MainForm_KeyDown(sender, new KeyEventArgs(e.KeyCode));
+
+            e.IsInputKey = true;
+            if (e.Control && !e.Shift && !e.Alt && e.KeyCode == Keys.V)
+            {
+                string clipboardText = Clipboard.GetText();
+                if (!string.IsNullOrEmpty(clipboardText))
+                {
+                    ADBClient client = new ADBClient(device);
+                    await client.TurnOnADBKeyboard();
+                    client.ADBKeyboardService.Input(clipboardText);
+                }
+                return;
+            }
+            if (e.Control && !e.Shift && !e.Alt && e.KeyCode == Keys.C)
+            {
+                ADBClient client = new ADBClient(device);
+                string clipboardText = await client.GetClipboardText();
+                Clipboard.SetText(clipboardText);
+                return;
+            }
+
+            // Xử lý phím bình thường
+            var msg = new KeycodeControlMessage
+            {
+                KeyCode = KeycodeHelper.ConvertKey(e.KeyCode),
+                Metastate = KeycodeHelper.ConvertModifiers(e.Modifiers)
+            };
+            instance.SendControlCommand(msg);
         }
 
         private void RoundPictureBox(PictureBox pic, int radius)
@@ -162,7 +175,7 @@ namespace LamToolAutoPhonePrime
             {
                 RoundPictureBox(pictureBox1, 4);
 
-                FFmpeg.AutoGen.ffmpeg.RootPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ScrcpyNet");
+
                 EnsureSdlInitialized();
 
                 if (pictureBox1.IsHandleCreated)
@@ -170,9 +183,7 @@ namespace LamToolAutoPhonePrime
                     sdlWinPtr = SDL.SDL_CreateWindowFrom(pictureBox1.Handle);
                 }
 
-                AdbServer.Instance.StartServer(Path.Combine(ProcessHelper.ADBPath, "adb.exe"), false);
 
-                instance = manager.StartForDevice(deviceData, device.Port);
                 instance.OnLoadSizeEvent += Scrcpy_OnLoadSizeEvent;
                 instance.VideoStreamDecoder.NewFrameEvent += VideoStreamDecoder_NewFrameEvent;
                 // Ẩn button4, button5 từ Designer (chúng ta dùng SDL buttons)
@@ -200,9 +211,6 @@ namespace LamToolAutoPhonePrime
                         instance.VideoStreamDecoder.NewFrameEvent -= VideoStreamDecoder_NewFrameEvent;
                     }
                     catch { }
-
-                    manager.Stop(device.Serial);
-                    instance = null;
                 }
 
                 lock (locker)
@@ -246,7 +254,7 @@ namespace LamToolAutoPhonePrime
             showButtons = true;
             hideButtonsTimer.Stop();
             hideButtonsTimer.Start();
-            try { pictureBox1.Focus(); } catch { }
+            try { pictureBox1.Focus(); panel1.BorderColor = Color.Green; } catch { }
         }
 
         private void PictureBox1_MouseDown(object? sender, MouseEventArgs e)
@@ -284,38 +292,15 @@ namespace LamToolAutoPhonePrime
             // Touch handling
             if (!IsInsideRender(e.Location)) return;
 
+            if (panel1.BorderColor != Color.Green) return;
+
             var pos = GetTouchPosition(e.Location);
             SendTouch(AndroidMotionEventAction.AMOTION_EVENT_ACTION_DOWN, pos, e.Button);
             isPointerDown = true;
             moveThrottle.Restart();
             pictureBox1.Capture = true;
         }
-        private async void MainForm_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Control && e.KeyCode == Keys.V)
-            {
-                e.Handled = true;
-                string clipboardText = Clipboard.GetText();
-                if (!string.IsNullOrEmpty(clipboardText))
-                {
-                    ADBClient client = new ADBClient(device);
-                   await client.TurnOnADBKeyboard();
-                    client.ADBKeyboardService.Input(clipboardText);
-                }
-            }
-            else
-            {
-                e.Handled = true;
-                e.SuppressKeyPress = true;
 
-                var msg = new KeycodeControlMessage
-                {
-                    KeyCode = KeycodeHelper.ConvertKey(e.KeyCode),
-                    Metastate = KeycodeHelper.ConvertModifiers(e.Modifiers)
-                };
-                instance.SendControlCommand(msg);
-            }
-        }
         private void PictureBox1_MouseMove(object? sender, MouseEventArgs e)
         {
             // Update button hover state
@@ -349,6 +334,7 @@ namespace LamToolAutoPhonePrime
             // Touch move
             if (!isPointerDown || moveThrottle.ElapsedMilliseconds < moveIntervalMs)
                 return;
+            if (panel1.BorderColor != Color.Green) return;
 
             var pos = GetTouchPosition(e.Location);
             SendTouch(AndroidMotionEventAction.AMOTION_EVENT_ACTION_MOVE, pos, e.Button);
@@ -359,7 +345,7 @@ namespace LamToolAutoPhonePrime
         {
             if (!isPointerDown)
                 return;
-
+            if (panel1.BorderColor != Color.Green) return;
             var pos = GetTouchPosition(e.Location);
             SendTouch(AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, pos, e.Button);
             isPointerDown = false;
@@ -372,10 +358,9 @@ namespace LamToolAutoPhonePrime
             btnSettingsHovered = false;
             btnInfoHovered = false;
             pictureBox1.Cursor = Cursors.Default;
-
+            panel1.BorderColor = Color.RoyalBlue;
             if (!isPointerDown)
                 return;
-
             var pos = GetTouchPosition(PointToClient(Cursor.Position));
             SendTouch(AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, pos, MouseButtons.Left);
             isPointerDown = false;
@@ -385,6 +370,7 @@ namespace LamToolAutoPhonePrime
 
         private void PictureBox1_MouseWheel(object? sender, MouseEventArgs e)
         {
+            if (panel1.BorderColor != Color.Green) return;
             var pos = GetTouchPosition(e.Location);
             var msg = new TouchEventControlMessage
             {

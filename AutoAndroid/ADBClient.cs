@@ -36,7 +36,8 @@ namespace AutoAndroid
         }
         private ADBHelper _adb;
         public MaxChangeService maxChange;
-        public ADBKeyboardService ADBKeyboardService;
+        public readonly ADBKeyboardService ADBKeyboardService;
+        private readonly ClipboardService _clipboardService;
         public DeviceModel Create(string serial)
         {
             DeviceModel model = new DeviceModel();
@@ -62,6 +63,7 @@ namespace AutoAndroid
             _logHelper = new LogHelper(Device);
             maxChange = new MaxChangeService(this);
             ADBKeyboardService = new ADBKeyboardService(this);
+            _clipboardService = new ClipboardService(this);
             ProcessHelper.RunAdbWithTimeout($"-s {Device.Serial} shell settings put system user_rotation 0");
             ProcessHelper.RunAdbWithTimeout($"-s {Device.Serial} shell settings put system accelerometer_rotation 0");
         }
@@ -87,6 +89,10 @@ namespace AutoAndroid
             _atx = new ATXService(this);
             _logHelper = new LogHelper(Device);
             maxChange = new MaxChangeService(this);
+        }
+        public async Task<string> GetClipboardText()
+        {
+            return await _clipboardService.GetText();
         }
         public List<string> ExtractBoundsFromXml(int timeoutSeconds, string xmlSource)
         {

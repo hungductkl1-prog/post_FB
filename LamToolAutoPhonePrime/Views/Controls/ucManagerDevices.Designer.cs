@@ -71,7 +71,7 @@ namespace Sunny.Subdy.UI.View.Pages
             button3.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             button3.IconRatio = 0.8F;
             button3.IconSvg = "XFilled";
-            button3.Location = new Point(915, 23);
+            button3.Location = new System.Drawing.Point(915, 23);
             button3.Name = "button3";
             button3.Shape = AntdUI.TShape.Round;
             button3.Size = new Size(137, 39);
@@ -79,7 +79,6 @@ namespace Sunny.Subdy.UI.View.Pages
             button3.Text = "Đóng";
             button3.Type = AntdUI.TTypeMini.Error;
             button3.Visible = false;
-            button3.Click += button3_Click;
             // 
             // button2
             // 
@@ -88,7 +87,7 @@ namespace Sunny.Subdy.UI.View.Pages
             button2.IconRatio = 1.2F;
             button2.IconSvg = "CaretRightFilled";
             button2.IconToggleAnimation = 400;
-            button2.Location = new Point(772, 23);
+            button2.Location = new System.Drawing.Point(772, 23);
             button2.Name = "button2";
             button2.Shape = AntdUI.TShape.Round;
             button2.Size = new Size(137, 39);
@@ -96,20 +95,18 @@ namespace Sunny.Subdy.UI.View.Pages
             button2.Text = "Bắt đầu";
             button2.Type = AntdUI.TTypeMini.Success;
             button2.Visible = false;
-            button2.Click += button2_Click;
             // 
             // button53
             // 
             button53.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button53.IconSvg = "ReloadOutlined";
-            button53.Location = new Point(267, 22);
+            button53.Location = new System.Drawing.Point(267, 22);
             button53.Name = "button53";
             button53.Shape = AntdUI.TShape.Round;
             button53.Size = new Size(137, 39);
             button53.TabIndex = 11;
             button53.Text = "Load Devices";
             button53.Type = AntdUI.TTypeMini.Success;
-            button53.Click += button53_Click;
             // 
             // panel6
             // 
@@ -120,7 +117,7 @@ namespace Sunny.Subdy.UI.View.Pages
             panel6.Controls.Add(input1);
             panel6.Controls.Add(button53);
             panel6.Dock = DockStyle.Top;
-            panel6.Location = new Point(24, 24);
+            panel6.Location = new System.Drawing.Point(24, 24);
             panel6.Margin = new Padding(10, 3, 3, 3);
             panel6.Name = "panel6";
             panel6.padding = new Padding(10);
@@ -134,20 +131,19 @@ namespace Sunny.Subdy.UI.View.Pages
             // 
             button1.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             button1.IconSvg = "StopOutlined";
-            button1.Location = new Point(410, 23);
+            button1.Location = new System.Drawing.Point(410, 23);
             button1.Name = "button1";
             button1.Shape = AntdUI.TShape.Round;
             button1.Size = new Size(137, 39);
             button1.TabIndex = 13;
             button1.Text = "Kill ADB";
             button1.Type = AntdUI.TTypeMini.Error;
-            button1.Click += button1_Click;
             // 
             // input1
             // 
             input1.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
             input1.LocalizationPlaceholderText = "Overview.{id}";
-            input1.Location = new Point(20, 22);
+            input1.Location = new System.Drawing.Point(20, 22);
             input1.Name = "input1";
             input1.Padding = new Padding(0, 2, 0, 2);
             input1.PlaceholderText = "Tìm kiếm";
@@ -160,7 +156,7 @@ namespace Sunny.Subdy.UI.View.Pages
             panel1.Controls.Add(dataGridView1);
             panel1.Controls.Add(panel5);
             panel1.Dock = DockStyle.Fill;
-            panel1.Location = new Point(24, 112);
+            panel1.Location = new System.Drawing.Point(24, 112);
             panel1.Margin = new Padding(10, 3, 3, 3);
             panel1.Name = "panel1";
             panel1.padding = new Padding(10);
@@ -197,7 +193,7 @@ namespace Sunny.Subdy.UI.View.Pages
             dataGridView1.EditMode = DataGridViewEditMode.EditOnEnter;
             dataGridView1.EnableHeadersVisualStyles = false;
             dataGridView1.GridColor = Color.FromArgb(230, 230, 230);
-            dataGridView1.Location = new Point(14, 86);
+            dataGridView1.Location = new System.Drawing.Point(14, 86);
             dataGridView1.Name = "dataGridView1";
             dataGridView1.RightToLeft = RightToLeft.No;
             dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
@@ -214,14 +210,13 @@ namespace Sunny.Subdy.UI.View.Pages
             dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dataGridView1.Size = new Size(800, 215);
             dataGridView1.TabIndex = 12;
-            dataGridView1.MouseClick += Control_MouseClick;
             // 
             // panel5
             // 
             panel5.BackColor = Color.Transparent;
             panel5.Controls.Add(toolStrip2);
             panel5.Dock = DockStyle.Bottom;
-            panel5.Location = new Point(20, 467);
+            panel5.Location = new System.Drawing.Point(20, 467);
             panel5.Margin = new Padding(10, 3, 3, 3);
             panel5.Name = "panel5";
             panel5.padding = new Padding(10);
@@ -237,7 +232,7 @@ namespace Sunny.Subdy.UI.View.Pages
             toolStrip2.Dock = DockStyle.Bottom;
             toolStrip2.GripStyle = ToolStripGripStyle.Hidden;
             toolStrip2.Items.AddRange(new ToolStripItem[] { toolStripLabel7, toolStripLabel8, toolStripLabel9, toolStripLabel10, toolStripLabel11, toolStripLabel12 });
-            toolStrip2.Location = new Point(10, 7);
+            toolStrip2.Location = new System.Drawing.Point(10, 7);
             toolStrip2.Name = "toolStrip2";
             toolStrip2.Size = new Size(1022, 25);
             toolStrip2.TabIndex = 9;
@@ -308,7 +303,6 @@ namespace Sunny.Subdy.UI.View.Pages
             Name = "ucManagerDevices";
             Padding = new Padding(24);
             Size = new Size(1130, 655);
-            Load += ucManagerDevices_Load;
             panel6.ResumeLayout(false);
             panel1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dataGridView1).EndInit();

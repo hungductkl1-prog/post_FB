@@ -460,6 +460,7 @@
             StartPosition = FormStartPosition.CenterScreen;
             Text = "Form1";
             WindowState = FormWindowState.Maximized;
+            FormClosing += Form1_FormClosing;
             windowBar.ResumeLayout(false);
             panel1.ResumeLayout(false);
             panel2.ResumeLayout(false);

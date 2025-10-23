@@ -1,23 +1,16 @@
 ﻿using FFmpeg.AutoGen;
 using Serilog;
 using SharpAdbClient;
-using System;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 
-namespace ScrcpyNet
+namespace StreamAndroid
 {
     public class Scrcpy
     {
@@ -25,7 +18,8 @@ namespace ScrcpyNet
         public int Width { get; internal set; }
         public int Height { get; internal set; }
         public long Bitrate { get; set; } = 8000000;
-        public string ScrcpyServerFile { get; set; } = "ScrcpyNet/scrcpy-server.jar";
+        public string ScrcpyServerFile { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App", "scrcpy-server.jar");
+
 
         public bool Connected { get; private set; }
         public VideoStreamDecoder VideoStreamDecoder { get; }
@@ -66,7 +60,7 @@ namespace ScrcpyNet
             if (Connected)
                 throw new Exception("Already connected.");
 
-           // UpdatePort();
+            // UpdatePort();
             MobileServerSetup();
 
             listener = new TcpListener(IPAddress.Loopback, this.port);
