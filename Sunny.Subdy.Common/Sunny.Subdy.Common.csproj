@@ -9,7 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Services\DeviceServices.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="HtmlAgilityPack" Version="1.12.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="RestSharp" Version="112.1.1-alpha.0.4" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
     <PackageReference Include="System.Resources.Extensions" Version="9.0.0" />
@@ -17,7 +22,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AntdUI\AntdUI.csproj" />
-    <ProjectReference Include="..\AutoAndroid\AutoAndroid.csproj" />
   </ItemGroup>
 
   <ItemGroup>

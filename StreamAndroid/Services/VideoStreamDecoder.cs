@@ -3,7 +3,7 @@ using Serilog;
 using Sunny.Subdy.Common.Logs;
 using System.Text;
 
-namespace StreamAndroid
+namespace StreamAndroid.Services
 {
     public unsafe class FrameData : IDisposable
     {
@@ -194,18 +194,18 @@ namespace StreamAndroid
                     if (ret == ffmpeg.AVERROR(ffmpeg.EAGAIN) || ret == ffmpeg.AVERROR(ffmpeg.AVERROR_EOF))
                         return;
 
-                    if (this.NewFrameEvent != null)
+                    if (NewFrameEvent != null)
                     {
-                        this.NewFrameEvent(*frame);
+                        NewFrameEvent(*frame);
                         ffmpeg.av_frame_unref(frame);
                         ffmpeg.av_packet_unref(&packet);
                     }
                     else
                     {
-                        var frameData = this.GetFrameData(*frame);
+                        var frameData = GetFrameData(*frame);
                         if (frameData != null)
                         {
-                            this.OnFrame?.Invoke(this.Scrcpy, frameData);
+                            OnFrame?.Invoke(Scrcpy, frameData);
                         }
                     }
                 }

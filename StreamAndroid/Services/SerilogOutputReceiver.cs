@@ -2,7 +2,7 @@
 using SharpAdbClient;
 using System.Collections.Generic;
 
-namespace StreamAndroid
+namespace StreamAndroid.Services
 {
     public class SerilogOutputReceiver : MultiLineReceiver
     {

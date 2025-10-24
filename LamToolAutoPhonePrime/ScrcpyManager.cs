@@ -2,6 +2,7 @@
 using ScrcpyNet;
 using Serilog;
 using SharpAdbClient;
+using Sunny.Subdy.Data.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

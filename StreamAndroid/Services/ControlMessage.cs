@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Buffers.Binary;
 
-namespace StreamAndroid
+namespace StreamAndroid.Services
 {
     public enum ControlMessageType : byte
     {

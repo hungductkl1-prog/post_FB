@@ -1,22 +1,67 @@
 ﻿using System.ComponentModel;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using static Sunny.Subdy.Data.AppDbContext;
 
-namespace AutoAndroid
+namespace Sunny.Subdy.Data.Models
 {
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
     public class DeviceModel : INotifyPropertyChanged
     {
+        [SqlKey]
+        public int Id
+        {
+            get => _id;
+            set
+            {
+                if (_id != value)
+                {
+                    _id = value;
+                    OnPropertyChanged(nameof(Id));
+                }
+            }
+        }
         private string _status;
         private string _os;
         private string _name;
         private bool _check;
         private int _color;
-        private int _index;
+        private int _id;
         private string _serial;
         private bool _isScrcpy;
+        private bool _isControl;
+        private string _state;
+        private string _model;
+        private string _nameFolder;
+        public string Model
+        {
+            get => _model;
+            set
+            {
+                if (_model != value)
+                {
+                    _model = value;
+                    OnPropertyChanged(nameof(Model));
+                }
+            }
+        }
+
+        [NotMapped]
+        public bool IsControl
+        {
+            get => _isControl;
+            set
+            {
+                if (_isControl != value)
+                {
+                    _isControl = value;
+                    OnPropertyChanged(nameof(IsControl));
+                }
+            }
+        }
 
         public int Port { get; set; }
-        public int PortScrcpy { get; set; }
 
         public bool IsScrcpy
         {
@@ -27,6 +72,30 @@ namespace AutoAndroid
                 {
                     _isScrcpy = value;
                     OnPropertyChanged(nameof(IsScrcpy));
+                }
+            }
+        }
+        public string NameFolder    
+        {
+            get => _nameFolder;
+            set
+            {
+                if (_nameFolder != value)
+                {
+                    _nameFolder = value;
+                    OnPropertyChanged(nameof(NameFolder));
+                }
+            }
+        }
+        public string State
+        {
+            get => _state;
+            set
+            {
+                if (_state != value)
+                {
+                    _state = value;
+                    OnPropertyChanged(nameof(State));
                 }
             }
         }
@@ -96,19 +165,7 @@ namespace AutoAndroid
             }
         }
 
-        public int Index
-        {
-            get => _index;
-            set
-            {
-                if (_index != value)
-                {
-                    _index = value;
-                    OnPropertyChanged(nameof(Index));
-                }
-            }
-        }
-
+        [NotMapped]
         public int TypeColor
         {
             get => _color;
@@ -121,6 +178,7 @@ namespace AutoAndroid
                 }
             }
         }
+
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -140,5 +198,4 @@ namespace AutoAndroid
             }
         }
     }
-
 }

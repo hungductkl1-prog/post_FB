@@ -1,6 +1,6 @@
 ﻿// Based on https://android.googlesource.com/platform/frameworks/native/+/master/include/android/keycodes.h
 
-namespace StreamAndroid
+namespace StreamAndroid.Services
 {
     public enum AndroidKeycode : int
     {

@@ -1,4 +1,4 @@
-﻿namespace StreamAndroid
+﻿namespace StreamAndroid.Services
 {
     public static class TouchHelper
     {

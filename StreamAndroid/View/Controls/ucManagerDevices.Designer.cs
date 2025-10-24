@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using StreamAndroid.Services;
+using System.Reflection;
 using System.Windows.Forms;
 
 namespace StreamAndroid
@@ -11,7 +12,7 @@ namespace StreamAndroid
         private System.ComponentModel.IContainer components = null;
         private bool isDraggingPanel = false;
         private int panel1OriginalWidth;
-        private Point lastMousePosition;
+        private System.Drawing.Point lastMousePosition;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -186,6 +187,7 @@ namespace StreamAndroid
             button1.Size = new Size(140, 32);
             button1.TabIndex = 13;
             button1.Text = "Ẩn điều khiển";
+            button1.Click += button1_Click;
             // 
             // select4
             // 
@@ -417,13 +419,14 @@ namespace StreamAndroid
             // 
             slider3.Dock = DockStyle.Fill;
             slider3.Location = new System.Drawing.Point(91, 0);
-            slider3.MaxValue = 1240;
-            slider3.MinValue = 480;
+            slider3.MaxValue = 840;
+            slider3.MinValue = 192;
             slider3.Name = "slider3";
             slider3.ShowValue = true;
             slider3.Size = new Size(135, 28);
             slider3.TabIndex = 19;
-            slider3.Value = 720;
+            slider3.Value = 192;
+            slider3.ValueChanged += slider3_ValueChanged;
             // 
             // label9
             // 
@@ -492,13 +495,13 @@ namespace StreamAndroid
             button4.IconHoverSvg = "";
             button4.IconRatio = 0.75F;
             button4.IconSvg = "ScanOutlined";
+            button4.LoadingValue = -1F;
             button4.Location = new System.Drawing.Point(14, 106);
             button4.Margin = new Padding(0, 0, 0, 8);
             button4.Name = "button4";
             button4.Size = new Size(242, 34);
             button4.TabIndex = 18;
             button4.Text = "OTG";
-            button4.TextCenterHasIcon = true;
             // 
             // button3
             // 
@@ -530,7 +533,6 @@ namespace StreamAndroid
             button2.Size = new Size(242, 34);
             button2.TabIndex = 14;
             button2.Text = "Xoay màn hình";
-            button2.TextCenterHasIcon = true;
             // 
             // label6
             // 
@@ -627,6 +629,7 @@ namespace StreamAndroid
             segmented5.SelectIndex = 0;
             segmented5.Size = new Size(88, 32);
             segmented5.TabIndex = 5;
+            segmented5.SelectIndexChanged += segmented5_SelectIndexChanged;
             // 
             // ucManagerDevices
             // 
@@ -690,7 +693,7 @@ namespace StreamAndroid
         private AntdUI.Button button6;
         private AntdUI.Button button9;
         private AntdUI.Switch switch1;
-        private AntdUI.Slider slider3;
+        public AntdUI.Slider slider3;
         private AntdUI.Slider slider4;
         private GroupBox groupBox2;
         private Panel panel10;

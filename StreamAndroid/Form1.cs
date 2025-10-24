@@ -1,4 +1,5 @@
-﻿using System;
+﻿using StreamAndroid.Services;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -15,9 +16,11 @@ namespace StreamAndroid
         public Form1()
         {
             InitializeComponent();
+          
             ucManagerDevices ucManager = new ucManagerDevices();
             ucManager.Dock = DockStyle.Fill;
             this.Controls.Add(ucManager);
+        
         }
     }
 }

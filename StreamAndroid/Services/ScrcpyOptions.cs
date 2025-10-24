@@ -1,4 +1,4 @@
-﻿namespace StreamAndroid
+﻿namespace StreamAndroid.Services
 {
     // Values taken from Genymobile/scrcpy -> app/src/options.h
     public enum ScrcpyLockVideoOrientation

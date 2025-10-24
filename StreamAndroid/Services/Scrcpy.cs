@@ -10,7 +10,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Channels;
 
-namespace StreamAndroid
+namespace StreamAndroid.Services
 {
     public class Scrcpy
     {
@@ -18,7 +18,7 @@ namespace StreamAndroid
         public int Width { get; internal set; }
         public int Height { get; internal set; }
         public long Bitrate { get; set; } = 8000000;
-        public string ScrcpyServerFile { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App", "scrcpy-server.jar");
+        public static string ScrcpyServerFile { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App", "scrcpy-server.jar");
 
 
         public bool Connected { get; private set; }
@@ -49,12 +49,6 @@ namespace StreamAndroid
             VideoStreamDecoder.Scrcpy = this;
         }
 
-        //public void SetDecoder(VideoStreamDecoder videoStreamDecoder)
-        //{
-        //    this.videoStreamDecoder = videoStreamDecoder;
-        //    this.videoStreamDecoder.Scrcpy = this;
-        //}
-
         public void Start(long timeoutMs = 5000)
         {
             if (Connected)
@@ -63,7 +57,7 @@ namespace StreamAndroid
             // UpdatePort();
             MobileServerSetup();
 
-            listener = new TcpListener(IPAddress.Loopback, this.port);
+            listener = new TcpListener(IPAddress.Loopback, port);
             listener.Start();
 
             MobileServerStart();
@@ -105,41 +99,13 @@ namespace StreamAndroid
             MobileServerCleanup();
         }
 
-        private void UpdatePort()
-        {
-            //check port ,more deivce can connect
-            for (int i = this.port; i <= 65535; i++)
-            {
-                if (!PortInUse(i))
-                {
-                    this.port = i;
-                    return;
-                }
-            }
-            //This is a nonsense
-            throw new Exception("No port can use");
-        }
-
-        private bool PortInUse(int port)
-        {
-            var ipPorperties = IPGlobalProperties.GetIPGlobalProperties();
-            var ipEndPoints = ipPorperties.GetActiveTcpListeners();
-            var first = ipEndPoints.FirstOrDefault(i => i.Port == port);
-            if (first != null)
-                return true;
-
-            ipEndPoints = ipPorperties.GetActiveUdpListeners();
-            first = ipEndPoints.FirstOrDefault(i => i.Port == port);
-            return first != null;
-
-        }
 
         private async void BufferMain()
         {
-            if (this.cts == null) return;
-            await foreach (var item in this.bufferChannel.Reader.ReadAllAsync())
+            if (cts == null) return;
+            await foreach (var item in bufferChannel.Reader.ReadAllAsync())
             {
-                this.VideoStreamDecoder?.DecodePacket(item);
+                VideoStreamDecoder?.DecodePacket(item);
             }
         }
 
@@ -187,7 +153,7 @@ namespace StreamAndroid
             Width = BinaryPrimitives.ReadInt16BigEndian(deviceInfoSpan[64..]);
             Height = BinaryPrimitives.ReadInt16BigEndian(deviceInfoSpan[66..]);
             log.Information($"Initial texture: {Width}x{Height}");
-            this.OnLoadSizeEvent?.Invoke(new Size(Width, Height));
+            OnLoadSizeEvent?.Invoke(new Size(Width, Height));
             pool.Return(deviceInfoBuf);
         }
 
@@ -211,7 +177,7 @@ namespace StreamAndroid
                     // Read metadata (each packet starts with some metadata)
                     try
                     {
-                        bytesRead = await videoStream.ReadAsync(metaBuf, 0, 12, this.cts.Token);
+                        bytesRead = await videoStream.ReadAsync(metaBuf, 0, 12, cts.Token);
                     }
                     catch (OperationCanceledException)
                     {
@@ -251,7 +217,7 @@ namespace StreamAndroid
                     {
                         while (bytesToRead != 0 && !cts.Token.IsCancellationRequested)
                         {
-                            bytesRead = await videoStream.ReadAsync(packetBuf, pos, bytesToRead, this.cts.Token);
+                            bytesRead = await videoStream.ReadAsync(packetBuf, pos, bytesToRead, cts.Token);
 
                             if (bytesRead == 0)
                             {
@@ -277,7 +243,7 @@ namespace StreamAndroid
                             {
                                 foreach (var info in packets)
                                 {
-                                    this.bufferChannel.Writer.TryWrite(info);
+                                    bufferChannel.Writer.TryWrite(info);
                                 }
                             }
 
@@ -350,7 +316,7 @@ namespace StreamAndroid
             UploadMobileServer();
 
             // Create port reverse rule
-            adb.CreateReverseForward(device, "localabstract:scrcpy", $"tcp:{this.port}", true);
+            adb.CreateReverseForward(device, "localabstract:scrcpy", $"tcp:{port}", true);
         }
 
         /// <summary>
@@ -431,5 +397,7 @@ namespace StreamAndroid
             public byte[]? Buffer { get; set; }
             public long Pts { get; set; }
         }
+
+       
     }
 }

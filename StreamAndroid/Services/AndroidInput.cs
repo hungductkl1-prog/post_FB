@@ -1,6 +1,6 @@
 ﻿// Based on https://android.googlesource.com/platform/frameworks/native/+/master/include/android/input.h
 
-namespace StreamAndroid
+namespace StreamAndroid.Services
 {
     public enum AndroidKeyEventAction : byte
     {

@@ -8,6 +8,7 @@ using AutoAndroid;
 using Sunny.Subdy.Common;
 using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.Common.Services;
+using Sunny.Subdy.Data.Models;
 
 namespace Sunny.Subdy.Server
 {

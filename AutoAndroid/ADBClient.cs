@@ -1,5 +1,7 @@
 ﻿using OpenCvSharp;
 using OpenCvSharp.Extensions;
+using Sunny.Subdy.Data.Context;
+using Sunny.Subdy.Data.Models;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Diagnostics;
@@ -43,7 +45,14 @@ namespace AutoAndroid
             DeviceModel model = new DeviceModel();
             model.Serial = serial;
             using var _client = new ADBSocket(serial);
-
+            try
+            {
+                model.Id = new DeviceModelContext().GetBySerial(serial).Id;
+            }
+            catch
+            {
+            }
+           
             model.Port = _client.ForwardPort(7912);
             string name = ProcessHelper.RunAdbWithTimeout($"-s {serial} shell settings get global device_name");
             string version = ProcessHelper.RunAdbWithTimeout($"-s {serial} shell getprop ro.build.version.release");

@@ -24,13 +24,17 @@
 		<PackageReference Include="Emgu.CV.runtime.windows" Version="4.10.0.5680" />
 		<PackageReference Include="FFmpeg.AutoGen" Version="4.4.1.1" />
 		<PackageReference Include="ICSharpCode.SharpZipLib.dll" Version="0.85.4.369" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
 		<PackageReference Include="OpenCvSharp4" Version="4.10.0.20241108" />
 		<PackageReference Include="OpenCvSharp4.Extensions" Version="4.10.0.20241108" />
 		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.10.0.20241108" />
 		<PackageReference Include="System.Drawing.Common" Version="9.0.0" />
 		<PackageReference Include="System.Resources.Extensions" Version="9.0.0" />
 		<PackageReference Include="Tesseract" Version="5.2.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
