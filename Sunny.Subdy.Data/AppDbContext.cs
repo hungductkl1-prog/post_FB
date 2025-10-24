@@ -167,6 +167,46 @@ namespace Sunny.Subdy.Data
             transaction.Commit();
             return true;
         }
+        //public bool InsertEntity<T>(T entity)
+        //{
+        //    if (entity == null) return false;
+
+        //    var type = typeof(T);
+        //    var tableName = type.Name;
+        //    var props = type.GetProperties();
+
+        //    var columnNames = new List<string>();
+        //    var paramNames = new List<string>();
+        //    var parameters = new List<SQLiteParameter>();
+
+        //    foreach (var prop in props)
+        //    {
+        //        var value = prop.GetValue(entity);
+        //        if (value == null) continue;
+
+        //        // Lọc chỉ lấy các kiểu đơn giản: primitive, string, Guid
+        //        var propType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+        //        if (!(propType.IsPrimitive || propType == typeof(string) || propType == typeof(Guid) || propType.IsEnum))
+        //            continue;
+
+        //        if (value is Guid g)
+        //            value = g.ToString();
+
+        //        columnNames.Add(prop.Name);
+        //        string paramName = $"@{prop.Name}";
+        //        paramNames.Add(paramName);
+        //        parameters.Add(new SQLiteParameter(paramName, value));
+        //    }
+
+        //    if (columnNames.Count == 0) return false;
+
+        //    string sql = $"INSERT INTO {tableName} ({string.Join(",", columnNames)}) VALUES ({string.Join(",", paramNames)});";
+
+        //    using var conn = GetConnection();
+        //    using var cmd = new SQLiteCommand(sql, conn);
+        //    cmd.Parameters.AddRange(parameters.ToArray());
+        //    return cmd.ExecuteNonQuery() > 0;
+        //}
         public bool InsertEntity<T>(T entity)
         {
             if (entity == null) return false;
@@ -174,6 +214,7 @@ namespace Sunny.Subdy.Data
             var type = typeof(T);
             var tableName = type.Name;
             var props = type.GetProperties();
+            var keyProp = props.FirstOrDefault(p => p.GetCustomAttribute<SqlKeyAttribute>() != null);
 
             var columnNames = new List<string>();
             var paramNames = new List<string>();
@@ -181,10 +222,13 @@ namespace Sunny.Subdy.Data
 
             foreach (var prop in props)
             {
+                // Bỏ qua cột khóa chính (SQLite tự tăng)
+                if (prop == keyProp)
+                    continue;
+
                 var value = prop.GetValue(entity);
                 if (value == null) continue;
 
-                // Lọc chỉ lấy các kiểu đơn giản: primitive, string, Guid
                 var propType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                 if (!(propType.IsPrimitive || propType == typeof(string) || propType == typeof(Guid) || propType.IsEnum))
                     continue;

@@ -2,6 +2,7 @@
 using FFmpeg.AutoGen;
 using ScrcpyNet;
 using SDL2;
+using Sunny.Subdy.Data.Models;
 using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -496,7 +497,7 @@ namespace LamToolAutoPhonePrime
             MessageBox.Show(
                 $"Device: {device.NameDevice}\n" +
                 $"Serial: {device.Serial}\n" +
-                $"Index: {device.Index}\n" +
+                $"Index: {device.Id}\n" +
                 $"Port: {device.Port}",
                 "Device Information",
                 MessageBoxButtons.OK,
@@ -777,7 +778,7 @@ namespace LamToolAutoPhonePrime
                     if (showOverlayText)
                     {
                         DrawSDLButtons(sdlRender);
-                        DrawOverlayText(sdlRender, device.Index.ToString(), device.NameDevice.ToString());
+                        DrawOverlayText(sdlRender, device.Id.ToString(), device.NameDevice.ToString());
                     }
                     if (!string.IsNullOrEmpty(textRender))
                     {

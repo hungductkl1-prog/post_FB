@@ -1,4 +1,4 @@
-﻿namespace LamToolAutoPhonePrime
+﻿namespace StreamAndroid
 {
     partial class ucThongBaoDeviceView
     {
@@ -29,10 +29,10 @@
         private void InitializeComponent()
         {
             panel1 = new AntdUI.Panel();
-            label2 = new AntdUI.Label();
-            label1 = new Label();
             button4 = new AntdUI.Button();
             button5 = new AntdUI.Button();
+            label1 = new Label();
+            label2 = new AntdUI.Label();
             panel1.SuspendLayout();
             SuspendLayout();
             // 
@@ -53,34 +53,9 @@
             panel1.Location = new Point(0, 0);
             panel1.Name = "panel1";
             panel1.Radius = 10;
-            panel1.Size = new Size(226, 405);
+            panel1.Size = new Size(275, 401);
             panel1.TabIndex = 3;
             panel1.Text = "panel3";
-            // 
-            // label2
-            // 
-            label2.Dock = DockStyle.Fill;
-            label2.Font = new Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label2.ForeColor = Color.FromArgb(247, 125, 38);
-            label2.Location = new Point(7, 68);
-            label2.Name = "label2";
-            label2.Size = new Size(212, 330);
-            label2.TabIndex = 11;
-            label2.Text = "Điện thoại đã ngắt kết nối, vui lòng kiểm tra...";
-            label2.TextAlign = ContentAlignment.MiddleCenter;
-            // 
-            // label1
-            // 
-            label1.Dock = DockStyle.Top;
-            label1.FlatStyle = FlatStyle.Flat;
-            label1.Font = new Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label1.ForeColor = Color.FromArgb(247, 125, 38);
-            label1.Location = new Point(7, 7);
-            label1.Name = "label1";
-            label1.Size = new Size(212, 61);
-            label1.TabIndex = 10;
-            label1.Text = "01\r\nSM-G930F";
-            label1.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // button4
             // 
@@ -97,7 +72,7 @@
             button4.IconGap = 0F;
             button4.IconHoverSvg = "";
             button4.IconSvg = "ExclamationCircleOutlined";
-            button4.Location = new Point(1131, 1387);
+            button4.Location = new Point(1155, 1385);
             button4.Name = "button4";
             button4.OriginalBackColor = Color.FromArgb(60, 60, 60);
             button4.Size = new Size(39, 34);
@@ -119,12 +94,37 @@
             button5.IconGap = 0F;
             button5.IconHoverSvg = "";
             button5.IconSvg = "PlusCircleOutlined";
-            button5.Location = new Point(1131, 1347);
+            button5.Location = new Point(1155, 1345);
             button5.Name = "button5";
             button5.OriginalBackColor = Color.FromArgb(60, 60, 60);
             button5.Radius = 2;
             button5.Size = new Size(39, 34);
             button5.TabIndex = 8;
+            // 
+            // label1
+            // 
+            label1.Dock = DockStyle.Top;
+            label1.FlatStyle = FlatStyle.Flat;
+            label1.Font = new Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label1.ForeColor = Color.FromArgb(247, 125, 38);
+            label1.Location = new Point(7, 7);
+            label1.Name = "label1";
+            label1.Size = new Size(261, 61);
+            label1.TabIndex = 10;
+            label1.Text = "01\r\nSM-G930F";
+            label1.TextAlign = ContentAlignment.MiddleCenter;
+            // 
+            // label2
+            // 
+            label2.Dock = DockStyle.Fill;
+            label2.Font = new Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label2.ForeColor = Color.FromArgb(247, 125, 38);
+            label2.Location = new Point(7, 68);
+            label2.Name = "label2";
+            label2.Size = new Size(261, 326);
+            label2.TabIndex = 11;
+            label2.Text = "Điện thoại đã ngắt kết nối, vui lòng kiểm tra...";
+            label2.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // ucThongBaoDeviceView
             // 
@@ -133,7 +133,7 @@
             BackColor = Color.Transparent;
             Controls.Add(panel1);
             Name = "ucThongBaoDeviceView";
-            Size = new Size(226, 405);
+            Size = new Size(275, 401);
             panel1.ResumeLayout(false);
             ResumeLayout(false);
         }

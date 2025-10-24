@@ -6,6 +6,7 @@ using LamToolAutoPhonePrime.Utils;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.Common.Services;
+using Sunny.Subdy.Data.Models;
 using System;
 using System.Diagnostics;
 using System.Drawing.Imaging;
@@ -134,7 +135,7 @@ namespace Sunny.Subdy.UI.View.Pages
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
             dataGridViewTextBoxColumn1.ToolTipText = "Số thứ tự trong bảng";
-            dataGridViewTextBoxColumn1.DataPropertyName = nameof(DeviceModel.Index);
+            dataGridViewTextBoxColumn1.DataPropertyName = nameof(DeviceModel.Id);
 
             var columns = new List<(string Name, string Header, string Tooltip)>
                     {
