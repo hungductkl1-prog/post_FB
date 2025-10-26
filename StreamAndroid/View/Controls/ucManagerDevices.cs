@@ -15,7 +15,7 @@ namespace StreamAndroid
         public ucManagerDevices()
         {
             InitializeComponent();
-            CreateLoadingOverlay();
+            
 
 
             flControlAndroid = new SelectableFlowLayoutPanel();
@@ -52,6 +52,8 @@ namespace StreamAndroid
         {
             try
             {
+                CreateLoadingOverlay();
+                await Task.Delay(500);
                 await SetupHelper.Setup();
                 await deviceManagerService.HookDeviceEvents();
             }
@@ -280,21 +282,8 @@ namespace StreamAndroid
         private async void slider3_ValueChanged(object sender, IntEventArgs e)
         {
             var value = e.Value;
-            await RunBackgroundWork(async () =>
-            {
-                flControlAndroid?.Invoke(new Action(() =>
-                {
-                    SetRenderSize(value);
-                }));
-               
-                await Task.Delay(100).ConfigureAwait(false);
-            },
-            onUiComplete: () =>
-            {
-            },
-            onError: (ex) =>
-            {
-            });
+            SetRenderSize(value);
+            await Task.Delay(200).ConfigureAwait(false);
         }
         public void SetRenderSize(int size)
         {

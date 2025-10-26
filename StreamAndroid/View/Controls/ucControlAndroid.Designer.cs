@@ -58,6 +58,7 @@
             // 
             pictureBox1.Cursor = Cursors.Hand;
             pictureBox1.Dock = DockStyle.Fill;
+            pictureBox1.Image = Properties.Resources.ZJFD;
             pictureBox1.Location = new Point(7, 7);
             pictureBox1.Name = "pictureBox1";
             pictureBox1.Size = new Size(882, 1236);
@@ -109,7 +110,7 @@
             button5.Size = new Size(39, 34);
             button5.TabIndex = 8;
             // 
-            // ucDeviceView
+            // ucControlAndroid
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;

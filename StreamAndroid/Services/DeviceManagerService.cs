@@ -27,6 +27,7 @@ namespace StreamAndroid.Services
         private ucManagerDevices ucManagerDevices;
         public DeviceManagerService(ucManagerDevices ucManagerDevices)
         {
+            ADBHelper.StartServer();
             var endPoint = new IPEndPoint(IPAddress.Loopback, 5037);
             monitor = new DeviceMonitor(new AdbSocket(endPoint));
             this.selectableFlowLayoutPanel = ucManagerDevices.flControlAndroid;
@@ -81,7 +82,7 @@ namespace StreamAndroid.Services
                             device.ucThongBaoDeviceView.Dispose();
                             selectableFlowLayoutPanel.Controls.Add(device.UCControlAndroid);
                             selectableFlowLayoutPanel.Controls.SetChildIndex(device.UCControlAndroid, oldIndex);
-
+                           
                         }));
                     }
                     catch
@@ -164,7 +165,7 @@ namespace StreamAndroid.Services
                             var control = new ucControlAndroid(view);
                             selectableFlowLayoutPanel.Controls.Add(control);
                             view.UCControlAndroid = control;
-
+                           
                         }
 
                     }));
