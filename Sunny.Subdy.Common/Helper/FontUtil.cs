@@ -1,8 +1,9 @@
-﻿using System.Drawing.Text;
+﻿using System.Drawing;
+using System.Drawing.Text;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-namespace LamToolAutoPhonePrime.Utils
+namespace Sunny.Subdy.Common.Helper
 {
     public class FontUtil
     {

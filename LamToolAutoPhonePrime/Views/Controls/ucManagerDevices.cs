@@ -32,7 +32,7 @@ namespace Sunny.Subdy.UI.View.Pages
             dataGridView1.BorderStyle = BorderStyle.None;
             dataGridView1.AutoGenerateColumns = false;
             dataGridView1.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
-            var defaultFont = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold);
+            var defaultFont = new Font(Common.Helper.FontUtil._fontSemiBold, 9F, FontStyle.Bold);
             dataGridView1.DefaultCellStyle = new DataGridViewCellStyle
             {
                 BackColor = Color.White,
@@ -98,8 +98,8 @@ namespace Sunny.Subdy.UI.View.Pages
                     dataGridView1.CommitEdit(DataGridViewDataErrorContexts.Commit);
                 }
             };
-
-            FontUtil.ApplyFontToAllControls(this);
+           
+            Common.Helper.FontUtil.ApplyFontToAllControls(this);
         }
         private void TryEnableDoubleBuffer(DataGridView dgv)
         {

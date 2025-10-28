@@ -2,20 +2,24 @@
 using StreamAndroid.Helper;
 using StreamAndroid.Services;
 using StreamAndroid.View;
+using Sunny.Subdy.Common.Helper;
+using Sunny.Subdy.Data.Models;
+using System.Diagnostics;
 using System.Reflection;
-using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace StreamAndroid
 {
     public partial class ucManagerDevices : UserControl
     {
-        private DeviceManagerService deviceManagerService;
+        private readonly DeviceManagerService deviceManagerService;
         public SelectableFlowLayoutPanel flControlAndroid;
         public ucDataGridViewDevice dataGridViewDevice;
+        public SortableBindingList<Account> bindingList;
         public ucManagerDevices()
         {
             InitializeComponent();
-            
+
 
 
             flControlAndroid = new SelectableFlowLayoutPanel();
@@ -28,6 +32,8 @@ namespace StreamAndroid
             flControlAndroid.TabIndex = 1;
             pMain.Controls.Add(flControlAndroid);
             flControlAndroid.BringToFront();
+            flControlAndroid.SelectionChanged += SelectionChanged;
+
 
             dataGridViewDevice = new ucDataGridViewDevice();
             dataGridViewDevice.AutoScroll = true;
@@ -41,7 +47,8 @@ namespace StreamAndroid
 
             EnableDoubleBufferingRecursive(this);
 
-
+            select1.Items.Add("Tất cả");
+            select1.SelectedIndex = 0;
             deviceManagerService = new DeviceManagerService(this);
             this.Load += ucManagerDevices_Load;
             button6.Click += button6_Click;
@@ -56,6 +63,8 @@ namespace StreamAndroid
                 await Task.Delay(500);
                 await SetupHelper.Setup();
                 await deviceManagerService.HookDeviceEvents();
+                SetRenderSize(slider3.Value, rotationAngle);
+                SetOverlayTextOpacity(slider1.Value);
             }
             catch (Exception ex)
             {
@@ -209,6 +218,7 @@ namespace StreamAndroid
             if (e.Value == 0)
             {
                 flControlAndroid.BringToFront();
+                SetRenderSize(slider3.Value, rotationAngle);
             }
             else
             {
@@ -282,37 +292,237 @@ namespace StreamAndroid
         private async void slider3_ValueChanged(object sender, IntEventArgs e)
         {
             var value = e.Value;
-            SetRenderSize(value);
+            // Chỉ resize, KHÔNG thay đổi rotation
+            SetRenderSize(value, rotationAngle); // Truyền rotation hiện tại
             await Task.Delay(200).ConfigureAwait(false);
         }
-        public void SetRenderSize(int size)
+        public void SetRenderSize(int size, int? rotation = null)
         {
-            foreach (Control ctrl in flControlAndroid.Controls)
+            try
             {
-                if (ctrl is ucControlAndroid ucDevice)
+                // Nếu có rotation mới thì update
+                if (rotation.HasValue)
                 {
-                    ucDevice.SetRenderSize(size);
-                }
-                else
-                if (ctrl is ucThongBaoDeviceView uc)
-                {
-                    uc.SetRenderSize(size);
+                    rotationAngle = rotation.Value;
                 }
 
-            }
-            if (flControlAndroid.IsHandleCreated)
-            {
-                flControlAndroid.BeginInvoke((System.Windows.Forms.MethodInvoker)delegate
+                foreach (Control ctrl in flControlAndroid.Controls)
+                {
+                    if (ctrl is ucControlAndroid uc)
+                    {
+                        if (uc.InvokeRequired)
+                        {
+                            uc.Invoke(new Action(() =>
+                            {
+                                uc.SetRenderSize(size, rotationAngle);
+                            }));
+                        }
+                        else
+                        {
+                            uc.SetRenderSize(size, rotationAngle);
+                        }
+                    }
+                    else if (ctrl is ucThongBaoDeviceView uct)
+                    {
+                        if (uct.InvokeRequired)
+                        {
+                            uct.Invoke(new Action(() =>
+                            {
+                                uct.SetRenderSize(size, rotationAngle);
+                            }));
+                        }
+                        else
+                        {
+                            uct.SetRenderSize(size, rotationAngle);
+                        }
+                    }
+                }
+
+                if (flControlAndroid.InvokeRequired)
+                {
+                    flControlAndroid.Invoke(new Action(() => flControlAndroid.Refresh()));
+                }
+                else
                 {
                     flControlAndroid.Refresh();
-                });
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"⚠️ Error in SetRenderSize: {ex.Message}");
+            }
+        }
+
+        private void SelectionChanged(Rectangle rect)
+        {
+            List<DeviceModel> selectedDevices = new List<DeviceModel>();
+            foreach (Control ctrl in flControlAndroid.Controls)
+            {
+                if (ctrl is ucControlAndroid uc)
+                {
+                    uc.device.IsSelectControl = false;
+                    bool intersect = rect.IntersectsWith(ctrl.Bounds);
+                    if (intersect)
+                    {
+                        uc.device.IsSelectControl = true;
+
+                    }
+                    uc.panel1.BorderColor = uc.device.IsSelectControl
+                              ? Color.Green
+                              : Color.RoyalBlue;
+                }
+            }
+            foreach (DataGridViewRow row in dataGridViewDevice.dataGridView1.Rows)
+            {
+                row.Selected = false;
+                if (row.DataBoundItem is DeviceModel device)
+                {
+                    if (device.IsSelectControl)
+                    {
+                        row.Selected = true;
+                    }
+                }
+            }
+            label4.Text = $"Bôi đen\r\n{dataGridViewDevice.dataGridView1.SelectedRows.Count}";
+        }
+
+        private async void select4_SelectedIndexChanged(object sender, IntEventArgs e)
+        {
+            if (e == null || deviceManagerService == null) return;
+            // input6.Text = "";
+            await deviceManagerService.FilterDevices(select1.Text.Trim(), input6.Text);
+            //  input6_TextChanged(null, null);
+        }
+        private const int WM_SETREDRAW = 0x000B;
+        [DllImport("user32.dll")]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+        private static void SetRedraw(Control c, bool enable)
+        {
+            if (!c.IsHandleCreated) return;
+            SendMessage(c.Handle, WM_SETREDRAW, enable ? (IntPtr)1 : IntPtr.Zero, IntPtr.Zero);
+        }
+        private void ApplySelection(IReadOnlyList<int> indexes, bool hasSearch)
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => ApplySelection(indexes, hasSearch)));
+                return;
+            }
+
+            dataGridViewDevice._suppressSelectionChanged = true;
+
+            try
+            {
+                SetRedraw(dataGridViewDevice, false);
+                dataGridViewDevice.SuspendLayout();
+
+                var dgv = dataGridViewDevice.dataGridView1;
+                dgv.ClearSelection();
+                dgv.CurrentCell = null; // tránh lỗi khi ẩn dòng
+
+                int total = DeviceManagerService.DeviceModels.Count;
+                bool showAll = !hasSearch; // nếu không search => hiện tất cả
+                var visibleSet = new HashSet<int>(indexes);
+
+                for (int i = 0; i < total; i++)
+                {
+                    bool visible = showAll || visibleSet.Contains(i);
+
+                    if (i < flControlAndroid.Controls.Count)
+                        flControlAndroid.Controls[i].Visible = visible;
+
+                    if (i < dgv.Rows.Count)
+                    {
+                        var row = dgv.Rows[i];
+                        if (row.Visible != visible)
+                            row.Visible = visible;
+                    }
+                }
+            }
+            finally
+            {
+                dataGridViewDevice.ResumeLayout();
+                SetRedraw(dataGridViewDevice, true);
+                dataGridViewDevice.Invalidate();
+                dataGridViewDevice._suppressSelectionChanged = false;
+            }
+        }
+
+        private async void input6_TextChanged(object sender, EventArgs e)
+        {
+
+            try
+            {
+                await deviceManagerService.FilterDevices(select1.Text.Trim(), input6.Text);
+                await Task.Delay(250);
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+
+
+        }
+        private int rotationAngle = 0;
+        private async void button2_Click(object sender, EventArgs e)
+        {
+            button2.Enabled = false;
+
+            try
+            {
+                // Tăng rotation
+                rotationAngle = (rotationAngle + 90) % 360;
+
+                // Gọi SetRenderSize với rotation mới
+                SetRenderSize(slider3.Value, rotationAngle);
+
+                await Task.Delay(100); // Đợi render ổn định
+            }
+            finally
+            {
+                button2.Enabled = true;
+            }
+        }
+
+        private void switch1_CheckedChanged(object sender, BoolEventArgs e)
+        {
+            if (e.Value)
+            {
+                foreach (Control ctrl in flControlAndroid.Controls)
+                {
+                    ctrl.Enabled = true;
+                }
             }
             else
             {
-                flControlAndroid.Refresh();
+                foreach (Control ctrl in flControlAndroid.Controls)
+                {
+                    ctrl.Enabled = false;
+                }
             }
         }
+        private void SetOverlayTextOpacity(int opacity)
+        {
+            foreach (Control ctrl in flControlAndroid.Controls)
+            {
+                if (ctrl is ucControlAndroid uc)
+                {
+                    uc.SetOverlayTextOpacity(opacity);
+                }
+                if (ctrl is ucThongBaoDeviceView uct)
+                {
+                    uct.SetTextOpacity(opacity);
+                }
+            }
+        }
+        private void slider1_ValueChanged(object sender, IntEventArgs e)
+        {
+            SetOverlayTextOpacity(slider1.Value);
+        }
 
+        private void button9_Click(object sender, EventArgs e)
+        {
 
+        }
     }
 }

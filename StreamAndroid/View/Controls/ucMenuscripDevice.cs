@@ -1,4 +1,6 @@
-﻿namespace StreamAndroid
+﻿using Sunny.Subdy.Common.Helper;
+
+namespace StreamAndroid
 {
     public partial class ucMenuscripDevice : UserControl
     {

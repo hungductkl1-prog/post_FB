@@ -296,7 +296,7 @@
             // 
             btn_mode.Dock = DockStyle.Right;
             btn_mode.Ghost = true;
-            btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
+            btn_mode.Icon = LamToolAutoPhonePrime.Properties.Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(981, 0);
             btn_mode.Name = "btn_mode";
             btn_mode.Radius = 0;

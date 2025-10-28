@@ -1,4 +1,7 @@
-﻿namespace StreamAndroid
+﻿using System.Drawing;
+using System.Windows.Forms;
+
+namespace Sunny.Subdy.Common.Helper
 {
     public class DragHandler
     {

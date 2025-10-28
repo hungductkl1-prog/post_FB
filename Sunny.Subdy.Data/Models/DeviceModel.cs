@@ -34,6 +34,7 @@ namespace Sunny.Subdy.Data.Models
         private string _state;
         private string _model;
         private string _nameFolder;
+        private bool _isSelectControl;
         public string Model
         {
             get => _model;
@@ -46,7 +47,8 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
-
+        [NotMapped]
+        public int RotationAngle { get; set; } = 0;
         [NotMapped]
         public bool IsControl
         {
@@ -60,7 +62,19 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
-
+        [NotMapped]
+        public bool IsSelectControl
+        {
+            get => _isSelectControl;
+            set
+            {
+                if (_isSelectControl != value)
+                {
+                    _isSelectControl = value;
+                    OnPropertyChanged(nameof(IsSelectControl));
+                }
+            }
+        }
         public int Port { get; set; }
 
         public bool IsScrcpy

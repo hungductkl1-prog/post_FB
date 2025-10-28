@@ -42,12 +42,17 @@ namespace AutoAndroid
         private readonly ClipboardService _clipboardService;
         public DeviceModel Create(string serial)
         {
-            DeviceModel model = new DeviceModel();
-            model.Serial = serial;
+            DeviceModel model =null;
             using var _client = new ADBSocket(serial);
             try
             {
-                model.Id = new DeviceModelContext().GetBySerial(serial).Id;
+                model = new DeviceModelContext().GetBySerial(serial);
+                if (model== null)
+                {
+                    model = new DeviceModel();
+                    model.Serial = serial;
+                    
+                }
             }
             catch
             {

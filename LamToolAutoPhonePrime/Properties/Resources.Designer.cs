@@ -705,56 +705,6 @@ namespace LamToolAutoPhonePrime.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] Quicksand_Bold {
-            get {
-                object obj = ResourceManager.GetObject("Quicksand_Bold", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] Quicksand_Light {
-            get {
-                object obj = ResourceManager.GetObject("Quicksand_Light", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] Quicksand_Medium {
-            get {
-                object obj = ResourceManager.GetObject("Quicksand_Medium", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] Quicksand_Regular {
-            get {
-                object obj = ResourceManager.GetObject("Quicksand_Regular", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized resource of type System.Byte[].
-        /// </summary>
-        internal static byte[] Quicksand_SemiBold {
-            get {
-                object obj = ResourceManager.GetObject("Quicksand_SemiBold", resourceCulture);
-                return ((byte[])(obj));
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
         internal static System.Drawing.Bitmap thumbs_up {

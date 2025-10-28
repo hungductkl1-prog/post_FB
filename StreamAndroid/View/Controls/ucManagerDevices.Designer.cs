@@ -47,6 +47,8 @@ namespace StreamAndroid
             select4 = new AntdUI.Select();
             button9 = new AntdUI.Button();
             tableLayoutPanel2 = new TableLayoutPanel();
+            panel7 = new AntdUI.Panel();
+            label3 = new AntdUI.Label();
             panel4 = new AntdUI.Panel();
             label4 = new AntdUI.Label();
             panel3 = new AntdUI.Panel();
@@ -58,6 +60,9 @@ namespace StreamAndroid
             tableLayoutPanel3 = new TableLayoutPanel();
             panel8 = new AntdUI.Panel();
             groupBox2 = new GroupBox();
+            panel11 = new Panel();
+            slider1 = new AntdUI.Slider();
+            label7 = new Label();
             panel10 = new Panel();
             slider3 = new AntdUI.Slider();
             label9 = new Label();
@@ -79,6 +84,7 @@ namespace StreamAndroid
             tableLayoutPanel4.SuspendLayout();
             panel9.SuspendLayout();
             tableLayoutPanel2.SuspendLayout();
+            panel7.SuspendLayout();
             panel4.SuspendLayout();
             panel3.SuspendLayout();
             panel2.SuspendLayout();
@@ -86,6 +92,7 @@ namespace StreamAndroid
             tableLayoutPanel3.SuspendLayout();
             panel8.SuspendLayout();
             groupBox2.SuspendLayout();
+            panel11.SuspendLayout();
             panel10.SuspendLayout();
             panel13.SuspendLayout();
             panel5.SuspendLayout();
@@ -200,6 +207,7 @@ namespace StreamAndroid
             select4.PlaceholderText = "Chọn nhóm";
             select4.Size = new Size(160, 32);
             select4.TabIndex = 12;
+            select4.SelectedIndexChanged += select4_SelectedIndexChanged;
             // 
             // button9
             // 
@@ -215,14 +223,17 @@ namespace StreamAndroid
             button9.Size = new Size(118, 32);
             button9.TabIndex = 6;
             button9.Text = "Thêm";
+            button9.Click += button9_Click;
             // 
             // tableLayoutPanel2
             // 
-            tableLayoutPanel2.ColumnCount = 4;
-            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
-            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
-            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
-            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            tableLayoutPanel2.ColumnCount = 5;
+            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tableLayoutPanel2.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            tableLayoutPanel2.Controls.Add(panel7, 4, 0);
             tableLayoutPanel2.Controls.Add(panel4, 3, 0);
             tableLayoutPanel2.Controls.Add(panel3, 2, 0);
             tableLayoutPanel2.Controls.Add(panel2, 1, 0);
@@ -236,34 +247,63 @@ namespace StreamAndroid
             tableLayoutPanel2.Size = new Size(1138, 62);
             tableLayoutPanel2.TabIndex = 0;
             // 
+            // panel7
+            // 
+            panel7.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            panel7.Back = Color.White;
+            panel7.BackColor = Color.Transparent;
+            panel7.Controls.Add(label3);
+            panel7.Location = new System.Drawing.Point(908, 0);
+            panel7.Margin = new Padding(0, 0, 4, 0);
+            panel7.Name = "panel7";
+            panel7.Padding = new Padding(12);
+            panel7.Radius = 12;
+            panel7.Shadow = 2;
+            panel7.Size = new Size(226, 62);
+            panel7.TabIndex = 5;
+            // 
+            // label3
+            // 
+            label3.Dock = DockStyle.Fill;
+            label3.Font = new Font("Segoe UI", 9F);
+            label3.ForeColor = Color.FromArgb(245, 34, 45);
+            label3.IconGap = 10;
+            label3.Location = new System.Drawing.Point(14, 14);
+            label3.Name = "label3";
+            label3.PrefixSvg = "InfoCircleOutlined";
+            label3.RightToLeft = RightToLeft.No;
+            label3.Size = new Size(198, 34);
+            label3.TabIndex = 2;
+            label3.Text = "Ngắt kết nối\r\n12";
+            // 
             // panel4
             // 
             panel4.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             panel4.Back = Color.White;
             panel4.BackColor = Color.Transparent;
             panel4.Controls.Add(label4);
-            panel4.Location = new System.Drawing.Point(852, 0);
+            panel4.Location = new System.Drawing.Point(681, 0);
             panel4.Margin = new Padding(0);
             panel4.Name = "panel4";
             panel4.Padding = new Padding(12);
             panel4.Radius = 12;
             panel4.Shadow = 2;
-            panel4.Size = new Size(286, 62);
+            panel4.Size = new Size(227, 62);
             panel4.TabIndex = 4;
             // 
             // label4
             // 
             label4.Dock = DockStyle.Fill;
             label4.Font = new Font("Segoe UI", 9F);
-            label4.ForeColor = Color.FromArgb(245, 34, 45);
+            label4.ForeColor = Color.DarkOrange;
             label4.IconGap = 10;
             label4.Location = new System.Drawing.Point(14, 14);
             label4.Name = "label4";
             label4.PrefixSvg = "InfoCircleOutlined";
             label4.RightToLeft = RightToLeft.No;
-            label4.Size = new Size(258, 34);
+            label4.Size = new Size(199, 34);
             label4.TabIndex = 3;
-            label4.Text = "Ngắt kết nối\r\n12";
+            label4.Text = "Bôi đen\r\n12";
             // 
             // panel3
             // 
@@ -271,13 +311,13 @@ namespace StreamAndroid
             panel3.Back = Color.White;
             panel3.BackColor = Color.Transparent;
             panel3.Controls.Add(label5);
-            panel3.Location = new System.Drawing.Point(568, 0);
+            panel3.Location = new System.Drawing.Point(454, 0);
             panel3.Margin = new Padding(0, 0, 4, 0);
             panel3.Name = "panel3";
             panel3.Padding = new Padding(12);
             panel3.Radius = 12;
             panel3.Shadow = 2;
-            panel3.Size = new Size(280, 62);
+            panel3.Size = new Size(223, 62);
             panel3.TabIndex = 3;
             // 
             // label5
@@ -290,7 +330,7 @@ namespace StreamAndroid
             label5.Name = "label5";
             label5.PrefixSvg = "CheckSquareOutlined";
             label5.RightToLeft = RightToLeft.No;
-            label5.Size = new Size(252, 34);
+            label5.Size = new Size(195, 34);
             label5.TabIndex = 2;
             label5.Text = "Đã chọn\r\n12";
             // 
@@ -300,13 +340,13 @@ namespace StreamAndroid
             panel2.Back = Color.White;
             panel2.BackColor = Color.Transparent;
             panel2.Controls.Add(label2);
-            panel2.Location = new System.Drawing.Point(284, 0);
+            panel2.Location = new System.Drawing.Point(227, 0);
             panel2.Margin = new Padding(0, 0, 4, 0);
             panel2.Name = "panel2";
             panel2.Padding = new Padding(12);
             panel2.Radius = 12;
             panel2.Shadow = 2;
-            panel2.Size = new Size(280, 62);
+            panel2.Size = new Size(223, 62);
             panel2.TabIndex = 2;
             // 
             // label2
@@ -319,7 +359,7 @@ namespace StreamAndroid
             label2.Name = "label2";
             label2.PrefixSvg = "SafetyOutlined";
             label2.RightToLeft = RightToLeft.No;
-            label2.Size = new Size(252, 34);
+            label2.Size = new Size(195, 34);
             label2.TabIndex = 1;
             label2.Text = "Đã kết nối\r\n12";
             // 
@@ -335,7 +375,7 @@ namespace StreamAndroid
             panel1.Padding = new Padding(12);
             panel1.Radius = 12;
             panel1.Shadow = 2;
-            panel1.Size = new Size(280, 62);
+            panel1.Size = new Size(223, 62);
             panel1.TabIndex = 1;
             // 
             // label1
@@ -349,7 +389,7 @@ namespace StreamAndroid
             label1.Name = "label1";
             label1.PrefixSvg = "TabletOutlined";
             label1.RightToLeft = RightToLeft.No;
-            label1.Size = new Size(252, 34);
+            label1.Size = new Size(195, 34);
             label1.TabIndex = 0;
             label1.Text = "Tổng thiết bị\r\n12";
             // 
@@ -390,6 +430,7 @@ namespace StreamAndroid
             // 
             // groupBox2
             // 
+            groupBox2.Controls.Add(panel11);
             groupBox2.Controls.Add(panel10);
             groupBox2.Controls.Add(panel13);
             groupBox2.Controls.Add(switch1);
@@ -399,10 +440,44 @@ namespace StreamAndroid
             groupBox2.Margin = new Padding(0);
             groupBox2.Name = "groupBox2";
             groupBox2.Padding = new Padding(8);
-            groupBox2.Size = new Size(242, 140);
+            groupBox2.Size = new Size(242, 141);
             groupBox2.TabIndex = 19;
             groupBox2.TabStop = false;
             groupBox2.Text = "Điều khiển màn hình";
+            // 
+            // panel11
+            // 
+            panel11.Controls.Add(slider1);
+            panel11.Controls.Add(label7);
+            panel11.Dock = DockStyle.Top;
+            panel11.Location = new System.Drawing.Point(8, 108);
+            panel11.Margin = new Padding(0);
+            panel11.Name = "panel11";
+            panel11.Size = new Size(226, 28);
+            panel11.TabIndex = 20;
+            // 
+            // slider1
+            // 
+            slider1.Dock = DockStyle.Fill;
+            slider1.Location = new System.Drawing.Point(91, 0);
+            slider1.MinValue = 10;
+            slider1.Name = "slider1";
+            slider1.ShowValue = true;
+            slider1.Size = new Size(135, 28);
+            slider1.TabIndex = 19;
+            slider1.Value = 10;
+            slider1.ValueChanged += slider1_ValueChanged;
+            // 
+            // label7
+            // 
+            label7.Dock = DockStyle.Left;
+            label7.Font = new Font("Segoe UI", 8.5F);
+            label7.Location = new System.Drawing.Point(0, 0);
+            label7.Name = "label7";
+            label7.Size = new Size(91, 28);
+            label7.TabIndex = 17;
+            label7.Text = "Mã điện thoại";
+            label7.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // panel10
             // 
@@ -476,7 +551,7 @@ namespace StreamAndroid
             // switch1
             // 
             switch1.Checked = true;
-            switch1.CheckedText = "Màn hình nhỏ";
+            switch1.CheckedText = "Điều khiển màn hình nhỏ";
             switch1.Dock = DockStyle.Top;
             switch1.Fill = Color.FromArgb(82, 196, 26);
             switch1.Location = new System.Drawing.Point(8, 24);
@@ -484,7 +559,8 @@ namespace StreamAndroid
             switch1.Name = "switch1";
             switch1.Size = new Size(226, 28);
             switch1.TabIndex = 17;
-            switch1.UnCheckedText = "Màn hình nhỏ";
+            switch1.UnCheckedText = "Điều khiển màn hình nhỏ";
+            switch1.CheckedChanged += switch1_CheckedChanged;
             // 
             // button4
             // 
@@ -533,6 +609,7 @@ namespace StreamAndroid
             button2.Size = new Size(242, 34);
             button2.TabIndex = 14;
             button2.Text = "Xoay màn hình";
+            button2.Click += button2_Click;
             // 
             // label6
             // 
@@ -598,6 +675,7 @@ namespace StreamAndroid
             input6.PrefixSvg = "SearchOutlined";
             input6.Size = new Size(594, 32);
             input6.TabIndex = 14;
+            input6.TextChanged += input6_TextChanged;
             // 
             // select1
             // 
@@ -611,6 +689,7 @@ namespace StreamAndroid
             select1.PrefixSvg = "FilterOutlined";
             select1.Size = new Size(150, 32);
             select1.TabIndex = 13;
+            select1.SelectedIndexChanged += select4_SelectedIndexChanged;
             // 
             // segmented5
             // 
@@ -644,6 +723,7 @@ namespace StreamAndroid
             tableLayoutPanel4.ResumeLayout(false);
             panel9.ResumeLayout(false);
             tableLayoutPanel2.ResumeLayout(false);
+            panel7.ResumeLayout(false);
             panel4.ResumeLayout(false);
             panel3.ResumeLayout(false);
             panel2.ResumeLayout(false);
@@ -651,6 +731,7 @@ namespace StreamAndroid
             tableLayoutPanel3.ResumeLayout(false);
             panel8.ResumeLayout(false);
             groupBox2.ResumeLayout(false);
+            panel11.ResumeLayout(false);
             panel10.ResumeLayout(false);
             panel13.ResumeLayout(false);
             panel5.ResumeLayout(false);
@@ -673,17 +754,11 @@ namespace StreamAndroid
         private AntdUI.Panel pMain;
         private AntdUI.Panel panel8;
         private AntdUI.Panel panel9;
-        private AntdUI.Label label1;
-        private AntdUI.Label label2;
-        private AntdUI.Label label3;
-        private AntdUI.Label label4;
-        private AntdUI.Label label5;
+        public AntdUI.Label label4;
         private Label label6;
         private Label label9;
         private Label label10;
         private AntdUI.Input input6;
-        private AntdUI.Select select1;
-        private AntdUI.Select select4;
         private AntdUI.Segmented segmented5;
         private AntdUI.Button button1;
         private AntdUI.Button button2;
@@ -698,5 +773,15 @@ namespace StreamAndroid
         private GroupBox groupBox2;
         private Panel panel10;
         private Panel panel13;
+        private AntdUI.Panel panel7;
+        public AntdUI.Label label1;
+        public AntdUI.Label label5;
+        public AntdUI.Label label2;
+        public AntdUI.Label label3;
+        public AntdUI.Select select4;
+        public AntdUI.Select select1;
+        private Panel panel11;
+        public AntdUI.Slider slider1;
+        private Label label7;
     }
 }
