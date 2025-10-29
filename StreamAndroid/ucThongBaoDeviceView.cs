@@ -188,7 +188,7 @@ namespace StreamAndroid
                     // Kiểm tra lại sau khi CreateControl
                     if (!pictureBox1.IsHandleCreated)
                     {
-                        Debug.WriteLine("⚠️ PictureBox handle not created");
+                        //  Debug.WriteLine("⚠️ PictureBox handle not created");
                         return;
                     }
 
@@ -196,7 +196,7 @@ namespace StreamAndroid
 
                     if (sdlWinPtr == IntPtr.Zero)
                     {
-                        Debug.WriteLine($"⚠️ SDL_CreateWindowFrom failed: {SDL.SDL_GetError()}");
+                        //  Debug.WriteLine($"⚠️ SDL_CreateWindowFrom failed: {SDL.SDL_GetError()}");
                         return;
                     }
 
@@ -214,7 +214,7 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Load error: {ex.Message}\n{ex.StackTrace}");
+                //  Debug.WriteLine($"⚠️ Load error: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
@@ -339,7 +339,7 @@ namespace StreamAndroid
                     {
                         this.Invoke(new Action(() =>
                         {
-                            Debug.WriteLine($"🎨 Render after SetRenderSize - Size:{width}x{height}, Angle:{angle}");
+                            //  Debug.WriteLine($"🎨 Render after SetRenderSize - Size:{width}x{height}, Angle:{angle}");
                             RenderFrame();
                         }));
                     }
@@ -401,7 +401,7 @@ namespace StreamAndroid
             {
                 if (!pictureBox1.IsHandleCreated)
                 {
-                    Debug.WriteLine("⚠️ InitRender: PictureBox handle not created yet");
+                    //  Debug.WriteLine("⚠️ InitRender: PictureBox handle not created yet");
                     return;
                 }
 
@@ -409,7 +409,7 @@ namespace StreamAndroid
 
                 if (sdlWinPtr == IntPtr.Zero)
                 {
-                    Debug.WriteLine($"⚠️ InitRender: SDL_CreateWindowFrom failed - {SDL.SDL_GetError()}");
+                    //  Debug.WriteLine($"⚠️ InitRender: SDL_CreateWindowFrom failed - {SDL.SDL_GetError()}");
                     return;
                 }
             }
@@ -418,7 +418,7 @@ namespace StreamAndroid
 
             if (winW <= 0 || winH <= 0)
             {
-                Debug.WriteLine($"⚠️ Invalid window size: {winW}x{winH}");
+                //  Debug.WriteLine($"⚠️ Invalid window size: {winW}x{winH}");
                 return;
             }
 
@@ -430,13 +430,13 @@ namespace StreamAndroid
 
             if (sdlRender == IntPtr.Zero)
             {
-                Debug.WriteLine($"⚠️ SDL_CreateRenderer failed: {SDL.SDL_GetError()}");
+                //  Debug.WriteLine($"⚠️ SDL_CreateRenderer failed: {SDL.SDL_GetError()}");
                 return;
             }
 
             if (renderSize.Width <= 0 || renderSize.Height <= 0)
             {
-                Debug.WriteLine($"⚠️ Invalid renderSize: {renderSize.Width}x{renderSize.Height}");
+                //  Debug.WriteLine($"⚠️ Invalid renderSize: {renderSize.Width}x{renderSize.Height}");
                 return;
             }
 
@@ -446,7 +446,7 @@ namespace StreamAndroid
 
             if (sdlTexture == IntPtr.Zero)
             {
-                Debug.WriteLine($"⚠️ SDL_CreateTexture failed: {SDL.SDL_GetError()}");
+                //  Debug.WriteLine($"⚠️ SDL_CreateTexture failed: {SDL.SDL_GetError()}");
             }
         }
 
@@ -503,7 +503,7 @@ namespace StreamAndroid
 
             if (!Monitor.TryEnter(locker, 10)) // Timeout 10ms
             {
-                Debug.WriteLine("⚠️ RenderFrame: Could not acquire lock");
+                //  Debug.WriteLine("⚠️ RenderFrame: Could not acquire lock");
                 return;
             }
 
@@ -543,7 +543,7 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ RenderFrame error: {ex.Message}");
+                //  Debug.WriteLine($"❌ RenderFrame error: {ex.Message}");
             }
             finally
             {

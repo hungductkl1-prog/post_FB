@@ -23,7 +23,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             }
             else
             {
-                Debug.WriteLine($"⚠️ Không tìm thấy handler cho {typeAction}");
+                //  Debug.WriteLine($"⚠️ Không tìm thấy handler cho {typeAction}");
             }
             return new SubdyExtension(SubdyEnum.None, $"Không tìm thấy handler cho {typeAction}");
         }

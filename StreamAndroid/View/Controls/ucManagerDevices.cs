@@ -165,7 +165,6 @@ namespace StreamAndroid
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine(ex);
                 }
             }
         }
@@ -350,7 +349,7 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Error in SetRenderSize: {ex.Message}");
+                //  Debug.WriteLine($"⚠️ Error in SetRenderSize: {ex.Message}");
             }
         }
 

@@ -41,7 +41,7 @@ namespace Sunny.Subdy.Server
                                     .ToArray();
 
             _routes.Add((method, regex, paramNames, handler));
-            Debug.WriteLine($"[ApiRouter] Registered: Method={method}, Pattern='{pathPattern}', Generated Regex='{regex.ToString()}'");
+            //  Debug.WriteLine($"[ApiRouter] Registered: Method={method}, Pattern='{pathPattern}', Generated Regex='{regex.ToString()}'");
             LogManager.Info($"[ApiRouter] Registered: Method={method}, Pattern='{pathPattern}', Generated Regex='{regex.ToString()}'"); // THÊM LOG
         }
 
@@ -65,7 +65,7 @@ namespace Sunny.Subdy.Server
                 {
                     if (route.httpMethod.Equals(method, StringComparison.OrdinalIgnoreCase))
                     {
-                        Debug.WriteLine($"[ApiRouter] Trying to match '{rawUrlPath}' against regex '{route.regex.ToString()}'");
+                        //  Debug.WriteLine($"[ApiRouter] Trying to match '{rawUrlPath}' against regex '{route.regex.ToString()}'");
                         LogManager.Info($"[ApiRouter] Trying to match '{rawUrlPath}' against regex '{route.regex.ToString()}'");
                         var match = route.regex.Match(rawUrlPath);
                         if (match.Success)
@@ -75,14 +75,14 @@ namespace Sunny.Subdy.Server
                             {
                                 routeParams[paramName] = match.Groups[paramName].Value;
                             }
-                            Debug.WriteLine($"[ApiRouter] MATCHED! Regex '{route.regex.ToString()}' matched path '{rawUrlPath}'. Executing handler.");
+                            //  Debug.WriteLine($"[ApiRouter] MATCHED! Regex '{route.regex.ToString()}' matched path '{rawUrlPath}'. Executing handler.");
                             LogManager.Info($"[ApiRouter] MATCHED! Regex '{route.regex.ToString()}' matched path '{rawUrlPath}'. Executing handler."); // THÊM LOG
                             await route.handler(context, routeParams);
                             return;
                         }
                         else
                         {
-                            Debug.WriteLine($"[ApiRouter] NO MATCH for '{rawUrlPath}' against regex '{route.regex.ToString()}'");
+                            //  Debug.WriteLine($"[ApiRouter] NO MATCH for '{rawUrlPath}' against regex '{route.regex.ToString()}'");
                             LogManager.Info($"[ApiRouter] NO MATCH for '{rawUrlPath}' against regex '{route.regex.ToString()}'"); // THÊM LOG
                         }
                     }
@@ -92,7 +92,7 @@ namespace Sunny.Subdy.Server
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ApiRouter] NO MATCH for '{rawUrlPath}' against regex '{ex.ToString()}'");
+                //  Debug.WriteLine($"[ApiRouter] NO MATCH for '{rawUrlPath}' against regex '{ex.ToString()}'");
                 LogManager.Error(ex);
                 await SendJsonResponse(response, ApiResponse<object>.ErrorResponse($"Internal server error: {ex.Message}"), HttpStatusCode.InternalServerError);
             }

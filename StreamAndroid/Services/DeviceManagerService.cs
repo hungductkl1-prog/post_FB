@@ -82,7 +82,7 @@ namespace StreamAndroid.Services
             foreach (var device in devices)
             {
                 EnsureDeviceDefaults(device);
-                Debug.WriteLine($"{device.Id} - {device.NameDevice}");
+                //  Debug.WriteLine($"{device.Id} - {device.NameDevice}");
 
                 if (connectedSerials.Contains(device.Serial))
                 {
@@ -145,7 +145,7 @@ namespace StreamAndroid.Services
         private async void OnDeviceConnected(object sender, DeviceDataEventArgs e)
         {
             var serial = e.Device.Serial;
-            Debug.WriteLine($"📱 Kết nối event: {serial}");
+            //  Debug.WriteLine($"📱 Kết nối event: {serial}");
 
             if (_pendingOperations.TryGetValue(serial, out var existingCts))
             {
@@ -164,7 +164,7 @@ namespace StreamAndroid.Services
                 var now = DateTime.Now;
                 if ((now - lastTime).TotalMilliseconds < DEBOUNCE_MS)
                 {
-                    Debug.WriteLine($"⏭️ Bỏ qua event cũ: {serial}");
+                    //  Debug.WriteLine($"⏭️ Bỏ qua event cũ: {serial}");
                     return;
                 }
                 _lastEventTime[serial] = now;
@@ -173,7 +173,7 @@ namespace StreamAndroid.Services
             }
             catch (TaskCanceledException)
             {
-                Debug.WriteLine($"⏹️ Hủy operation: {serial}");
+                //  Debug.WriteLine($"⏹️ Hủy operation: {serial}");
             }
             finally
             {
@@ -184,7 +184,7 @@ namespace StreamAndroid.Services
         private async void OnDeviceDisconnected(object sender, DeviceDataEventArgs e)
         {
             var serial = e.Device.Serial;
-            Debug.WriteLine($"❌ Ngắt kết nối event: {serial}");
+            //  Debug.WriteLine($"❌ Ngắt kết nối event: {serial}");
 
             if (_pendingOperations.TryGetValue(serial, out var existingCts))
             {
@@ -203,7 +203,7 @@ namespace StreamAndroid.Services
                 var now = DateTime.Now;
                 if ((now - lastTime).TotalMilliseconds < DEBOUNCE_MS)
                 {
-                    Debug.WriteLine($"⏭️ Bỏ qua disconnect event cũ: {serial}");
+                    //  Debug.WriteLine($"⏭️ Bỏ qua disconnect event cũ: {serial}");
                     return;
                 }
                 _lastEventTime[serial] = now;
@@ -212,7 +212,7 @@ namespace StreamAndroid.Services
             }
             catch (TaskCanceledException)
             {
-                Debug.WriteLine($"⏹️ Hủy disconnect operation: {serial}");
+                //  Debug.WriteLine($"⏹️ Hủy disconnect operation: {serial}");
             }
             finally
             {
@@ -222,7 +222,7 @@ namespace StreamAndroid.Services
 
         private async Task ProcessDeviceConnectedAsync(string serial)
         {
-            Debug.WriteLine($"✅ Xử lý kết nối: {serial}");
+            //  Debug.WriteLine($"✅ Xử lý kết nối: {serial}");
 
             await _uiSemaphore.WaitAsync();
             try
@@ -246,7 +246,7 @@ namespace StreamAndroid.Services
 
         private async Task ProcessDeviceDisconnectedAsync(string serial)
         {
-            Debug.WriteLine($"✅ Xử lý ngắt kết nối: {serial}");
+            //  Debug.WriteLine($"✅ Xử lý ngắt kết nối: {serial}");
 
             await _uiSemaphore.WaitAsync();
             try
@@ -300,7 +300,7 @@ namespace StreamAndroid.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ UpdateUIStatsSync error: {ex.Message}");
+                //  Debug.WriteLine($"⚠️ UpdateUIStatsSync error: {ex.Message}");
             }
         }
 
@@ -330,7 +330,7 @@ namespace StreamAndroid.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Lỗi kết nối {serial}: {ex.Message}");
+                //  Debug.WriteLine($"⚠️ Lỗi kết nối {serial}: {ex.Message}");
             }
         }
 
@@ -338,20 +338,20 @@ namespace StreamAndroid.Services
         {
             if (!_instances.TryGetValue(serial, out var deviceView))
             {
-                Debug.WriteLine($"⚠️ Device {serial} not found in instances");
+                //  Debug.WriteLine($"⚠️ Device {serial} not found in instances");
                 return;
             }
 
             try
             {
-                Debug.WriteLine($"🔄 Starting reconnect for {serial}");
+                //  Debug.WriteLine($"🔄 Starting reconnect for {serial}");
 
                 // CRITICAL: Stop old scrcpy instance FIRST (if still running)
                 if (deviceView.Scrcpy != null)
                 {
                     try
                     {
-                        Debug.WriteLine($"🛑 Stopping old scrcpy instance for {serial}");
+                        //  Debug.WriteLine($"🛑 Stopping old scrcpy instance for {serial}");
                         deviceView.Scrcpy.Stop();
                         await Task.Delay(300); // Wait for cleanup
                     }
@@ -360,7 +360,7 @@ namespace StreamAndroid.Services
                         // Ignore "Not connected" - device already disconnected
                         if (!ex.Message.Contains("Not connected"))
                         {
-                            Debug.WriteLine($"⚠️ Error stopping old scrcpy: {ex.Message}");
+                            //  Debug.WriteLine($"⚠️ Error stopping old scrcpy: {ex.Message}");
                         }
                     }
                     finally
@@ -381,7 +381,7 @@ namespace StreamAndroid.Services
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"⚠️ Error clearing UI: {ex.Message}");
+                            //  Debug.WriteLine($"⚠️ Error clearing UI: {ex.Message}");
                         }
                     });
                 }
@@ -397,11 +397,11 @@ namespace StreamAndroid.Services
                         deviceView.DeviceData = _adb.GetDevices().Find(d => d.Serial == serial);
                         if (deviceView.DeviceData == null)
                         {
-                            Debug.WriteLine($"⚠️ Device data not found for {serial}");
+                            //  Debug.WriteLine($"⚠️ Device data not found for {serial}");
                             return;
                         }
 
-                        Debug.WriteLine($"▶️ Starting new scrcpy instance for {serial}");
+                        //  Debug.WriteLine($"▶️ Starting new scrcpy instance for {serial}");
                         deviceView.Scrcpy = new Scrcpy(deviceView.DeviceData, deviceView.DeviceModel.Port)
                         {
                             MaxSize = 720,
@@ -435,11 +435,11 @@ namespace StreamAndroid.Services
                         deviceView.DeviceModel.TypeColor = 2;
                         deviceView.DeviceModel.Status = "Đã kết nối";
 
-                        Debug.WriteLine($"✅ Reconnect successful for {serial}");
+                        //  Debug.WriteLine($"✅ Reconnect successful for {serial}");
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"❌ Error in reconnect UI action: {ex.Message}");
+                        //  Debug.WriteLine($"❌ Error in reconnect UI action: {ex.Message}");
                         if (deviceView.UCControlAndroid != null)
                         {
                             deviceView.UCControlAndroid.SetCenterText(
@@ -452,7 +452,7 @@ namespace StreamAndroid.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ ReconnectExistingDeviceAsync failed for {serial}: {ex.Message}");
+                //  Debug.WriteLine($"❌ ReconnectExistingDeviceAsync failed for {serial}: {ex.Message}");
             }
         }
 
@@ -519,7 +519,7 @@ namespace StreamAndroid.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"⚠️ Lỗi Connect({serial}): {ex.Message}");
+                    //  Debug.WriteLine($"⚠️ Lỗi Connect({serial}): {ex.Message}");
                     return null;
                 }
             }
@@ -542,7 +542,7 @@ namespace StreamAndroid.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"⚠️ Error calling OnDeviceDisconnected: {ex.Message}");
+                    //  Debug.WriteLine($"⚠️ Error calling OnDeviceDisconnected: {ex.Message}");
                 }
 
                 deviceView.Scrcpy?.Stop();
@@ -573,11 +573,11 @@ namespace StreamAndroid.Services
                     Color.OrangeRed
                 );
 
-                Debug.WriteLine($"✅ Showed disconnected text for {serial}");
+                //  Debug.WriteLine($"✅ Showed disconnected text for {serial}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Lỗi ShowDisconnectedText({serial}): {ex.Message}");
+                //  Debug.WriteLine($"⚠️ Lỗi ShowDisconnectedText({serial}): {ex.Message}");
             }
         }
         private Task InvokeUIAsync(Action action)
@@ -636,7 +636,7 @@ namespace StreamAndroid.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"⚠️ Lỗi dispose {pair.Key}: {ex.Message}");
+                    //  Debug.WriteLine($"⚠️ Lỗi dispose {pair.Key}: {ex.Message}");
                 }
             }
 
@@ -646,14 +646,14 @@ namespace StreamAndroid.Services
         }
         private async void OnDataGridViewSelectionChanged(object sender, DeviceSelectionChangedEventArgs e)
         {
-            Debug.WriteLine($"🔍 Selection changed: {e.SelectionCount} devices selected");
+            //  Debug.WriteLine($"🔍 Selection changed: {e.SelectionCount} devices selected");
             _managerDevices.label4.Text = $"Bôi đen\r\n{e.SelectionCount}";
             await HandleSelectionChanged(e.SelectedDevices);
         }
 
         private async void OnDataGridViewCheckChanged(object sender, DeviceSelectionChangedEventArgs e)
         {
-            Debug.WriteLine($"🔍 Selection changed: {e.SelectionCount} devices selected");
+            //  Debug.WriteLine($"🔍 Selection changed: {e.SelectionCount} devices selected");
             _managerDevices.label5.Text = $"Đã chọn\r\n{e.SelectionCount}";
         }
 
@@ -703,11 +703,11 @@ namespace StreamAndroid.Services
                     }
                 });
 
-                Debug.WriteLine($"✅ Updated borders for {selectedDevices.Count} devices");
+                //  Debug.WriteLine($"✅ Updated borders for {selectedDevices.Count} devices");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Error in HandleSelectionChanged: {ex.Message}");
+                //  Debug.WriteLine($"⚠️ Error in HandleSelectionChanged: {ex.Message}");
             }
         }
         private ucControlAndroid ucControlAndroid;
@@ -758,6 +758,7 @@ namespace StreamAndroid.Services
                     ucControlAndroid.AttachInstance(fshow.ucDevice.DeviceView.Scrcpy);
                     ucControlAndroid.showOverlayText = true;
                     ucControlAndroid.OnDeviceReconnected();
+                    fshow.ucDevice.Dispose();
                     fshow.Hide();
                 }
             }
@@ -856,11 +857,11 @@ namespace StreamAndroid.Services
                     _dataGridView.dataGridView1.Refresh();
                 });
 
-                Debug.WriteLine($"✅ Filtered devices by state: {state ?? "All"}, search: '{search}'");
+                //  Debug.WriteLine($"✅ Filtered devices by state: {state ?? "All"}, search: '{search}'");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Error filtering devices: {ex.Message}");
+                //  Debug.WriteLine($"⚠️ Error filtering devices: {ex.Message}");
             }
         }
     }

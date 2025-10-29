@@ -53,7 +53,7 @@ namespace LamToolAutoPhonePrime
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             base.OnFormClosed(e);
-            Debug.WriteLine("fShowThongBao đã đóng, dispose xong");
+            //  Debug.WriteLine("fShowThongBao đã đóng, dispose xong");
         }
         private void timer1_Tick(object sender, EventArgs e)
         {

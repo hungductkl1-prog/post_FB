@@ -73,7 +73,7 @@ namespace AutoAndroid
                             Center = center
                         });
 
-                        Debug.WriteLine($"Region ({rx},{ry}) - found {regionPixels.Count} pixels, center at ({center.X},{center.Y})");
+                        //  Debug.WriteLine($"Region ({rx},{ry}) - found {regionPixels.Count} pixels, center at ({center.X},{center.Y})");
                     }
                 }
             }
@@ -142,7 +142,7 @@ namespace AutoAndroid
                 double avgX = top.Average(m => m.X);
                 double avgY = top.Average(m => m.Y);
 
-                Debug.WriteLine($"Top {keep}/{matches.Count} pixels avg: ({avgX:F2},{avgY:F2})");
+                //  Debug.WriteLine($"Top {keep}/{matches.Count} pixels avg: ({avgX:F2},{avgY:F2})");
 
                 return new Point((int)Math.Round(avgX), (int)Math.Round(avgY));
             }
@@ -198,7 +198,7 @@ namespace AutoAndroid
                         {
                             bestDiff = diff;
                             bestPt = new Point(x, y);
-                            Debug.WriteLine($"Found {bestPt} pixels");
+                            //  Debug.WriteLine($"Found {bestPt} pixels");
                         }
 
                         if (diff <= tolerance)
@@ -212,7 +212,7 @@ namespace AutoAndroid
                 {
                     int cx = (int)Math.Round(sumX / (double)count);
                     int cy = (int)Math.Round(sumY / (double)count);
-                    Debug.WriteLine($"Found {count} pixels within tolerance. Average position: ({cx}, {cy})");
+                    //  Debug.WriteLine($"Found {count} pixels within tolerance. Average position: ({cx}, {cy})");
                     return new Point(cx, cy);
                 }
                 return bestPt; // fallback
@@ -438,7 +438,7 @@ namespace AutoAndroid
                 // Check if image is successfully loaded
                 if (image.Empty())
                 {
-                    Debug.WriteLine("Image data is empty after conversion.");
+                    //  Debug.WriteLine("Image data is empty after conversion.");
                     return string.Empty;
                 }
                 // Preprocess image: convert to grayscale and blur
@@ -458,7 +458,7 @@ namespace AutoAndroid
                     {
                         if (pix == null)
                         {
-                            Debug.WriteLine("Failed to convert Mat to Pix.");
+                            //  Debug.WriteLine("Failed to convert Mat to Pix.");
                             return string.Empty;
                         }
 
@@ -469,7 +469,7 @@ namespace AutoAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("Error during OCR: " + ex.Message);
+                //  Debug.WriteLine("Error during OCR: " + ex.Message);
                 return string.Empty;
             }
         }

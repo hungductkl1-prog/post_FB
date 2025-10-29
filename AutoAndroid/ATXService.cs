@@ -489,7 +489,7 @@ namespace AutoAndroid
                 }
                 catch (JsonException ex)
                 {
-                    Debug.WriteLine($"Error parsing JSON: {ex.Message}");
+                    //  Debug.WriteLine($"Error parsing JSON: {ex.Message}");
                     return new AppInfo();
                 }
             }

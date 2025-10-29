@@ -5,6 +5,7 @@ using SharpAdbClient;
 using StreamAndroid.Models;
 using StreamAndroid.Services;
 using Sunny.Subdy.Data.Models;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -114,6 +115,7 @@ namespace StreamAndroid
             hideButtonsTimer = new System.Windows.Forms.Timer { Interval = 2000 };
             hideButtonsTimer.Tick += (s, e) =>
             {
+              
                 showButtons = false;
                 hideButtonsTimer.Stop();
             };
@@ -135,20 +137,20 @@ namespace StreamAndroid
                     RenderFrame();
                 }
             };
-            gcTimer = new System.Windows.Forms.Timer { Interval = 30000 };
-            gcTimer.Tick += (s, e) =>
-            {
-                try
-                {
-                    GC.Collect(0, GCCollectionMode.Optimized, false);
-                    if (frameDropCounter > 0)
-                    {
-                        Debug.WriteLine($"🧹 GC cleanup for {device.Serial} - dropped {frameDropCounter} frames");
-                    }
-                }
-                catch { }
-            };
-            gcTimer.Start();
+            //gcTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+            //gcTimer.Tick += (s, e) =>
+            //{
+            //    try
+            //    {
+            //        GC.Collect(0, GCCollectionMode.Optimized, false);
+            //        if (frameDropCounter > 0)
+            //        {
+            //            //  //  Debug.WriteLine($"🧹 GC cleanup for {device.Serial} - dropped {frameDropCounter} frames");
+            //        }
+            //    }
+            //    catch { }
+            //};
+            //gcTimer.Start();
         }
 
         public void AttachInstance(Scrcpy? newInstance)
@@ -296,16 +298,16 @@ namespace StreamAndroid
 
         private void Scrcpy_OnLoadSizeEvent(Size size)
         {
-            Debug.WriteLine($"📐 Video size event received: {size.Width}x{size.Height} for {device.Serial}");
+            //  //  Debug.WriteLine($"📐 Video size event received: {size.Width}x{size.Height} for {device.Serial}");
 
             if (renderSize.Width == size.Width && renderSize.Height == size.Height)
             {
-                Debug.WriteLine("📐 Video size unchanged, skipping reinit");
+                //  //  Debug.WriteLine("📐 Video size unchanged, skipping reinit");
                 return;
             }
 
             renderSize = size;
-            Debug.WriteLine($"📐 Updating render size from {renderSize.Width}x{renderSize.Height} to {size.Width}x{size.Height}");
+            //  //  Debug.WriteLine($"📐 Updating render size from {renderSize.Width}x{renderSize.Height} to {size.Width}x{size.Height}");
 
             // Must run on UI thread
             if (pictureBox1.InvokeRequired)
@@ -357,7 +359,7 @@ namespace StreamAndroid
             stallRecoverAttempts = 0;
             lastFrameWallClock = DateTime.UtcNow;
 
-            Debug.WriteLine($"✅ Video size event processed for {device.Serial}");
+            //  //  Debug.WriteLine($"✅ Video size event processed for {device.Serial}");
         }
 
 
@@ -397,7 +399,7 @@ namespace StreamAndroid
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"⚠️ Destroy window error: {ex.Message}");
+                            //  //  Debug.WriteLine($"⚠️ Destroy window error: {ex.Message}");
                         }
                         sdlWinPtr = IntPtr.Zero;
                     }
@@ -409,11 +411,11 @@ namespace StreamAndroid
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
 
-                Debug.WriteLine($"♻️ Disposed {device.Serial}, dropped {frameDropCounter} frames total");
+                //  //  Debug.WriteLine($"♻️ Disposed {device.Serial}, dropped {frameDropCounter} frames total");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ Dispose error: {ex.Message}");
+                //  //  Debug.WriteLine($"❌ Dispose error: {ex.Message}");
             }
         }
 
@@ -421,7 +423,7 @@ namespace StreamAndroid
         {
             try
             {
-                Debug.WriteLine($"🔄 Handling reconnect for {device.Serial}");
+                //  //  Debug.WriteLine($"🔄 Handling reconnect for {device.Serial}");
 
                 // Clear old state
                 lock (latestFrameLock)
@@ -464,11 +466,11 @@ namespace StreamAndroid
                 // Re-attach event handlers
                 AttachInstance(instance);
 
-                Debug.WriteLine($"✅ Reconnect handled for {device.Serial}");
+                //  //  Debug.WriteLine($"✅ Reconnect handled for {device.Serial}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ OnDeviceReconnected error: {ex.Message}");
+                //  //  Debug.WriteLine($"❌ OnDeviceReconnected error: {ex.Message}");
             }
         }
 
@@ -490,7 +492,7 @@ namespace StreamAndroid
         {
             try
             {
-                Debug.WriteLine($"⚠️ Handling disconnect for {device.Serial}");
+                //  //  Debug.WriteLine($"⚠️ Handling disconnect for {device.Serial}");
 
                 // Stop receiving frames
                 AttachInstance(null);
@@ -510,7 +512,7 @@ namespace StreamAndroid
                         try
                         {
                             SDL.SDL_DestroyTexture(sdlTexture);
-                            Debug.WriteLine("🗑️ Cleared video texture");
+                            //  //  Debug.WriteLine("🗑️ Cleared video texture");
                         }
                         catch { }
                         sdlTexture = IntPtr.Zero;
@@ -520,18 +522,18 @@ namespace StreamAndroid
                 // Reset video size to force texture recreation on reconnect
                 renderSize = new Size(0, 0);
 
-                Debug.WriteLine($"✅ Disconnect handled for {device.Serial}");
+                //  //  Debug.WriteLine($"✅ Disconnect handled for {device.Serial}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ OnDeviceDisconnected error: {ex.Message}");
+                //  //  Debug.WriteLine($"❌ OnDeviceDisconnected error: {ex.Message}");
             }
 
             // Show disconnect message
             SetCenterText("Điện thoại đã ngắt kết nối, vui lòng kiểm tra.", Color.OrangeRed);
         }
 
-      
+
         public void RenderFrame()
         {
             if (isDisposing || !IsHandleCreated || !Visible || !pictureBox1.Visible) return;
@@ -595,14 +597,14 @@ namespace StreamAndroid
 
             if (isDisposing) return;
 
-            Debug.WriteLine($"📝 SetCenterText: '{text}', valid: {isRendererValid}");
+            //  //  Debug.WriteLine($"📝 SetCenterText: '{text}', valid: {isRendererValid}");
 
             // If renderer not ready, store as pending
             if (sdlRender == IntPtr.Zero || !isRendererValid)
             {
                 pendingCenterText = centerText;
                 pendingCenterTextColor = centerTextColor;
-                Debug.WriteLine($"⏳ Renderer not ready, text pending");
+                //  //  Debug.WriteLine($"⏳ Renderer not ready, text pending");
 
                 // Try to initialize if handle created
                 if (pictureBox1.IsHandleCreated && !isDisposing)
@@ -1304,7 +1306,7 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ NewFrameEvent error: {ex.Message}");
+                //  //  Debug.WriteLine($"❌ NewFrameEvent error: {ex.Message}");
             }
         }
 
@@ -1389,7 +1391,7 @@ namespace StreamAndroid
 
                         if (updateResult != 0)
                         {
-                            Debug.WriteLine($"⚠️ SDL_UpdateYUVTexture failed: {SDL.SDL_GetError()}");
+                            //  //  Debug.WriteLine($"⚠️ SDL_UpdateYUVTexture failed: {SDL.SDL_GetError()}");
                             isRendererValid = false;
                             // try to recover renderer on next frame
                             InitRender();
@@ -1427,7 +1429,7 @@ namespace StreamAndroid
 
                                 if (renderCopyResult != 0)
                                 {
-                                    Debug.WriteLine($"⚠️ SDL_RenderCopyEx failed: {SDL.SDL_GetError()}");
+                                    //  //  Debug.WriteLine($"⚠️ SDL_RenderCopyEx failed: {SDL.SDL_GetError()}");
                                     isRendererValid = false;
                                     InitRender();
                                     return;
@@ -1449,7 +1451,7 @@ namespace StreamAndroid
 
                                 if (renderCopyResult != 0)
                                 {
-                                    Debug.WriteLine($"⚠️ SDL_RenderCopyEx failed: {SDL.SDL_GetError()}");
+                                    //  //  Debug.WriteLine($"⚠️ SDL_RenderCopyEx failed: {SDL.SDL_GetError()}");
                                     isRendererValid = false;
                                     InitRender();
                                     return;
@@ -1461,7 +1463,7 @@ namespace StreamAndroid
                             int renderCopyResult = SDL_RenderCopy(sdlRender, sdlTexture, IntPtr.Zero, ref updateRect);
                             if (renderCopyResult != 0)
                             {
-                                Debug.WriteLine($"⚠️ SDL_RenderCopy failed: {SDL.SDL_GetError()}");
+                                //  //  Debug.WriteLine($"⚠️ SDL_RenderCopy failed: {SDL.SDL_GetError()}");
                                 isRendererValid = false;
                                 InitRender();
                                 return;
@@ -1477,7 +1479,7 @@ namespace StreamAndroid
                             }
                             catch (Exception ex)
                             {
-                                Debug.WriteLine($"⚠️ Draw overlay failed: {ex.Message}");
+                                //  //  Debug.WriteLine($"⚠️ Draw overlay failed: {ex.Message}");
                             }
                         }
 
@@ -1496,7 +1498,7 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ RenderLatestFrameOnUI exception: {ex}");
+                //  //  Debug.WriteLine($"❌ RenderLatestFrameOnUI exception: {ex}");
                 isRendererValid = false;
             }
             finally
@@ -1539,6 +1541,7 @@ namespace StreamAndroid
 
             try
             {
+                GC.Collect(0, GCCollectionMode.Optimized, false);
                 var stalledMs = (int)(DateTime.UtcNow - lastFrameWallClock).TotalMilliseconds;
 
                 // Only trigger if really stalled (>5 seconds to avoid false positives)
@@ -1547,7 +1550,7 @@ namespace StreamAndroid
                     // Reset counter when receiving frames normally
                     if (stallRecoverAttempts > 0)
                     {
-                        Debug.WriteLine($"✅ Watchdog: frames flowing normally, reset counter");
+                      //  //  //  Debug.WriteLine($"✅ Watchdog: frames flowing normally, reset counter");
                         stallRecoverAttempts = 0;
                     }
                     return;
@@ -1558,7 +1561,7 @@ namespace StreamAndroid
                 // CRITICAL: Stop after limited attempts to avoid infinite loop
                 if (stallRecoverAttempts >= 2)
                 {
-                    Debug.WriteLine($"⚠️ Watchdog: max attempts reached ({stallRecoverAttempts}), giving up");
+                    //  //  Debug.WriteLine($"⚠️ Watchdog: max attempts reached ({stallRecoverAttempts}), giving up");
                     stallWatchdogTimer?.Stop();
                     return;
                 }
@@ -1568,14 +1571,14 @@ namespace StreamAndroid
 
                 try
                 {
-                    Debug.WriteLine($"🛠 Watchdog attempt {stallRecoverAttempts}/2 for {device.Serial}, stalled {stalledMs}ms");
+                    //  //  Debug.WriteLine($"🛠 Watchdog attempt {stallRecoverAttempts}/2 for {device.Serial}, stalled {stalledMs}ms");
 
                     // Notify DeviceManagerService to handle full reconnect
                     await System.Threading.Tasks.Task.Run(async () =>
                     {
                         try
                         {
-                            Debug.WriteLine($"🔄 Watchdog: requesting full reconnect for {device.Serial}");
+                            //  //  Debug.WriteLine($"🔄 Watchdog: requesting full reconnect for {device.Serial}");
 
                             // This will be handled by DeviceManagerService properly
                             // For now, just clear the stale state
@@ -1600,11 +1603,11 @@ namespace StreamAndroid
                                 SetCenterText("Đang thử kết nối lại...", Color.Orange);
                             });
 
-                            Debug.WriteLine($"✅ Watchdog: cleared stale state for {device.Serial}");
+                            //  //  Debug.WriteLine($"✅ Watchdog: cleared stale state for {device.Serial}");
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"❌ Watchdog recovery failed: {ex.Message}");
+                            //  //  Debug.WriteLine($"❌ Watchdog recovery failed: {ex.Message}");
                         }
                     });
                 }
@@ -1615,7 +1618,7 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"❌ Watchdog error: {ex.Message}");
+                //  //  Debug.WriteLine($"❌ Watchdog error: {ex.Message}");
                 isRecovering = false;
             }
         }
@@ -1726,7 +1729,7 @@ namespace StreamAndroid
 
                     if (!pictureBox1.IsHandleCreated || isDisposing)
                     {
-                        Debug.WriteLine("⚠️ InitRender: Handle not created or disposing");
+                        //  //  Debug.WriteLine("⚠️ InitRender: Handle not created or disposing");
                         isRendererValid = false;
                         return;
                     }
@@ -1737,7 +1740,7 @@ namespace StreamAndroid
 
                     if (expectedW <= 10 || expectedH <= 10)
                     {
-                        Debug.WriteLine($"⚠️ InitRender: PictureBox size too small: {expectedW}x{expectedH}, waiting...");
+                        //  //  Debug.WriteLine($"⚠️ InitRender: PictureBox size too small: {expectedW}x{expectedH}, waiting...");
                         isRendererValid = false;
                         return;
                     }
@@ -1757,7 +1760,7 @@ namespace StreamAndroid
                     sdlWinPtr = SDL.SDL_CreateWindowFrom(pictureBox1.Handle);
                     if (sdlWinPtr == IntPtr.Zero)
                     {
-                        Debug.WriteLine($"❌ Failed to create SDL window: {SDL.SDL_GetError()}");
+                        //  //  Debug.WriteLine($"❌ Failed to create SDL window: {SDL.SDL_GetError()}");
                         isRendererValid = false;
                         return;
                     }
@@ -1766,7 +1769,7 @@ namespace StreamAndroid
 
                     if (winW <= 0 || winH <= 0)
                     {
-                        Debug.WriteLine($"⚠️ Invalid SDL window size: {winW}x{winH}");
+                        //  //  Debug.WriteLine($"⚠️ Invalid SDL window size: {winW}x{winH}");
                         isRendererValid = false;
                         return;
                     }
@@ -1774,12 +1777,12 @@ namespace StreamAndroid
                     // Log size verification (no forced resize - let SDL handle it naturally)
                     if (Math.Abs(winW - expectedW) > 5 || Math.Abs(winH - expectedH) > 5)
                     {
-                        Debug.WriteLine($"⚠️ Size mismatch: PictureBox={expectedW}x{expectedH}, SDL={winW}x{winH}");
+                        //  //  Debug.WriteLine($"⚠️ Size mismatch: PictureBox={expectedW}x{expectedH}, SDL={winW}x{winH}");
                         // Don't call SDL_SetWindowSize - this breaks SDL_CreateWindowFrom windows!
                         // SDL will sync with the native control on next frame
                     }
 
-                    Debug.WriteLine($"🪟 SDL Window created: {winW}x{winH}");
+                    //  //  Debug.WriteLine($"🪟 SDL Window created: {winW}x{winH}");
 
                     // Calculate render rectangle
                     if (renderSize.Width > 0 && renderSize.Height > 0)
@@ -1803,14 +1806,14 @@ namespace StreamAndroid
 
                     if (sdlRender == IntPtr.Zero)
                     {
-                        Debug.WriteLine($"⚠️ ACCELERATED renderer failed: {SDL.SDL_GetError()}, trying SOFTWARE");
+                        //  //  Debug.WriteLine($"⚠️ ACCELERATED renderer failed: {SDL.SDL_GetError()}, trying SOFTWARE");
                         sdlRender = SDL.SDL_CreateRenderer(sdlWinPtr, -1,
                             SDL.SDL_RendererFlags.SDL_RENDERER_SOFTWARE);
                     }
 
                     if (sdlRender == IntPtr.Zero)
                     {
-                        Debug.WriteLine($"❌ All renderer creation failed: {SDL.SDL_GetError()}");
+                        //  //  Debug.WriteLine($"❌ All renderer creation failed: {SDL.SDL_GetError()}");
                         isRendererValid = false;
                         return;
                     }
@@ -1825,7 +1828,7 @@ namespace StreamAndroid
 
                         if (sdlTexture == IntPtr.Zero)
                         {
-                            Debug.WriteLine($"❌ Failed to create texture: {SDL.SDL_GetError()}");
+                            //  //  Debug.WriteLine($"❌ Failed to create texture: {SDL.SDL_GetError()}");
                             isRendererValid = false;
                             return;
                         }
@@ -1839,20 +1842,20 @@ namespace StreamAndroid
                         centerText = pendingCenterText!;
                         centerTextColor = pendingCenterTextColor;
                         pendingCenterText = null;
-                        Debug.WriteLine($"✅ Showing pending center text: {centerText}");
+                        //  //  Debug.WriteLine($"✅ Showing pending center text: {centerText}");
                         RenderFrame();
                     }
                     else if (!string.IsNullOrEmpty(centerText))
                     {
-                        Debug.WriteLine($"✅ Re-rendering center text: {centerText}");
+                        //  //  Debug.WriteLine($"✅ Re-rendering center text: {centerText}");
                         RenderFrame();
                     }
 
-                    Debug.WriteLine($"✅ Renderer initialized - {winW}x{winH}, video={renderSize.Width}x{renderSize.Height}");
+                    //  //  Debug.WriteLine($"✅ Renderer initialized - {winW}x{winH}, video={renderSize.Width}x{renderSize.Height}");
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"❌ InitRender exception: {ex.Message}");
+                    //  //  Debug.WriteLine($"❌ InitRender exception: {ex.Message}");
                     isRendererValid = false;
                     CleanupSDLResources();
                 }
@@ -1892,7 +1895,7 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Cleanup SDL error: {ex.Message}");
+                //  //  Debug.WriteLine($"⚠️ Cleanup SDL error: {ex.Message}");
             }
         }
 
@@ -2079,7 +2082,7 @@ namespace StreamAndroid
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"FromAVFrame copy failed: {ex}");
+                    //  //  Debug.WriteLine($"FromAVFrame copy failed: {ex}");
                     return null;
                 }
             }
