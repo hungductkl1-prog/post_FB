@@ -30,9 +30,7 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Update="ucThongBaoDeviceView.cs">
-      <SubType>UserControl</SubType>
-    </Compile>
+    <Compile Update="ucThongBaoDeviceView.cs" />
     <Compile Update="View\Form\fShowDevice.cs">
       <SubType>Form</SubType>
     </Compile>

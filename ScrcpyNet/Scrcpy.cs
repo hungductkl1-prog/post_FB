@@ -151,14 +151,39 @@ namespace ScrcpyNet
 
         public void Stop()
         {
-            if (!Connected)
-                throw new Exception("Not connected.");
+            // Make Stop idempotent
+            if (cts == null && !Connected)
+                return;
 
-            cts?.Cancel();
+            try
+            {
+                try { cts?.Cancel(); } catch { }
 
-            videoThread?.Join();
-            controlThread?.Join();
-            listener?.Stop();
+                try { videoThread?.Join(); } catch { }
+                try { controlThread?.Join(); } catch { }
+                try { bufferThread?.Join(); } catch { }
+
+                try { listener?.Stop(); } catch { }
+
+                try { videoClient?.Close(); } catch { }
+                try { controlClient?.Close(); } catch { }
+
+                videoThread = null;
+                controlThread = null;
+                bufferThread = null;
+                listener = null;
+                videoClient = null;
+                controlClient = null;
+
+                Connected = false;
+            }
+            finally
+            {
+                try { cts?.Dispose(); } catch { }
+                cts = null;
+                // Best-effort cleanup of ADB routes
+                try { MobileServerCleanup(); } catch { }
+            }
         }
 
         public void SendControlCommand(IControlMessage msg)

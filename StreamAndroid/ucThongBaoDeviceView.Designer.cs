@@ -29,11 +29,11 @@
         private void InitializeComponent()
         {
             panel1 = new AntdUI.Panel();
+            pictureBox1 = new PictureBox();
             button4 = new AntdUI.Button();
             button5 = new AntdUI.Button();
-            label1 = new Label();
-            label2 = new AntdUI.Label();
             panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             SuspendLayout();
             // 
             // panel1
@@ -45,8 +45,7 @@
             panel1.BorderColor = Color.RoyalBlue;
             panel1.BorderWidth = 7F;
             panel1.ColorScheme = AntdUI.TAMode.Light;
-            panel1.Controls.Add(label2);
-            panel1.Controls.Add(label1);
+            panel1.Controls.Add(pictureBox1);
             panel1.Controls.Add(button4);
             panel1.Controls.Add(button5);
             panel1.Dock = DockStyle.Fill;
@@ -56,6 +55,17 @@
             panel1.Size = new Size(275, 401);
             panel1.TabIndex = 3;
             panel1.Text = "panel3";
+            // 
+            // pictureBox1
+            // 
+            pictureBox1.Cursor = Cursors.Hand;
+            pictureBox1.Dock = DockStyle.Fill;
+            pictureBox1.Location = new Point(7, 7);
+            pictureBox1.Name = "pictureBox1";
+            pictureBox1.Size = new Size(261, 387);
+            pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
+            pictureBox1.TabIndex = 10;
+            pictureBox1.TabStop = false;
             // 
             // button4
             // 
@@ -101,31 +111,6 @@
             button5.Size = new Size(39, 34);
             button5.TabIndex = 8;
             // 
-            // label1
-            // 
-            label1.Dock = DockStyle.Top;
-            label1.FlatStyle = FlatStyle.Flat;
-            label1.Font = new Font("Segoe UI", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label1.ForeColor = Color.FromArgb(247, 125, 38);
-            label1.Location = new Point(7, 7);
-            label1.Name = "label1";
-            label1.Size = new Size(261, 61);
-            label1.TabIndex = 10;
-            label1.Text = "01\r\nSM-G930F";
-            label1.TextAlign = ContentAlignment.MiddleCenter;
-            // 
-            // label2
-            // 
-            label2.Dock = DockStyle.Fill;
-            label2.Font = new Font("Segoe UI", 12F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label2.ForeColor = Color.FromArgb(247, 125, 38);
-            label2.Location = new Point(7, 68);
-            label2.Name = "label2";
-            label2.Size = new Size(261, 326);
-            label2.TabIndex = 11;
-            label2.Text = "Điện thoại đã ngắt kết nối, vui lòng kiểm tra...";
-            label2.TextAlign = ContentAlignment.MiddleCenter;
-            // 
             // ucThongBaoDeviceView
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -134,7 +119,9 @@
             Controls.Add(panel1);
             Name = "ucThongBaoDeviceView";
             Size = new Size(275, 401);
+            VisibleChanged += ucThongBaoDeviceView_VisibleChanged;
             panel1.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
             ResumeLayout(false);
         }
 
@@ -143,7 +130,6 @@
         private AntdUI.Panel panel1;
         private AntdUI.Button button4;
         private AntdUI.Button button5;
-        private AntdUI.Label label2;
-        private Label label1;
+        private PictureBox pictureBox1;
     }
 }

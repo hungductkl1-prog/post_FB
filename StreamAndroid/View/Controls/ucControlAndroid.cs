@@ -1,6 +1,7 @@
 ﻿using AutoAndroid;
 using FFmpeg.AutoGen;
 using SDL2;
+using SharpAdbClient;
 using StreamAndroid.Models;
 using StreamAndroid.Services;
 using Sunny.Subdy.Data.Models;
@@ -33,29 +34,31 @@ namespace StreamAndroid
 
         private static int sdlInitCount = 0;
         private static readonly object sdlInitLock = new();
-        private int frameIntervalMs = 1000 / 30;
+
+        private int frameIntervalMs = 33; // 30 FPS
         private long lastFrameTimestamp = 0;
+        private DateTime lastFrameWallClock = DateTime.UtcNow;
 
-        // Throttle / scheduling
-        private int renderScheduled = 0; // 0 = no render scheduled, 1 = render scheduled on UI thread
+        private int angle = 0;
+        private int renderScheduled = 0;
 
-        // Buffer chứa frame mới nhất (overwrite)
         private FrameBuffer? latestFrame = null;
         private readonly object latestFrameLock = new object();
-
         private int processingFrame = 0;
 
-        // SDL Button state
+        private int frameSkipCounter = 0;
+        private const int FRAME_SKIP_INTERVAL = 2;
+
         private bool showButtons = false;
         private SDL.SDL_Rect btnSettingsRect;
         private SDL.SDL_Rect btnInfoRect;
         private bool btnSettingsHovered = false;
         private bool btnInfoHovered = false;
         private System.Windows.Forms.Timer hideButtonsTimer;
+        private System.Windows.Forms.Timer stallWatchdogTimer;
         private IntPtr btnSettingsTexture = IntPtr.Zero;
         private IntPtr btnInfoTexture = IntPtr.Zero;
 
-        // Drag & Drop support
         private bool isDragging = false;
         private System.Drawing.Point dragStartPoint;
         private System.Drawing.Point dragStartLocation;
@@ -64,11 +67,29 @@ namespace StreamAndroid
         public event EventHandler? SettingsButtonClicked;
         public event EventHandler? InfoButtonClicked;
 
+        private int overlayTextOpacity = 100;
+
+        private volatile bool isDisposing = false;
+        private volatile bool isRendererValid = false;
+        private readonly object rendererLock = new object();
+        private volatile bool isRecovering = false;
+        private int stallRecoverAttempts = 0;
+
+        private string centerText = "";
+        private Color centerTextColor = Color.White;
+        private string cachedOverlayText = "";
+        private IntPtr cachedOverlayTexture = IntPtr.Zero;
+
+        // Defer center text until renderer ready
+        private string? pendingCenterText;
+        private Color pendingCenterTextColor = Color.White;
+
         public ucControlAndroid(DeviceView deviceView)
         {
             InitializeComponent();
             this.device = deviceView.DeviceModel;
             instance = deviceView.Scrcpy;
+
             this.Load += UcDeviceView_Load;
             this.Disposed += UcDeviceView_Disposed;
             this.VisibleChanged += UcDeviceView_VisibleChanged;
@@ -85,18 +106,55 @@ namespace StreamAndroid
             panel1.MouseMove += Panel1_MouseMove;
             panel1.MouseUp += Panel1_MouseUp;
 
-            hideButtonsTimer = new System.Windows.Forms.Timer
-            {
-                Interval = 2000
-            };
+            hideButtonsTimer = new System.Windows.Forms.Timer { Interval = 2000 };
             hideButtonsTimer.Tick += (s, e) =>
             {
                 showButtons = false;
                 hideButtonsTimer.Stop();
-                // request redraw if needed
             };
 
+            stallWatchdogTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            stallWatchdogTimer.Tick += (s, e) => WatchdogTick();
+            stallWatchdogTimer.Start();
+
             pictureBox1.PreviewKeyDown += PictureBox1_PreviewKeyDown;
+            pictureBox1.HandleCreated += (s, e) =>
+            {
+                if (isDisposing) return;
+                InitRender();
+                if (!string.IsNullOrEmpty(pendingCenterText))
+                {
+                    centerText = pendingCenterText;
+                    centerTextColor = pendingCenterTextColor;
+                    pendingCenterText = null;
+                    RenderFrame();
+                }
+            };
+        }
+
+        public void AttachInstance(Scrcpy? newInstance)
+        {
+            if (isDisposing) return;
+
+            // Detach old
+            if (instance != null)
+            {
+                try
+                {
+                    instance.OnLoadSizeEvent -= Scrcpy_OnLoadSizeEvent;
+                    instance.VideoStreamDecoder.NewFrameEvent -= VideoStreamDecoder_NewFrameEvent;
+                }
+                catch { }
+            }
+
+            instance = newInstance;
+
+            // Attach new
+            if (instance != null)
+            {
+                instance.OnLoadSizeEvent += Scrcpy_OnLoadSizeEvent;
+                instance.VideoStreamDecoder.NewFrameEvent += VideoStreamDecoder_NewFrameEvent;
+            }
         }
 
         private async void PictureBox1_PreviewKeyDown(object? sender, PreviewKeyDownEventArgs e)
@@ -126,7 +184,7 @@ namespace StreamAndroid
                 KeyCode = KeycodeHelper.ConvertKey(e.KeyCode),
                 Metastate = KeycodeHelper.ConvertModifiers(e.Modifiers)
             };
-            instance.SendControlCommand(msg);
+            instance?.SendControlCommand(msg);
         }
 
         private void RoundPictureBox(PictureBox pic, int radius)
@@ -144,10 +202,43 @@ namespace StreamAndroid
             pic.Invalidate();
         }
 
-        public void SetRenderSize(int height)
+        public void SetRenderSize(int height, int rotationAngle = 0)
         {
-            int width = (int)(height * 9.0 / 16.0);
+            angle = rotationAngle;
+
+            int rotationValue = angle switch
+            {
+                0 => 0,
+                90 => 1,
+                180 => 2,
+                270 => 3,
+                _ => 0
+            };
+            device.RotationAngle = rotationValue;
+
+            int width;
+            if (angle == 90 || angle == 270)
+            {
+                width = (int)(height * 16.0 / 9.0);
+            }
+            else
+            {
+                width = (int)(height * 9.0 / 16.0);
+            }
+
             this.Size = new Size(width, height);
+
+            // Force reinitialize renderer after Size is set, to ensure SDL window matches PictureBox
+            if (pictureBox1.IsHandleCreated && !isDisposing)
+            {
+                lock (rendererLock)
+                {
+                    isRendererValid = false;
+                    isResize = true;
+                    InitRender();
+                    isResize = false;
+                }
+            }
             this.Refresh();
         }
 
@@ -178,87 +269,485 @@ namespace StreamAndroid
 
         private void UcDeviceView_Load(object? sender, EventArgs e)
         {
-            try
-            {
-                RoundPictureBox(pictureBox1, 4);
+            EnsureSdlInitialized();
 
-                EnsureSdlInitialized();
-
-                if (pictureBox1.IsHandleCreated)
-                {
-                    sdlWinPtr = SDL.SDL_CreateWindowFrom(pictureBox1.Handle);
-                }
-
-                instance.OnLoadSizeEvent += Scrcpy_OnLoadSizeEvent;
-                instance.VideoStreamDecoder.NewFrameEvent += VideoStreamDecoder_NewFrameEvent;
-                if (button4 != null) button4.Visible = false;
-                if (button5 != null) button5.Visible = false;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Lỗi khởi tạo ScrcpyManager: " + ex.Message);
-            }
+            // Attach events immediately
+            AttachInstance(instance);
         }
+
         private void Scrcpy_OnLoadSizeEvent(Size size)
         {
-            renderSize = size;
-            lock (locker)
+            Debug.WriteLine($"📐 Video size event received: {size.Width}x{size.Height} for {device.Serial}");
+
+            if (renderSize.Width == size.Width && renderSize.Height == size.Height)
             {
-                InitRender();
+                Debug.WriteLine("📐 Video size unchanged, skipping reinit");
+                return;
             }
+
+            renderSize = size;
+            Debug.WriteLine($"📐 Updating render size from {renderSize.Width}x{renderSize.Height} to {size.Width}x{size.Height}");
+
+            // Must run on UI thread
+            if (pictureBox1.InvokeRequired)
+            {
+                pictureBox1.Invoke((Action)(() => {
+                    if (!isDisposing)
+                    {
+                        lock (rendererLock)
+                        {
+                            isRendererValid = false;
+                            CleanupSDLResources();
+
+                            if (sdlWinPtr != IntPtr.Zero)
+                            {
+                                try { SDL.SDL_DestroyWindow(sdlWinPtr); } catch { }
+                                sdlWinPtr = IntPtr.Zero;
+                            }
+
+                            if (pictureBox1.IsHandleCreated)
+                            {
+                                InitRender();
+                            }
+                        }
+                    }
+                }));
+            }
+            else
+            {
+                lock (rendererLock)
+                {
+                    isRendererValid = false;
+                    CleanupSDLResources();
+
+                    if (sdlWinPtr != IntPtr.Zero)
+                    {
+                        try { SDL.SDL_DestroyWindow(sdlWinPtr); } catch { }
+                        sdlWinPtr = IntPtr.Zero;
+                    }
+
+                    if (pictureBox1.IsHandleCreated && !isDisposing)
+                    {
+                        InitRender();
+                    }
+                }
+            }
+
+            // Reset watchdog since we got video
+            stallRecoverAttempts = 0;
+            lastFrameWallClock = DateTime.UtcNow;
+
+            Debug.WriteLine($"✅ Video size event processed for {device.Serial}");
         }
+
+
         private void UcDeviceView_Disposed(object? sender, EventArgs e)
         {
             try
             {
+                isDisposing = true;
+                isRendererValid = false;
+
                 hideButtonsTimer?.Stop();
                 hideButtonsTimer?.Dispose();
 
-                if (instance != null)
+                AttachInstance(null); // detach
+
+                lock (latestFrameLock)
                 {
-                    try
-                    {
-                        instance.OnLoadSizeEvent -= Scrcpy_OnLoadSizeEvent;
-                        instance.VideoStreamDecoder.NewFrameEvent -= VideoStreamDecoder_NewFrameEvent;
-                    }
-                    catch { }
+                    latestFrame?.Dispose();
+                    latestFrame = null;
                 }
 
-                lock (locker)
+                lock (rendererLock)
                 {
-                    if (btnSettingsTexture != IntPtr.Zero)
-                    {
-                        SDL.SDL_DestroyTexture(btnSettingsTexture);
-                        btnSettingsTexture = IntPtr.Zero;
-                    }
-                    if (btnInfoTexture != IntPtr.Zero)
-                    {
-                        SDL.SDL_DestroyTexture(btnInfoTexture);
-                        btnInfoTexture = IntPtr.Zero;
-                    }
-                    if (sdlTexture != IntPtr.Zero)
-                    {
-                        SDL.SDL_DestroyTexture(sdlTexture);
-                        sdlTexture = IntPtr.Zero;
-                    }
-                    if (sdlRender != IntPtr.Zero)
-                    {
-                        SDL.SDL_DestroyRenderer(sdlRender);
-                        sdlRender = IntPtr.Zero;
-                    }
+                    CleanupSDLResources();
+
                     if (sdlWinPtr != IntPtr.Zero)
                     {
-                        try { SDL.SDL_DestroyWindow(sdlWinPtr); } catch { }
+                        try
+                        {
+                            SDL.SDL_DestroyWindow(sdlWinPtr);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"⚠️ Destroy window error: {ex.Message}");
+                        }
                         sdlWinPtr = IntPtr.Zero;
                     }
                 }
 
                 EnsureSdlShutdown();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Dispose error: {ex.Message}");
+            }
         }
 
-        #region Mouse Event Handlers
+        public void OnDeviceReconnected()
+        {
+            try
+            {
+                Debug.WriteLine($"🔄 Handling reconnect for {device.Serial}");
+
+                // Clear old state
+                lock (latestFrameLock)
+                {
+                    latestFrame?.Dispose();
+                    latestFrame = null;
+                }
+
+                // IMPORTANT: Force full renderer recreation
+                // This ensures fresh SDL context for new video stream
+                lock (rendererLock)
+                {
+                    isRendererValid = false;
+                    CleanupSDLResources();
+
+                    // Destroy and recreate SDL window to reset state
+                    if (sdlWinPtr != IntPtr.Zero)
+                    {
+                        try { SDL.SDL_DestroyWindow(sdlWinPtr); } catch { }
+                        sdlWinPtr = IntPtr.Zero;
+                    }
+
+                    if (pictureBox1.IsHandleCreated && !isDisposing)
+                    {
+                        InitRender();
+                    }
+                }
+
+                // Reset timing
+                lastFrameTimestamp = 0;
+                lastFrameWallClock = DateTime.UtcNow;
+                Interlocked.Exchange(ref renderScheduled, 0);
+                Interlocked.Exchange(ref processingFrame, 0);
+                frameSkipCounter = 0;
+                stallRecoverAttempts = 0;
+
+                // Clear disconnect message
+                ClearAllText();
+
+                // Re-attach event handlers
+                AttachInstance(instance);
+
+                Debug.WriteLine($"✅ Reconnect handled for {device.Serial}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ OnDeviceReconnected error: {ex.Message}");
+            }
+        }
+
+
+
+
+        public void ClearAllText()
+        {
+            centerText = "";
+            pendingCenterText = null;
+            lock (rendererLock)
+            {
+                if (cachedOverlayTexture != IntPtr.Zero) { try { SDL.SDL_DestroyTexture(cachedOverlayTexture); } catch { } cachedOverlayTexture = IntPtr.Zero; }
+                cachedOverlayText = "";
+            }
+        }
+
+        public void OnDeviceDisconnected()
+        {
+            try
+            {
+                Debug.WriteLine($"⚠️ Handling disconnect for {device.Serial}");
+
+                // Stop receiving frames
+                AttachInstance(null);
+
+                // Clear frame buffer
+                lock (latestFrameLock)
+                {
+                    latestFrame?.Dispose();
+                    latestFrame = null;
+                }
+
+                // Clear video texture to show disconnect message clearly
+                lock (rendererLock)
+                {
+                    if (sdlTexture != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            SDL.SDL_DestroyTexture(sdlTexture);
+                            Debug.WriteLine("🗑️ Cleared video texture");
+                        }
+                        catch { }
+                        sdlTexture = IntPtr.Zero;
+                    }
+                }
+
+                // Reset video size to force texture recreation on reconnect
+                renderSize = new Size(0, 0);
+
+                Debug.WriteLine($"✅ Disconnect handled for {device.Serial}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ OnDeviceDisconnected error: {ex.Message}");
+            }
+
+            // Show disconnect message
+            SetCenterText("Điện thoại đã ngắt kết nối, vui lòng kiểm tra.", Color.OrangeRed);
+        }
+
+        private void DrawBackground()
+        {
+            SDL.SDL_SetRenderDrawColor(sdlRender, 45, 45, 45, 255);
+            SDL.SDL_RenderFillRect(sdlRender, ref updateRect);
+        }
+
+        public void RenderFrame()
+        {
+            if (isDisposing || !IsHandleCreated || !Visible || !pictureBox1.Visible) return;
+            if (!Monitor.TryEnter(locker, 10)) return;
+
+            try
+            {
+                if (isResize || sdlRender == IntPtr.Zero) return;
+
+                int pbW = pictureBox1.ClientSize.Width;
+                int pbH = pictureBox1.ClientSize.Height;
+
+                // Clear with dark background
+                SDL.SDL_SetRenderDrawColor(sdlRender, 45, 45, 45, 255);
+                SDL.SDL_Rect fullRect = new SDL.SDL_Rect { x = 0, y = 0, w = pbW, h = pbH };
+                SDL.SDL_RenderFillRect(sdlRender, ref fullRect);
+
+                // Draw video if available and connected
+                bool drewVideo = false;
+                if (instance != null && sdlTexture != IntPtr.Zero && updateRect.w > 0 && updateRect.h > 0 && isRendererValid)
+                {
+                    int rc;
+                    if (angle != 0)
+                    {
+                        SDL.SDL_Point center = new SDL.SDL_Point { x = updateRect.w / 2, y = updateRect.h / 2 };
+                        rc = SDL_RenderCopyEx(sdlRender, sdlTexture, IntPtr.Zero, ref updateRect, angle, ref center, SDL.SDL_RendererFlip.SDL_FLIP_NONE);
+                    }
+                    else
+                    {
+                        rc = SDL_RenderCopy(sdlRender, sdlTexture, IntPtr.Zero, ref updateRect);
+                    }
+                    drewVideo = (rc == 0);
+                }
+
+                // Show overlay text only when connected and streaming
+                if (showOverlayText && instance != null && drewVideo)
+                {
+                    DrawOverlayTextCached(sdlRender, device.Id.ToString(), device.NameDevice ?? "Unknown");
+                }
+
+                // Always show center text if present (disconnect msg, etc)
+                if (!string.IsNullOrEmpty(centerText))
+                {
+                    DrawCenterText(sdlRender, centerText, centerTextColor);
+                }
+
+                SDL.SDL_RenderPresent(sdlRender);
+                lastFrameWallClock = DateTime.UtcNow;
+            }
+            finally
+            {
+                Monitor.Exit(locker);
+            }
+        }
+
+
+
+        public void SetCenterText(string text, Color? color = null)
+        {
+            centerText = text ?? "";
+            if (color.HasValue) centerTextColor = color.Value;
+
+            if (isDisposing) return;
+
+            Debug.WriteLine($"📝 SetCenterText: '{text}', valid: {isRendererValid}");
+
+            // If renderer not ready, store as pending
+            if (sdlRender == IntPtr.Zero || !isRendererValid)
+            {
+                pendingCenterText = centerText;
+                pendingCenterTextColor = centerTextColor;
+                Debug.WriteLine($"⏳ Renderer not ready, text pending");
+
+                // Try to initialize if handle created
+                if (pictureBox1.IsHandleCreated && !isDisposing)
+                {
+                    BeginInvoke((Action)(() => {
+                        if (!isDisposing)
+                        {
+                            InitRender();
+                        }
+                    }));
+                }
+                return;
+            }
+
+            // Renderer ready, show immediately
+            pendingCenterText = null;
+            RenderFrame();
+        }
+
+
+        private void DrawCenterText(IntPtr renderer, string text, Color textColor)
+        {
+            if (string.IsNullOrWhiteSpace(text) || renderer == IntPtr.Zero)
+                return;
+
+            int availableHeight = updateRect.h > 0 ? updateRect.h :
+                                 (pictureBox1?.ClientSize.Height > 0 ? pictureBox1.ClientSize.Height : 720);
+
+            int availableWidth = updateRect.w > 0 ? updateRect.w :
+                                (pictureBox1?.ClientSize.Width > 0 ? pictureBox1.ClientSize.Width : 480);
+
+            int maxWidth = (int)(availableWidth * 0.9);
+            int maxHeight = (int)(availableHeight * 0.8);
+
+            const double referenceHeight = 720.0;
+            double scale = Math.Max(0.3, Math.Min(availableHeight / referenceHeight, 3.0));
+            float baseFontSize = Math.Max(8f, Math.Min((float)Math.Round(42f * scale), 18f));
+
+            float fontSize = baseFontSize;
+            Font font = null;
+            List<string> lines = null;
+            List<SizeF> lineSizes = null;
+            float totalHeight = 0;
+            float maxLineWidth = 0;
+            float lineSpacing = 0;
+
+            while (fontSize >= 8f)
+            {
+                font?.Dispose();
+                font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
+
+                lineSpacing = fontSize * 0.08f;
+
+                lines = WrapText(text, font, maxWidth, out lineSizes);
+
+                totalHeight = 0;
+                maxLineWidth = 0;
+
+                for (int i = 0; i < lineSizes.Count; i++)
+                {
+                    totalHeight += lineSizes[i].Height;
+                    if (i < lineSizes.Count - 1)
+                        totalHeight += lineSpacing;
+
+                    maxLineWidth = Math.Max(maxLineWidth, lineSizes[i].Width);
+                }
+
+                if (totalHeight <= maxHeight && maxLineWidth <= maxWidth)
+                    break;
+
+                fontSize -= 1f;
+            }
+
+            if (font == null || lines == null || lines.Count == 0)
+                return;
+
+            int containerX = updateRect.w > 0 ? updateRect.x : 0;
+            int containerY = updateRect.h > 0 ? updateRect.y : 0;
+            int containerW = updateRect.w > 0 ? updateRect.w :
+                             (pictureBox1?.ClientSize.Width > 0 ? pictureBox1.ClientSize.Width : 480);
+            int containerH = updateRect.h > 0 ? updateRect.h :
+                             (pictureBox1?.ClientSize.Height > 0 ? pictureBox1.ClientSize.Height : 720);
+
+            int startY = containerY + (int)((containerH - totalHeight) / 2);
+            float currentY = startY;
+
+            byte alpha = (byte)(overlayTextOpacity * 255 / 100);
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i];
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                int borderThickness = Math.Max(1, Math.Min((int)(fontSize * 0.08f), 3));
+                int shadowOffset = Math.Max(1, Math.Min((int)(fontSize * 0.06f), 2));
+
+                var tex = CreateOutlinedTextTexture(renderer, line, font,
+                    textColor, Color.FromArgb(30, 30, 30), borderThickness, shadowOffset);
+
+                if (tex == IntPtr.Zero)
+                    continue;
+
+                SDL.SDL_QueryTexture(tex, out _, out _, out int w, out int h);
+                SDL.SDL_SetTextureAlphaMod(tex, alpha);
+
+                int x = containerX + (containerW - w) / 2;
+
+                SDL.SDL_Rect dst = new SDL.SDL_Rect
+                {
+                    x = x,
+                    y = (int)currentY,
+                    w = w,
+                    h = h
+                };
+                SDL.SDL_RenderCopy(renderer, tex, IntPtr.Zero, ref dst);
+                SDL.SDL_DestroyTexture(tex);
+
+                currentY += h + (i < lines.Count - 1 ? lineSpacing : 0);
+            }
+
+            font?.Dispose();
+        }
+
+        private List<string> WrapText(string text, Font font, int maxWidth, out List<SizeF> lineSizes)
+        {
+            var lines = new List<string>();
+            lineSizes = new List<SizeF>();
+
+            using (var tmpBmp = new Bitmap(1, 1))
+            using (var g = Graphics.FromImage(tmpBmp))
+            {
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                var sf = StringFormat.GenericTypographic;
+
+                var paragraphs = text.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+
+                foreach (var paragraph in paragraphs)
+                {
+                    var words = paragraph.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    string currentLine = "";
+
+                    foreach (var word in words)
+                    {
+                        string testLine = string.IsNullOrEmpty(currentLine) ? word : currentLine + " " + word;
+                        var size = g.MeasureString(testLine, font, PointF.Empty, sf);
+
+                        if (size.Width > maxWidth && !string.IsNullOrEmpty(currentLine))
+                        {
+                            var currentSize = g.MeasureString(currentLine, font, PointF.Empty, sf);
+                            lines.Add(currentLine);
+                            lineSizes.Add(currentSize);
+                            currentLine = word;
+                        }
+                        else
+                        {
+                            currentLine = testLine;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(currentLine))
+                    {
+                        var currentSize = g.MeasureString(currentLine, font, PointF.Empty, sf);
+                        lines.Add(currentLine);
+                        lineSizes.Add(currentSize);
+                    }
+                }
+            }
+
+            return lines;
+        }
 
         private void PictureBox1_MouseEnter(object? sender, EventArgs e)
         {
@@ -283,13 +772,11 @@ namespace StreamAndroid
                     return;
                 }
             }
+
             if (showOverlayText && e.Button == MouseButtons.Right)
             {
                 var ucMenuscrip = new ucMenuscripDevice(false) { Height = this.Size.Height };
-                var config = new AntdUI.Popover.Config(
-                   pictureBox1,
-                   ucMenuscrip
-                )
+                var config = new AntdUI.Popover.Config(pictureBox1, ucMenuscrip)
                 {
                     ArrowAlign = AntdUI.TAlign.Right,
                     Offset = 4
@@ -298,6 +785,7 @@ namespace StreamAndroid
                 var f = AntdUI.Popover.open(config);
                 return;
             }
+
             if (!IsInsideRender(e.Location)) return;
             if (panel1.BorderColor != Color.Green) return;
 
@@ -328,11 +816,6 @@ namespace StreamAndroid
                     hideButtonsTimer.Start();
                     pictureBox1.Cursor = Cursors.Default;
                 }
-
-                if (wasHovered != isHovered)
-                {
-                    // optionally request redraw
-                }
             }
 
             if (!isPointerDown || moveThrottle.ElapsedMilliseconds < moveIntervalMs)
@@ -349,6 +832,7 @@ namespace StreamAndroid
             if (!isPointerDown)
                 return;
             if (panel1.BorderColor != Color.Green) return;
+
             var pos = GetTouchPosition(e.Location);
             SendTouch(AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, pos, e.Button);
             isPointerDown = false;
@@ -362,8 +846,10 @@ namespace StreamAndroid
             btnInfoHovered = false;
             pictureBox1.Cursor = Cursors.Default;
             panel1.BorderColor = Color.RoyalBlue;
+
             if (!isPointerDown)
                 return;
+
             var pos = GetTouchPosition(PointToClient(Cursor.Position));
             SendTouch(AndroidMotionEventAction.AMOTION_EVENT_ACTION_UP, pos, MouseButtons.Left);
             isPointerDown = false;
@@ -374,6 +860,7 @@ namespace StreamAndroid
         private void PictureBox1_MouseWheel(object? sender, MouseEventArgs e)
         {
             if (panel1.BorderColor != Color.Green) return;
+
             var pos = GetTouchPosition(e.Location);
             var msg = new TouchEventControlMessage
             {
@@ -386,10 +873,6 @@ namespace StreamAndroid
             };
             SafeSend(msg);
         }
-
-        #endregion
-
-        #region Drag & Drop Support
 
         private void Panel1_MouseDown(object sender, MouseEventArgs e)
         {
@@ -444,44 +927,6 @@ namespace StreamAndroid
             }
         }
 
-        private void PageHeader_MouseDown(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Left)
-            {
-                isDragging = true;
-                dragStartPoint = e.Location;
-                dragStartLocation = this.Location;
-            }
-        }
-
-        private void PageHeader_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (isDragging)
-            {
-                Point newLocation = new Point(
-                    dragStartLocation.X + (e.X - dragStartPoint.X),
-                    dragStartLocation.Y + (e.Y - dragStartPoint.Y)
-                );
-
-                if (this.Parent != null)
-                {
-                    newLocation.X = Math.Max(0, Math.Min(newLocation.X, this.Parent.ClientSize.Width - this.Width));
-                    newLocation.Y = Math.Max(0, Math.Min(newLocation.Y, this.Parent.ClientSize.Height - this.Height));
-                }
-
-                this.Location = newLocation;
-            }
-        }
-
-        private void PageHeader_MouseUp(object sender, MouseEventArgs e)
-        {
-            isDragging = false;
-        }
-
-        #endregion
-
-        #region Button Actions
-
         private void OnSettingsButtonClick()
         {
             SettingsButtonClicked?.Invoke(this, EventArgs.Empty);
@@ -505,10 +950,6 @@ namespace StreamAndroid
             return p.X >= rect.x && p.X <= rect.x + rect.w &&
                    p.Y >= rect.y && p.Y <= rect.y + rect.h;
         }
-
-        #endregion
-
-        #region Render Helpers (unchanged graphics helpers)
 
         private IntPtr CreateOutlinedTextTexture(IntPtr renderer, string text, Font font, Color fillColor, Color borderColor, int borderThickness = 2, int shadowOffset = 3)
         {
@@ -574,6 +1015,27 @@ namespace StreamAndroid
             }
         }
 
+        private void DrawOverlayTextCached(IntPtr renderer, string line1, string line2)
+        {
+            string combinedText = $"{line1}|{line2}";
+
+            if (cachedOverlayText == combinedText && cachedOverlayTexture != IntPtr.Zero)
+            {
+                SDL.SDL_QueryTexture(cachedOverlayTexture, out _, out _, out int w, out int h);
+
+                int containerX = updateRect.w > 0 ? updateRect.x : 10;
+                int containerW = updateRect.w > 0 ? updateRect.w : Math.Max(w + 20, 200);
+                int centerX = containerX + containerW / 2;
+                int startY = (updateRect.h > 0 ? updateRect.y : 10) + 10;
+
+                SDL.SDL_Rect dst = new SDL.SDL_Rect { x = centerX - w / 2, y = startY, w = w, h = h };
+                SDL.SDL_RenderCopy(renderer, cachedOverlayTexture, IntPtr.Zero, ref dst);
+                return;
+            }
+
+            DrawOverlayText(renderer, line1, line2);
+        }
+
         private void DrawOverlayText(IntPtr renderer, string line1, string line2)
         {
             int availableHeight = updateRect.h > 0 ? updateRect.h :
@@ -604,6 +1066,13 @@ namespace StreamAndroid
             if (tex2 != IntPtr.Zero)
                 SDL.SDL_QueryTexture(tex2, out _, out _, out w2, out h2);
 
+            byte alpha = (byte)(overlayTextOpacity * 255 / 100);
+
+            if (tex1 != IntPtr.Zero)
+                SDL.SDL_SetTextureAlphaMod(tex1, alpha);
+            if (tex2 != IntPtr.Zero)
+                SDL.SDL_SetTextureAlphaMod(tex2, alpha);
+
             int containerX = updateRect.w > 0 ? updateRect.x : 10;
             int containerW = updateRect.w > 0 ? updateRect.w : Math.Max(Math.Max(w1, w2) + 20, 200);
             int centerX = containerX + containerW / 2;
@@ -621,46 +1090,6 @@ namespace StreamAndroid
                 SDL.SDL_RenderCopy(renderer, tex2, IntPtr.Zero, ref dst2);
                 SDL.SDL_DestroyTexture(tex2);
             }
-        }
-
-        private void DrawBottomText(IntPtr renderer, string text)
-        {
-            if (string.IsNullOrWhiteSpace(text) || renderer == IntPtr.Zero)
-                return;
-
-            int availableHeight = updateRect.h > 0 ? updateRect.h :
-                                 (pictureBox1?.ClientSize.Height > 0 ? pictureBox1.ClientSize.Height :
-                                 (renderSize.Height > 0 ? renderSize.Height : 720));
-
-            const double referenceHeight = 720.0;
-            double scale = Math.Max(0.5, Math.Min(availableHeight / referenceHeight, 3.0));
-            float fontSize = Math.Max(10f, Math.Min((float)Math.Round(16f * scale), 72f));
-
-            using var font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
-
-            var tex = CreateOutlinedTextTexture(renderer, text, font,
-                Color.White, Color.FromArgb(50, 50, 50), 2, 3);
-
-            if (tex == IntPtr.Zero)
-                return;
-
-            SDL.SDL_QueryTexture(tex, out _, out _, out int w, out int h);
-
-            int containerX = updateRect.w > 0 ? updateRect.x : 0;
-            int containerW = updateRect.w > 0 ? updateRect.w :
-                             (pictureBox1?.ClientSize.Width > 0 ? pictureBox1.ClientSize.Width : w);
-
-            int containerY = updateRect.h > 0 ? updateRect.y : 0;
-            int containerH = updateRect.h > 0 ? updateRect.h :
-                             (pictureBox1?.ClientSize.Height > 0 ? pictureBox1.ClientSize.Height : h);
-
-            int x = containerX + (containerW - w) / 2;
-            int y = containerY + containerH - h - 20;
-
-            SDL.SDL_Rect dst = new SDL.SDL_Rect { x = x, y = y, w = w, h = h };
-            SDL.SDL_RenderCopy(renderer, tex, IntPtr.Zero, ref dst);
-
-            SDL.SDL_DestroyTexture(tex);
         }
 
         private void DrawSDLButtons(IntPtr renderer)
@@ -715,19 +1144,16 @@ namespace StreamAndroid
             }
         }
 
-        #endregion
-
-        #region Video frame handling (fixed, thread-safe)
-
-        // Event handler trên background thread (decode thread)
         private unsafe void VideoStreamDecoder_NewFrameEvent(AVFrame frame)
         {
             try
             {
-                // Kiểm tra nhanh điều kiện (không truy cập control)
-                if (!IsHandleCreated)
+                if (!IsHandleCreated || isDisposing)
+                    return;
+
+                frameSkipCounter++;
+                if (frameSkipCounter % FRAME_SKIP_INTERVAL != 0)
                 {
-                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Skip frame - handle not created");
                     return;
                 }
 
@@ -735,18 +1161,14 @@ namespace StreamAndroid
                 long elapsedMs = (now - lastFrameTimestamp) * 1000 / Stopwatch.Frequency;
                 if (elapsedMs < frameIntervalMs)
                 {
-                    // chưa tới interval
                     return;
                 }
 
-                // Nếu quá trình copy mất quá lâu, bỏ frame
                 if (Interlocked.CompareExchange(ref processingFrame, 1, 0) == 1)
                 {
-                    // đang copy frame khác -> skip để tránh backlog
                     return;
                 }
 
-                // Copy dữ liệu YUV từ native frame -> managed arrays nhanh chóng
                 try
                 {
                     var buf = FrameBuffer.FromAVFrame(frame);
@@ -755,19 +1177,16 @@ namespace StreamAndroid
                         return;
                     }
 
-                    // Lưu latestFrame (overwrite)
                     lock (latestFrameLock)
                     {
                         latestFrame?.Dispose();
                         latestFrame = buf;
                     }
 
-                    // Schedule render trên UI thread (chỉ schedule 1 lần nếu chưa có)
                     if (Interlocked.CompareExchange(ref renderScheduled, 1, 0) == 0)
                     {
-                        if (!IsHandleCreated)
+                        if (!IsHandleCreated || isDisposing)
                         {
-                            // nếu control chưa sẵn sàng thì clear flag và bỏ
                             Interlocked.Exchange(ref renderScheduled, 0);
                         }
                         else
@@ -790,29 +1209,38 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Exception in NewFrameEvent wrapper: {ex}");
+                Debug.WriteLine($"❌ NewFrameEvent error: {ex.Message}");
             }
         }
 
-        // Phương thức chạy trên UI thread để lấy frame gần nhất và render
         private void RenderLatestFrameOnUI()
         {
             FrameBuffer? buf = null;
             try
             {
-                // Lấy frame gần nhất
+                if (isDisposing)
+                {
+                    return;
+                }
+
+                // Attempt auto-recovery if renderer became invalid
+                if (!isRendererValid)
+                {
+                    InitRender();
+                    if (!isRendererValid)
+                    {
+                        return;
+                    }
+                }
+
                 lock (latestFrameLock)
                 {
                     buf = latestFrame;
                     latestFrame = null;
                 }
 
-                if (buf == null)
-                {
-                    return;
-                }
+                if (buf == null) return;
 
-                // Nếu control không hiển thị / pictureBox không hiển thị thì bỏ
                 if (!IsHandleCreated || !Visible || !pictureBox1.Visible)
                 {
                     return;
@@ -822,21 +1250,24 @@ namespace StreamAndroid
                 long elapsedMs = (now - lastFrameTimestamp) * 1000 / Stopwatch.Frequency;
                 if (elapsedMs < frameIntervalMs)
                 {
-                    // Thời gian chưa đến; re-schedule nếu vẫn có frame mới trong tương lai
-                    lastFrameTimestamp = now;
+                    return;
                 }
 
-                lock (locker)
+                lock (rendererLock)
                 {
-                    if (isResize)
+                    if (isDisposing || !isRendererValid)
                     {
                         return;
                     }
+
+                    if (isResize) return;
 
                     if (buf.Width != renderSize.Width || buf.Height != renderSize.Height)
                     {
                         renderSize = new Size(buf.Width, buf.Height);
                         InitRender();
+
+                        if (!isRendererValid) return;
                     }
 
                     if (sdlTexture == IntPtr.Zero || sdlRender == IntPtr.Zero)
@@ -844,7 +1275,6 @@ namespace StreamAndroid
                         return;
                     }
 
-                    // Update texture: cần pin mảng trước khi lấy pointer
                     GCHandle gchY = GCHandle.Alloc(buf.Y, GCHandleType.Pinned);
                     GCHandle gchU = GCHandle.Alloc(buf.U, GCHandleType.Pinned);
                     GCHandle gchV = GCHandle.Alloc(buf.V, GCHandleType.Pinned);
@@ -864,16 +1294,83 @@ namespace StreamAndroid
 
                         if (updateResult != 0)
                         {
-                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] SDL_UpdateYUVTexture failed: {SDL.SDL_GetError()}");
+                            Debug.WriteLine($"⚠️ SDL_UpdateYUVTexture failed: {SDL.SDL_GetError()}");
+                            isRendererValid = false;
+                            // try to recover renderer on next frame
+                            InitRender();
                             return;
                         }
 
                         SDL.SDL_RenderClear(sdlRender);
-                        int renderCopyResult = SDL_RenderCopy(sdlRender, sdlTexture, IntPtr.Zero, ref updateRect);
-                        if (renderCopyResult != 0)
+
+                        if (angle != 0)
                         {
-                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] SDL_RenderCopy failed: {SDL.SDL_GetError()}");
-                            return;
+                            if (angle == 90 || angle == 270)
+                            {
+                                int centerX = pictureBox1.ClientSize.Width / 2;
+                                int centerY = pictureBox1.ClientSize.Height / 2;
+
+                                SDL.SDL_Rect rotatedRect = new SDL.SDL_Rect
+                                {
+                                    x = centerX - updateRect.h / 2,
+                                    y = centerY - updateRect.w / 2,
+                                    w = updateRect.h,
+                                    h = updateRect.w
+                                };
+
+                                SDL.SDL_Point center = new SDL.SDL_Point
+                                {
+                                    x = rotatedRect.w / 2,
+                                    y = rotatedRect.h / 2
+                                };
+
+                                int renderCopyResult = SDL_RenderCopyEx(
+                                    sdlRender, sdlTexture, IntPtr.Zero,
+                                    ref rotatedRect, angle, ref center,
+                                    SDL.SDL_RendererFlip.SDL_FLIP_NONE
+                                );
+
+                                if (renderCopyResult != 0)
+                                {
+                                    Debug.WriteLine($"⚠️ SDL_RenderCopyEx failed: {SDL.SDL_GetError()}");
+                                    isRendererValid = false;
+                                    InitRender();
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                SDL.SDL_Point center = new SDL.SDL_Point
+                                {
+                                    x = updateRect.w / 2,
+                                    y = updateRect.h / 2
+                                };
+
+                                int renderCopyResult = SDL_RenderCopyEx(
+                                    sdlRender, sdlTexture, IntPtr.Zero,
+                                    ref updateRect, angle, ref center,
+                                    SDL.SDL_RendererFlip.SDL_FLIP_NONE
+                                );
+
+                                if (renderCopyResult != 0)
+                                {
+                                    Debug.WriteLine($"⚠️ SDL_RenderCopyEx failed: {SDL.SDL_GetError()}");
+                                    isRendererValid = false;
+                                    InitRender();
+                                    return;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            int renderCopyResult = SDL_RenderCopy(sdlRender, sdlTexture, IntPtr.Zero, ref updateRect);
+                            if (renderCopyResult != 0)
+                            {
+                                Debug.WriteLine($"⚠️ SDL_RenderCopy failed: {SDL.SDL_GetError()}");
+                                isRendererValid = false;
+                                InitRender();
+                                return;
+                            }
                         }
 
                         if (showOverlayText)
@@ -881,16 +1378,18 @@ namespace StreamAndroid
                             try
                             {
                                 DrawSDLButtons(sdlRender);
-                                DrawOverlayText(sdlRender, device.Id.ToString(), device.NameDevice ?? "Unknown");
+                                DrawOverlayTextCached(sdlRender, device.Id.ToString(), device.NameDevice ?? "Unknown");
                             }
                             catch (Exception ex)
                             {
-                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Draw overlay failed: {ex.Message}");
+                                Debug.WriteLine($"⚠️ Draw overlay failed: {ex.Message}");
                             }
                         }
 
                         SDL.SDL_RenderPresent(sdlRender);
                         lastFrameTimestamp = Stopwatch.GetTimestamp();
+                        lastFrameWallClock = DateTime.UtcNow;
+                        stallRecoverAttempts = 0; // reset only on successful frame render
                     }
                     finally
                     {
@@ -902,14 +1401,13 @@ namespace StreamAndroid
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Exception in RenderLatestFrameOnUI: {ex}");
+                Debug.WriteLine($"❌ RenderLatestFrameOnUI exception: {ex}");
+                isRendererValid = false;
             }
             finally
             {
-                // cho phép schedule tiếp
                 Interlocked.Exchange(ref renderScheduled, 0);
 
-                // nếu vẫn còn frame mới vừa được đặt trong latestFrame, schedule lần nữa
                 lock (latestFrameLock)
                 {
                     if (latestFrame != null)
@@ -918,7 +1416,14 @@ namespace StreamAndroid
                         {
                             try
                             {
-                                this.BeginInvoke((Action)RenderLatestFrameOnUI);
+                                if (IsHandleCreated && !isDisposing)
+                                {
+                                    this.BeginInvoke((Action)RenderLatestFrameOnUI);
+                                }
+                                else
+                                {
+                                    Interlocked.Exchange(ref renderScheduled, 0);
+                                }
                             }
                             catch
                             {
@@ -932,63 +1437,368 @@ namespace StreamAndroid
             }
         }
 
-        #endregion
-
-        private void PictureBox1_SizeChanged(object? sender, EventArgs e)
+        private async void WatchdogTick()
         {
+            if (isDisposing) return;
+            if (instance == null) return;
+
             try
             {
-                RoundPictureBox(pictureBox1, 4);
-            }
-            catch { }
+                var stalledMs = (int)(DateTime.UtcNow - lastFrameWallClock).TotalMilliseconds;
 
-            lock (locker)
+                // Only trigger if really stalled (>5 seconds to avoid false positives)
+                if (stalledMs < 5000)
+                {
+                    // Reset counter when receiving frames normally
+                    if (stallRecoverAttempts > 0)
+                    {
+                        Debug.WriteLine($"✅ Watchdog: frames flowing normally, reset counter");
+                        stallRecoverAttempts = 0;
+                    }
+                    return;
+                }
+
+                if (isRecovering) return;
+
+                // CRITICAL: Stop after limited attempts to avoid infinite loop
+                if (stallRecoverAttempts >= 2)
+                {
+                    Debug.WriteLine($"⚠️ Watchdog: max attempts reached ({stallRecoverAttempts}), giving up");
+                    stallWatchdogTimer?.Stop();
+                    return;
+                }
+
+                isRecovering = true;
+                stallRecoverAttempts++;
+
+                try
+                {
+                    Debug.WriteLine($"🛠 Watchdog attempt {stallRecoverAttempts}/2 for {device.Serial}, stalled {stalledMs}ms");
+
+                    // Notify DeviceManagerService to handle full reconnect
+                    await System.Threading.Tasks.Task.Run(async () =>
+                    {
+                        try
+                        {
+                            Debug.WriteLine($"🔄 Watchdog: requesting full reconnect for {device.Serial}");
+
+                            // This will be handled by DeviceManagerService properly
+                            // For now, just clear the stale state
+                            lock (latestFrameLock)
+                            {
+                                latestFrame?.Dispose();
+                                latestFrame = null;
+                            }
+
+                            await InvokeUIAsync(() =>
+                            {
+                                lock (rendererLock)
+                                {
+                                    isRendererValid = false;
+                                    if (sdlTexture != IntPtr.Zero)
+                                    {
+                                        try { SDL.SDL_DestroyTexture(sdlTexture); } catch { }
+                                        sdlTexture = IntPtr.Zero;
+                                    }
+                                }
+
+                                SetCenterText("Đang thử kết nối lại...", Color.Orange);
+                            });
+
+                            Debug.WriteLine($"✅ Watchdog: cleared stale state for {device.Serial}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"❌ Watchdog recovery failed: {ex.Message}");
+                        }
+                    });
+                }
+                finally
+                {
+                    isRecovering = false;
+                }
+            }
+            catch (Exception ex)
             {
-                isResize = true;
-                InitRender();
-                isResize = false;
+                Debug.WriteLine($"❌ Watchdog error: {ex.Message}");
+                isRecovering = false;
             }
         }
+        private Task InvokeUIAsync(Action action)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        action();
+                        tcs.SetResult(true);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.SetException(ex);
+                    }
+                }));
+            }
+            else
+            {
+                try
+                {
+                    action();
+                    tcs.SetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            }
+
+            return tcs.Task;
+        }
+        private void PictureBox1_SizeChanged(object? sender, EventArgs e)
+        {
+            if (isDisposing) return;
+
+            try { RoundPictureBox(pictureBox1, 4); } catch { }
+
+            // Ignore tiny sizes
+            if (pictureBox1.ClientSize.Width <= 10 || pictureBox1.ClientSize.Height <= 10)
+            {
+                return;
+            }
+
+            lock (rendererLock)
+            {
+                if (isDisposing) return;
+
+                isResize = true;
+                isRendererValid = false;
+
+                // Destroy SDL window to force recreation with new size
+                if (sdlWinPtr != IntPtr.Zero)
+                {
+                    try { SDL.SDL_DestroyWindow(sdlWinPtr); } catch { }
+                    sdlWinPtr = IntPtr.Zero;
+                }
+
+                InitRender();
+                isResize = false;
+
+                if (isRendererValid)
+                {
+                    RenderFrame();
+                }
+            }
+        }
+
+
+
 
         private void UcDeviceView_VisibleChanged(object? sender, EventArgs e)
         {
             if (Visible && pictureBox1.Visible)
             {
                 lastFrameTimestamp = 0;
+
+                // Initialize renderer if not valid
+                if (!isRendererValid && pictureBox1.IsHandleCreated)
+                {
+                    InitRender();
+                }
+
+                // Show any text
+                if (isRendererValid && (!string.IsNullOrEmpty(centerText) || !string.IsNullOrEmpty(pendingCenterText)))
+                {
+                    RenderFrame();
+                }
             }
         }
 
+
+
+
+
         private void InitRender()
         {
-            if (sdlTexture != IntPtr.Zero)
+            lock (rendererLock)
             {
-                try { SDL.SDL_DestroyTexture(sdlTexture); } catch { }
-                sdlTexture = IntPtr.Zero;
+                try
+                {
+                    EnsureSdlInitialized();
+
+                    if (!pictureBox1.IsHandleCreated || isDisposing)
+                    {
+                        Debug.WriteLine("⚠️ InitRender: Handle not created or disposing");
+                        isRendererValid = false;
+                        return;
+                    }
+
+                    // CRITICAL: Wait for valid PictureBox size
+                    int expectedW = pictureBox1.ClientSize.Width;
+                    int expectedH = pictureBox1.ClientSize.Height;
+
+                    if (expectedW <= 10 || expectedH <= 10)
+                    {
+                        Debug.WriteLine($"⚠️ InitRender: PictureBox size too small: {expectedW}x{expectedH}, waiting...");
+                        isRendererValid = false;
+                        return;
+                    }
+
+                    // Cleanup old resources FIRST
+                    CleanupSDLResources();
+
+                    // Destroy old SDL window if exists
+                    if (sdlWinPtr != IntPtr.Zero)
+                    {
+                        try { SDL.SDL_DestroyWindow(sdlWinPtr); } catch { }
+                        sdlWinPtr = IntPtr.Zero;
+                    }
+
+                    // Create NEW SDL window from current PictureBox handle
+                    // This ensures SDL window matches PictureBox size exactly
+                    sdlWinPtr = SDL.SDL_CreateWindowFrom(pictureBox1.Handle);
+                    if (sdlWinPtr == IntPtr.Zero)
+                    {
+                        Debug.WriteLine($"❌ Failed to create SDL window: {SDL.SDL_GetError()}");
+                        isRendererValid = false;
+                        return;
+                    }
+
+                    SDL.SDL_GetWindowSize(sdlWinPtr, out int winW, out int winH);
+
+                    if (winW <= 0 || winH <= 0)
+                    {
+                        Debug.WriteLine($"⚠️ Invalid SDL window size: {winW}x{winH}");
+                        isRendererValid = false;
+                        return;
+                    }
+
+                    // Log size verification (no forced resize - let SDL handle it naturally)
+                    if (Math.Abs(winW - expectedW) > 5 || Math.Abs(winH - expectedH) > 5)
+                    {
+                        Debug.WriteLine($"⚠️ Size mismatch: PictureBox={expectedW}x{expectedH}, SDL={winW}x{winH}");
+                        // Don't call SDL_SetWindowSize - this breaks SDL_CreateWindowFrom windows!
+                        // SDL will sync with the native control on next frame
+                    }
+
+                    Debug.WriteLine($"🪟 SDL Window created: {winW}x{winH}");
+
+                    // Calculate render rectangle
+                    if (renderSize.Width > 0 && renderSize.Height > 0)
+                    {
+                        updateRect = MakeThumb(renderSize.Width, renderSize.Height, winW, winH);
+                    }
+                    else
+                    {
+                        // No video yet, use full window
+                        updateRect = new SDL.SDL_Rect { x = 0, y = 0, w = winW, h = winH };
+                    }
+
+                    // Create renderer with optimal settings
+                    SDL.SDL_SetHint(SDL.SDL_HINT_RENDER_DRIVER, "direct3d11");
+                    SDL.SDL_SetHint(SDL.SDL_HINT_RENDER_SCALE_QUALITY, "1");
+                    SDL.SDL_SetHint(SDL.SDL_HINT_RENDER_VSYNC, "1");
+
+                    sdlRender = SDL.SDL_CreateRenderer(sdlWinPtr, -1,
+                        SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED |
+                        SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
+
+                    if (sdlRender == IntPtr.Zero)
+                    {
+                        Debug.WriteLine($"⚠️ ACCELERATED renderer failed: {SDL.SDL_GetError()}, trying SOFTWARE");
+                        sdlRender = SDL.SDL_CreateRenderer(sdlWinPtr, -1,
+                            SDL.SDL_RendererFlags.SDL_RENDERER_SOFTWARE);
+                    }
+
+                    if (sdlRender == IntPtr.Zero)
+                    {
+                        Debug.WriteLine($"❌ All renderer creation failed: {SDL.SDL_GetError()}");
+                        isRendererValid = false;
+                        return;
+                    }
+
+                    // Create texture for video rendering
+                    if (renderSize.Width > 0 && renderSize.Height > 0)
+                    {
+                        sdlTexture = SDL.SDL_CreateTexture(sdlRender,
+                            SDL.SDL_PIXELFORMAT_IYUV,
+                            (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_STREAMING,
+                            renderSize.Width, renderSize.Height);
+
+                        if (sdlTexture == IntPtr.Zero)
+                        {
+                            Debug.WriteLine($"❌ Failed to create texture: {SDL.SDL_GetError()}");
+                            isRendererValid = false;
+                            return;
+                        }
+                    }
+
+                    isRendererValid = true;
+
+                    // Show any pending center text
+                    if (!string.IsNullOrEmpty(pendingCenterText))
+                    {
+                        centerText = pendingCenterText!;
+                        centerTextColor = pendingCenterTextColor;
+                        pendingCenterText = null;
+                        Debug.WriteLine($"✅ Showing pending center text: {centerText}");
+                        RenderFrame();
+                    }
+                    else if (!string.IsNullOrEmpty(centerText))
+                    {
+                        Debug.WriteLine($"✅ Re-rendering center text: {centerText}");
+                        RenderFrame();
+                    }
+
+                    Debug.WriteLine($"✅ Renderer initialized - {winW}x{winH}, video={renderSize.Width}x{renderSize.Height}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"❌ InitRender exception: {ex.Message}");
+                    isRendererValid = false;
+                    CleanupSDLResources();
+                }
             }
-            if (sdlRender != IntPtr.Zero)
+        }
+
+
+        private void CleanupSDLResources()
+        {
+            try
             {
-                try { SDL.SDL_DestroyRenderer(sdlRender); } catch { }
-                sdlRender = IntPtr.Zero;
+                if (btnSettingsTexture != IntPtr.Zero)
+                {
+                    SDL.SDL_DestroyTexture(btnSettingsTexture);
+                    btnSettingsTexture = IntPtr.Zero;
+                }
+                if (btnInfoTexture != IntPtr.Zero)
+                {
+                    SDL.SDL_DestroyTexture(btnInfoTexture);
+                    btnInfoTexture = IntPtr.Zero;
+                }
+                if (cachedOverlayTexture != IntPtr.Zero)
+                {
+                    SDL.SDL_DestroyTexture(cachedOverlayTexture);
+                    cachedOverlayTexture = IntPtr.Zero;
+                }
+                if (sdlTexture != IntPtr.Zero)
+                {
+                    SDL.SDL_DestroyTexture(sdlTexture);
+                    sdlTexture = IntPtr.Zero;
+                }
+                if (sdlRender != IntPtr.Zero)
+                {
+                    SDL.SDL_DestroyRenderer(sdlRender);
+                    sdlRender = IntPtr.Zero;
+                }
             }
-
-            if (sdlWinPtr == IntPtr.Zero && pictureBox1.IsHandleCreated)
+            catch (Exception ex)
             {
-                sdlWinPtr = SDL.SDL_CreateWindowFrom(pictureBox1.Handle);
+                Debug.WriteLine($"⚠️ Cleanup SDL error: {ex.Message}");
             }
-
-            if (sdlWinPtr == IntPtr.Zero)
-                return;
-
-            SDL.SDL_GetWindowSize(sdlWinPtr, out int winW, out int winH);
-            updateRect = MakeThumb(renderSize.Width, renderSize.Height, winW, winH);
-
-            sdlRender = SDL.SDL_CreateRenderer(sdlWinPtr, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
-            if (renderSize.Width <= 0 || renderSize.Height <= 0)
-                return;
-
-            sdlTexture = SDL.SDL_CreateTexture(sdlRender, SDL.SDL_PIXELFORMAT_IYUV,
-                (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_STREAMING,
-                renderSize.Width, renderSize.Height);
         }
 
         private SDL.SDL_Rect MakeThumb(int pw, int ph, int ww, int wh)
@@ -996,12 +1806,21 @@ namespace StreamAndroid
             if (pw <= 0 || ph <= 0 || ww <= 0 || wh <= 0)
                 return new SDL.SDL_Rect { x = 0, y = 0, w = ww, h = wh };
 
-            double scaleX = ww / (double)pw;
-            double scaleY = wh / (double)ph;
-            double scale = Math.Max(scaleX, scaleY);
+            int effectiveW = pw;
+            int effectiveH = ph;
 
-            int destW = (int)Math.Ceiling(pw * scale);
-            int destH = (int)Math.Ceiling(ph * scale);
+            if (angle == 90 || angle == 270)
+            {
+                effectiveW = ph;
+                effectiveH = pw;
+            }
+
+            double scaleX = ww / (double)effectiveW;
+            double scaleY = wh / (double)effectiveH;
+            double scale = Math.Min(scaleX, scaleY);
+
+            int destW = (int)Math.Ceiling(effectiveW * scale);
+            int destH = (int)Math.Ceiling(effectiveH * scale);
 
             int destX = (ww - destW) / 2;
             int destY = (wh - destH) / 2;
@@ -1014,8 +1833,6 @@ namespace StreamAndroid
                 h = destH
             };
         }
-
-        #region Touch Helpers
 
         private void SendTouch(AndroidMotionEventAction action, Position pos, MouseButtons button)
         {
@@ -1065,10 +1882,6 @@ namespace StreamAndroid
             return pos;
         }
 
-        #endregion
-
-        #region SDL Externs
-
         [DllImport("SDL2", CallingConvention = CallingConvention.Cdecl)]
         public static extern int SDL_UpdateYUVTexture(IntPtr texture, IntPtr rect,
             IntPtr yPlane, int yPitch, IntPtr uPlane, int uPitch, IntPtr vPlane, int vPitch);
@@ -1077,9 +1890,15 @@ namespace StreamAndroid
         public static extern int SDL_RenderCopy(IntPtr renderer, IntPtr texture,
             IntPtr srcrect, ref SDL.SDL_Rect dstrect);
 
-        #endregion
-
-        #region Public Methods
+        [DllImport("SDL2", CallingConvention = CallingConvention.Cdecl)]
+        public static extern int SDL_RenderCopyEx(
+            IntPtr renderer,
+            IntPtr texture,
+            IntPtr srcrect,
+            ref SDL.SDL_Rect dstrect,
+            double angle,
+            ref SDL.SDL_Point center,
+            SDL.SDL_RendererFlip flip);
 
         public void SetFrameRate(int fps)
         {
@@ -1089,21 +1908,17 @@ namespace StreamAndroid
             frameIntervalMs = 1000 / fps;
         }
 
-        public DeviceModel GetDevice()
+        public DeviceModel GetDevice() => device;
+
+        public bool IsConnected() => instance != null && sdlRender != IntPtr.Zero;
+
+        public void SetOverlayTextOpacity(int opacity)
         {
-            return device;
+            overlayTextOpacity = Math.Max(10, Math.Min(100, opacity));
         }
 
-        public bool IsConnected()
-        {
-            return instance != null && sdlRender != IntPtr.Zero;
-        }
+        public int GetOverlayTextOpacity() => overlayTextOpacity;
 
-        #endregion
-
-        #region Helper FrameBuffer class
-
-        // Lưu dữ liệu Y/U/V đã copy để dùng trên UI thread
         private sealed class FrameBuffer : IDisposable
         {
             public int Width { get; }
@@ -1132,7 +1947,6 @@ namespace StreamAndroid
             public void Dispose()
             {
                 if (disposed) return;
-                // arrays will be GC'ed normally; if you want to zero memory, do it here
                 disposed = true;
             }
 
@@ -1149,7 +1963,6 @@ namespace StreamAndroid
                     int lsU = frame.linesize[1];
                     int lsV = frame.linesize[2];
 
-                    // Y size = linesizeY * height
                     int ySize = Math.Abs(lsY) * height;
                     int uvHeight = (height + 1) / 2;
                     int uSize = Math.Abs(lsU) * uvHeight;
@@ -1159,7 +1972,6 @@ namespace StreamAndroid
                     byte[] u = new byte[uSize];
                     byte[] v = new byte[vSize];
 
-                    // Copy from native pointers. frame.data[] expected as IntPtr-like
                     IntPtr pY = new IntPtr(frame.data[0]);
                     IntPtr pU = new IntPtr(frame.data[1]);
                     IntPtr pV = new IntPtr(frame.data[2]);
@@ -1177,7 +1989,5 @@ namespace StreamAndroid
                 }
             }
         }
-
-        #endregion
     }
 }
