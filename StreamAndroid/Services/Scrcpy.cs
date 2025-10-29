@@ -19,7 +19,8 @@ namespace StreamAndroid.Services
         public int Height { get; internal set; }
         public long Bitrate { get; set; } = 8000000;
         public static string ScrcpyServerFile { get; set; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App", "scrcpy-server.jar");
-
+        public int MaxSize { get; set; } = 0;  // 0 = original size, 720 = downscale to 720p
+        public int MaxFps { get; set; } = 0;   // 0 = unlimited, 20 = lock to 20fps
 
         public bool Connected { get; private set; }
         public VideoStreamDecoder VideoStreamDecoder { get; }
@@ -112,7 +113,7 @@ namespace StreamAndroid.Services
         public void Stop()
         {
             if (!Connected)
-                throw new Exception("Not connected.");
+                return;
 
             cts?.Cancel();
 
@@ -341,36 +342,43 @@ namespace StreamAndroid.Services
             var receiver = new SerilogOutputReceiver();
 
             string version = "1.23";
-            int maxFramerate = 60;
-            ScrcpyLockVideoOrientation orientation = ScrcpyLockVideoOrientation.Unlocked; // -1 means allow rotate
+
+            // ✅ Use MaxFps property if set, otherwise default to 60
+            int maxFramerate = MaxFps > 0 ? MaxFps : 60;
+
+            ScrcpyLockVideoOrientation orientation = ScrcpyLockVideoOrientation.Unlocked;
             bool control = true;
             bool showTouches = false;
             bool stayAwake = false;
 
             var cmds = new List<string>
-                {
-                    "CLASSPATH=/data/local/tmp/scrcpy-server.jar",
-                    "app_process",
+        {
+            "CLASSPATH=/data/local/tmp/scrcpy-server.jar",
+            "app_process",
+            "/",
+            "com.genymobile.scrcpy.Server",
+            version,
+            "log_level=debug",
+            $"bit_rate={Bitrate}"
+        };
 
-                    // Unused
-                    "/",
+            // ✅ CRITICAL: Add max_size parameter for downscaling
+            if (MaxSize > 0)
+            {
+                cmds.Add($"max_size={MaxSize}");
+                log.Information($"Downscaling to max_size={MaxSize}");
+            }
 
-                    // App entry point, or something like that.
-                    "com.genymobile.scrcpy.Server",
-
-                    version,
-                    "log_level=debug",
-                    $"bit_rate={Bitrate}"
-                };
-
-            if (maxFramerate != 0)
+            if (maxFramerate > 0)
+            {
                 cmds.Add($"max_fps={maxFramerate}");
+                log.Information($"Limiting to max_fps={maxFramerate}");
+            }
 
             if (orientation != ScrcpyLockVideoOrientation.Unlocked)
                 cmds.Add($"lock_video_orientation={(int)orientation}");
 
             cmds.Add("tunnel_forward=false");
-            //cmds.Add("crop=-");
             cmds.Add($"control={control}");
             cmds.Add("display_id=0");
             cmds.Add($"show_touches={showTouches}");

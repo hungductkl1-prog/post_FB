@@ -465,7 +465,7 @@ namespace StreamAndroid
             slider1.ShowValue = true;
             slider1.Size = new Size(135, 28);
             slider1.TabIndex = 19;
-            slider1.Value = 10;
+            slider1.Value = 100;
             slider1.ValueChanged += slider1_ValueChanged;
             // 
             // label7
@@ -536,6 +536,7 @@ namespace StreamAndroid
             slider4.Size = new Size(135, 28);
             slider4.TabIndex = 19;
             slider4.Value = 1024;
+            slider4.ValueChanged += slider4_ValueChanged;
             // 
             // label10
             // 
@@ -769,7 +770,7 @@ namespace StreamAndroid
         private AntdUI.Button button9;
         private AntdUI.Switch switch1;
         public AntdUI.Slider slider3;
-        private AntdUI.Slider slider4;
+        public AntdUI.Slider slider4;
         private GroupBox groupBox2;
         private Panel panel10;
         private Panel panel13;

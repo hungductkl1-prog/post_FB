@@ -7,28 +7,52 @@ namespace StreamAndroid
     public partial class fShowDevice : Form
     {
         public event EventHandler? SettingsButtonClicked;
-        private readonly Form parentForm;
+        private readonly Control parentForm;
         public ucControlAndroid ucDevice;
         private ucMenuscripDevice menu;
         public bool isDragging = false;
-        public fShowDevice(Form form)
+        public fShowDevice(Control form)
         {
             InitializeComponent();
             parentForm = form;
 
         }
+        private int angle = 0;
 
-        public void SetRenderSize(int height)
+        public void SetRenderSize(int height, int rotationAngle = 0)
         {
-            int width = (int)(height * 9.0 / 16.0);
-            ucDevice.SetRenderSize(height);
-            Size = new Size(width + menu.Width + 20, height);
+            ucDevice.SetRenderSize(height, rotationAngle);
+            angle = rotationAngle;
+
+            int rotationValue = angle switch
+            {
+                0 => 0,
+                90 => 1,
+                180 => 2,
+                270 => 3,
+                _ => 0
+            };
+            int width;
+            if (angle == 90 || angle == 270)
+            {
+                width = (int)(height * 16.0 / 9.0);
+            }
+            else
+            {
+                width = (int)(height * 9.0 / 16.0);
+            }
+
+            this.Size = new Size(width + menu.Width + 10, height);
+
+
             this.Refresh();
         }
         public void Load(ucControlAndroid device)
         {
+            tableLayoutPanel1.Controls.Clear();
             ucDevice = device;
-            menu = new ucMenuscripDevice(true, this, parentForm)
+            ucDevice.showOverlayText =false;
+            menu = new ucMenuscripDevice(ucDevice.device, this, parentForm)
             {
                 Dock = DockStyle.Right
             };

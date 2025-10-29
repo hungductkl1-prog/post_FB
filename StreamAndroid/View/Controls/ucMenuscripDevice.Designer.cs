@@ -15,118 +15,50 @@
 
         private void InitializeComponent()
         {
-            toolStripButton1 = new ToolStripButton();
-            toolStripButton6 = new ToolStripButton();
-            toolStripButton5 = new ToolStripButton();
-            toolStripButton4 = new ToolStripButton();
-            toolStripButton2 = new ToolStripDropDownButton();
+            AntdUI.MenuItem menuItem1 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem2 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem3 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem4 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem5 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem6 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem7 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem8 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem9 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem10 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem11 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem12 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem13 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem14 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem15 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem16 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem17 = new AntdUI.MenuItem();
+            AntdUI.MenuItem menuItem18 = new AntdUI.MenuItem();
             quảnLýLệnhToolStripMenuItem = new ToolStripMenuItem();
-            toolStripButton12 = new ToolStripButton();
-            toolStripButton11 = new ToolStripButton();
-            toolStripButton10 = new ToolStripButton();
-            toolStripButton9 = new ToolStripButton();
-            toolStripButton8 = new ToolStripButton();
-            toolStripDropDownButton1 = new ToolStripDropDownButton();
             toolStripMenuItem1 = new ToolStripMenuItem();
-            toolStripButton3 = new ToolStripButton();
-            toolStripSeparator1 = new ToolStripSeparator();
-            toolStripLabel1 = new ToolStripLabel();
             button1 = new AntdUI.Button();
             button2 = new AntdUI.Button();
             button3 = new AntdUI.Button();
             panel1 = new AntdUI.Panel();
-            panelScroll = new Panel();
-            toolStrip1 = new ToolStrip();
+            menu3 = new AntdUI.Menu();
+            panel3 = new Panel();
             tableLayoutPanel1 = new TableLayoutPanel();
             panel2 = new Panel();
             label2 = new AntdUI.Label();
             button9 = new AntdUI.Button();
             panel1.SuspendLayout();
-            panelScroll.SuspendLayout();
-            toolStrip1.SuspendLayout();
             tableLayoutPanel1.SuspendLayout();
             panel2.SuspendLayout();
             SuspendLayout();
-            // 
-            // toolStripButton1
-            // 
-            toolStripButton1.Name = "toolStripButton1";
-            toolStripButton1.Size = new Size(172, 4);
-            // 
-            // toolStripButton6
-            // 
-            toolStripButton6.Name = "toolStripButton6";
-            toolStripButton6.Size = new Size(172, 4);
-            // 
-            // toolStripButton5
-            // 
-            toolStripButton5.Name = "toolStripButton5";
-            toolStripButton5.Size = new Size(172, 4);
-            // 
-            // toolStripButton4
-            // 
-            toolStripButton4.Name = "toolStripButton4";
-            toolStripButton4.Size = new Size(172, 4);
-            // 
-            // toolStripButton2
-            // 
-            toolStripButton2.Name = "toolStripButton2";
-            toolStripButton2.Size = new Size(172, 4);
             // 
             // quảnLýLệnhToolStripMenuItem
             // 
             quảnLýLệnhToolStripMenuItem.Name = "quảnLýLệnhToolStripMenuItem";
             quảnLýLệnhToolStripMenuItem.Size = new Size(32, 19);
             // 
-            // toolStripButton12
-            // 
-            toolStripButton12.Name = "toolStripButton12";
-            toolStripButton12.Size = new Size(172, 4);
-            // 
-            // toolStripButton11
-            // 
-            toolStripButton11.Name = "toolStripButton11";
-            toolStripButton11.Size = new Size(172, 4);
-            // 
-            // toolStripButton10
-            // 
-            toolStripButton10.Name = "toolStripButton10";
-            toolStripButton10.Size = new Size(172, 4);
-            // 
-            // toolStripButton9
-            // 
-            toolStripButton9.Name = "toolStripButton9";
-            toolStripButton9.Size = new Size(172, 4);
-            // 
-            // toolStripButton8
-            // 
-            toolStripButton8.Name = "toolStripButton8";
-            toolStripButton8.Size = new Size(172, 4);
-            // 
-            // toolStripDropDownButton1
-            // 
-            toolStripDropDownButton1.Name = "toolStripDropDownButton1";
-            toolStripDropDownButton1.Size = new Size(172, 4);
-            // 
             // toolStripMenuItem1
             // 
             toolStripMenuItem1.Name = "toolStripMenuItem1";
             toolStripMenuItem1.Size = new Size(32, 19);
-            // 
-            // toolStripButton3
-            // 
-            toolStripButton3.Name = "toolStripButton3";
-            toolStripButton3.Size = new Size(172, 4);
-            // 
-            // toolStripSeparator1
-            // 
-            toolStripSeparator1.Name = "toolStripSeparator1";
-            toolStripSeparator1.Size = new Size(172, 6);
-            // 
-            // toolStripLabel1
-            // 
-            toolStripLabel1.Name = "toolStripLabel1";
-            toolStripLabel1.Size = new Size(172, 0);
             // 
             // button1
             // 
@@ -137,14 +69,14 @@
             // 
             // button2
             // 
-            button2.Location = new Point(61, 3);
+            button2.Location = new Point(47, 3);
             button2.Name = "button2";
             button2.Size = new Size(0, 0);
             button2.TabIndex = 1;
             // 
             // button3
             // 
-            button3.Location = new Point(119, 3);
+            button3.Location = new Point(91, 3);
             button3.Name = "button3";
             button3.Size = new Size(0, 0);
             button3.TabIndex = 2;
@@ -157,38 +89,81 @@
             panel1.BorderColor = Color.FromArgb(53, 182, 83);
             panel1.BorderWidth = 2.5F;
             panel1.ColorScheme = AntdUI.TAMode.Light;
-            panel1.Controls.Add(panelScroll);
+            panel1.Controls.Add(menu3);
+            panel1.Controls.Add(panel3);
             panel1.Controls.Add(tableLayoutPanel1);
             panel1.Controls.Add(panel2);
             panel1.Dock = DockStyle.Fill;
             panel1.Location = new Point(0, 0);
             panel1.Name = "panel1";
             panel1.Radius = 5;
-            panel1.Size = new Size(180, 450);
+            panel1.Size = new Size(140, 450);
             panel1.TabIndex = 0;
             // 
-            // panelScroll
+            // menu3
             // 
-            panelScroll.AutoScroll = true;
-            panelScroll.BackColor = Color.White;
-            panelScroll.Controls.Add(toolStrip1);
-            panelScroll.Dock = DockStyle.Fill;
-            panelScroll.Location = new Point(3, 53);
-            panelScroll.Name = "panelScroll";
-            panelScroll.Size = new Size(174, 354);
-            panelScroll.TabIndex = 0;
+            menu3.BackColor = Color.White;
+            menu3.BackHover = Color.FromArgb(233, 247, 239);
+            menu3.Dock = DockStyle.Fill;
+            menu3.ForeActive = Color.Green;
+            menu3.ForeColor = Color.Black;
+            menu3.IconRatio = 0.9F;
+            menuItem1.IconSvg = "MailOutlined";
+            menuItem3.Text = "Option 1";
+            menuItem4.Text = "Option 2";
+            menuItem2.Sub.Add(menuItem3);
+            menuItem2.Sub.Add(menuItem4);
+            menuItem2.Text = "Item 1";
+            menuItem6.Text = "Option 3";
+            menuItem7.Text = "Option 4";
+            menuItem5.Sub.Add(menuItem6);
+            menuItem5.Sub.Add(menuItem7);
+            menuItem5.Text = "Item 2";
+            menuItem1.Sub.Add(menuItem2);
+            menuItem1.Sub.Add(menuItem5);
+            menuItem1.Text = "Navigation One";
+            menuItem8.Expand = false;
+            menuItem8.IconSvg = "AppstoreOutlined";
+            menuItem9.Text = "Option 5";
+            menuItem10.Text = "Option 6";
+            menuItem12.Text = "Option 7";
+            menuItem13.Text = "Option 8";
+            menuItem11.Sub.Add(menuItem12);
+            menuItem11.Sub.Add(menuItem13);
+            menuItem11.Text = "Submenu";
+            menuItem8.Sub.Add(menuItem9);
+            menuItem8.Sub.Add(menuItem10);
+            menuItem8.Sub.Add(menuItem11);
+            menuItem8.Text = "Navigation Two";
+            menuItem14.Expand = false;
+            menuItem14.IconSvg = "SettingOutlined";
+            menuItem15.Text = "Option 9";
+            menuItem16.Text = "Option 10";
+            menuItem17.Text = "Option 11";
+            menuItem18.Text = "Option 12";
+            menuItem14.Sub.Add(menuItem15);
+            menuItem14.Sub.Add(menuItem16);
+            menuItem14.Sub.Add(menuItem17);
+            menuItem14.Sub.Add(menuItem18);
+            menuItem14.Text = "Navigation Three";
+            menu3.Items.Add(menuItem1);
+            menu3.Items.Add(menuItem8);
+            menu3.Items.Add(menuItem14);
+            menu3.Location = new Point(3, 92);
+            menu3.Mode = AntdUI.TMenuMode.Vertical;
+            menu3.Name = "menu3";
+            menu3.Size = new Size(134, 315);
+            menu3.TabIndex = 5;
+            menu3.SelectChanged += menu3_SelectChanged;
             // 
-            // toolStrip1
+            // panel3
             // 
-            toolStrip1.BackColor = Color.White;
-            toolStrip1.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip1.Items.AddRange(new ToolStripItem[] { toolStripButton1, toolStripButton6, toolStripButton5, toolStripButton4, toolStripButton2, toolStripButton12, toolStripButton11, toolStripButton10, toolStripButton9, toolStripButton8, toolStripButton3, toolStripSeparator1, toolStripLabel1, toolStripDropDownButton1 });
-            toolStrip1.LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow;
-            toolStrip1.Location = new Point(0, 0);
-            toolStrip1.Name = "toolStrip1";
-            toolStrip1.RenderMode = ToolStripRenderMode.Professional;
-            toolStrip1.Size = new Size(174, 95);
-            toolStrip1.TabIndex = 0;
+            panel3.BackColor = Color.White;
+            panel3.Dock = DockStyle.Top;
+            panel3.Location = new Point(3, 53);
+            panel3.Name = "panel3";
+            panel3.Size = new Size(134, 39);
+            panel3.TabIndex = 3;
             // 
             // tableLayoutPanel1
             // 
@@ -205,7 +180,7 @@
             tableLayoutPanel1.Name = "tableLayoutPanel1";
             tableLayoutPanel1.RowCount = 1;
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
-            tableLayoutPanel1.Size = new Size(174, 40);
+            tableLayoutPanel1.Size = new Size(134, 40);
             tableLayoutPanel1.TabIndex = 1;
             // 
             // panel2
@@ -217,7 +192,7 @@
             panel2.Location = new Point(3, 3);
             panel2.Margin = new Padding(0);
             panel2.Name = "panel2";
-            panel2.Size = new Size(174, 50);
+            panel2.Size = new Size(134, 50);
             panel2.TabIndex = 2;
             // 
             // label2
@@ -225,12 +200,12 @@
             label2.BackColor = Color.FromArgb(190, 231, 200);
             label2.Cursor = Cursors.SizeAll;
             label2.Dock = DockStyle.Fill;
-            label2.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            label2.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             label2.ForeColor = Color.Green;
             label2.Location = new Point(0, 0);
             label2.Name = "label2";
             label2.Padding = new Padding(10, 0, 0, 0);
-            label2.Size = new Size(144, 50);
+            label2.Size = new Size(110, 50);
             label2.Suffix = " SM-G930F";
             label2.SuffixColor = Color.FromArgb(53, 182, 83);
             label2.TabIndex = 0;
@@ -246,9 +221,9 @@
             button9.DisplayStyle = AntdUI.TButtonDisplayStyle.Image;
             button9.Dock = DockStyle.Right;
             button9.IconSvg = "CloseOutlined";
-            button9.Location = new Point(144, 0);
+            button9.Location = new Point(110, 0);
             button9.Name = "button9";
-            button9.Size = new Size(30, 50);
+            button9.Size = new Size(24, 50);
             button9.TabIndex = 1;
             button9.Click += button9_Click;
             // 
@@ -258,12 +233,8 @@
             Controls.Add(panel1);
             Margin = new Padding(0);
             Name = "ucMenuscripDevice";
-            Size = new Size(180, 450);
+            Size = new Size(140, 450);
             panel1.ResumeLayout(false);
-            panelScroll.ResumeLayout(false);
-            panelScroll.PerformLayout();
-            toolStrip1.ResumeLayout(false);
-            toolStrip1.PerformLayout();
             tableLayoutPanel1.ResumeLayout(false);
             panel2.ResumeLayout(false);
             ResumeLayout(false);
@@ -273,23 +244,8 @@
         #endregion
 
         private AntdUI.Panel panel1;
-        private ToolStrip toolStrip1;
-        private ToolStripButton toolStripButton1;
-        private ToolStripButton toolStripButton6;
-        private ToolStripButton toolStripButton5;
-        private ToolStripButton toolStripButton4;
-        private ToolStripDropDownButton toolStripButton2;
         private ToolStripMenuItem quảnLýLệnhToolStripMenuItem;
-        private ToolStripButton toolStripButton12;
-        private ToolStripButton toolStripButton11;
-        private ToolStripButton toolStripButton10;
-        private ToolStripButton toolStripButton9;
-        private ToolStripButton toolStripButton8;
-        private ToolStripDropDownButton toolStripDropDownButton1;
         private ToolStripMenuItem toolStripMenuItem1;
-        private ToolStripButton toolStripButton3;
-        private ToolStripSeparator toolStripSeparator1;
-        private ToolStripLabel toolStripLabel1;
 
         private TableLayoutPanel tableLayoutPanel1;
         private AntdUI.Button button1;
@@ -298,7 +254,8 @@
         private Panel panel2;
         private AntdUI.Label label2;
         private AntdUI.Button button9;
-        private Panel panelScroll;
+        private AntdUI.Menu menu3;
+        private Panel panel3;
         // Helpers for uniform setup
 
     }

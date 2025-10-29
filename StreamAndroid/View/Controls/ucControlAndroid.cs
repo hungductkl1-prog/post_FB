@@ -47,7 +47,10 @@ namespace StreamAndroid
         private int processingFrame = 0;
 
         private int frameSkipCounter = 0;
-        private const int FRAME_SKIP_INTERVAL = 2;
+        private const int FRAME_SKIP_INTERVAL = 5;
+
+        private int frameDropCounter = 0;
+        private System.Windows.Forms.Timer gcTimer;
 
         private bool showButtons = false;
         private SDL.SDL_Rect btnSettingsRect;
@@ -62,7 +65,7 @@ namespace StreamAndroid
         private bool isDragging = false;
         private System.Drawing.Point dragStartPoint;
         private System.Drawing.Point dragStartLocation;
-        private bool showOverlayText = true;
+        public bool showOverlayText = true;
 
         public event EventHandler? SettingsButtonClicked;
         public event EventHandler? InfoButtonClicked;
@@ -83,12 +86,14 @@ namespace StreamAndroid
         // Defer center text until renderer ready
         private string? pendingCenterText;
         private Color pendingCenterTextColor = Color.White;
-
+        public DeviceView DeviceView;
         public ucControlAndroid(DeviceView deviceView)
         {
             InitializeComponent();
+            DeviceView = deviceView;
             this.device = deviceView.DeviceModel;
             instance = deviceView.Scrcpy;
+            frameIntervalMs = 50;
 
             this.Load += UcDeviceView_Load;
             this.Disposed += UcDeviceView_Disposed;
@@ -130,6 +135,20 @@ namespace StreamAndroid
                     RenderFrame();
                 }
             };
+            gcTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+            gcTimer.Tick += (s, e) =>
+            {
+                try
+                {
+                    GC.Collect(0, GCCollectionMode.Optimized, false);
+                    if (frameDropCounter > 0)
+                    {
+                        Debug.WriteLine($"🧹 GC cleanup for {device.Serial} - dropped {frameDropCounter} frames");
+                    }
+                }
+                catch { }
+            };
+            gcTimer.Start();
         }
 
         public void AttachInstance(Scrcpy? newInstance)
@@ -291,7 +310,8 @@ namespace StreamAndroid
             // Must run on UI thread
             if (pictureBox1.InvokeRequired)
             {
-                pictureBox1.Invoke((Action)(() => {
+                pictureBox1.Invoke((Action)(() =>
+                {
                     if (!isDisposing)
                     {
                         lock (rendererLock)
@@ -351,7 +371,13 @@ namespace StreamAndroid
                 hideButtonsTimer?.Stop();
                 hideButtonsTimer?.Dispose();
 
-                AttachInstance(null); // detach
+                stallWatchdogTimer?.Stop();
+                stallWatchdogTimer?.Dispose();
+
+                gcTimer?.Stop();
+                gcTimer?.Dispose();
+
+                AttachInstance(null);
 
                 lock (latestFrameLock)
                 {
@@ -378,6 +404,12 @@ namespace StreamAndroid
                 }
 
                 EnsureSdlShutdown();
+
+                // ✅ Force GC on dispose
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+
+                Debug.WriteLine($"♻️ Disposed {device.Serial}, dropped {frameDropCounter} frames total");
             }
             catch (Exception ex)
             {
@@ -499,12 +531,7 @@ namespace StreamAndroid
             SetCenterText("Điện thoại đã ngắt kết nối, vui lòng kiểm tra.", Color.OrangeRed);
         }
 
-        private void DrawBackground()
-        {
-            SDL.SDL_SetRenderDrawColor(sdlRender, 45, 45, 45, 255);
-            SDL.SDL_RenderFillRect(sdlRender, ref updateRect);
-        }
-
+      
         public void RenderFrame()
         {
             if (isDisposing || !IsHandleCreated || !Visible || !pictureBox1.Visible) return;
@@ -540,7 +567,7 @@ namespace StreamAndroid
                 }
 
                 // Show overlay text only when connected and streaming
-                if (showOverlayText && instance != null && drewVideo)
+                if (showOverlayText)
                 {
                     DrawOverlayTextCached(sdlRender, device.Id.ToString(), device.NameDevice ?? "Unknown");
                 }
@@ -559,7 +586,6 @@ namespace StreamAndroid
                 Monitor.Exit(locker);
             }
         }
-
 
 
         public void SetCenterText(string text, Color? color = null)
@@ -581,7 +607,8 @@ namespace StreamAndroid
                 // Try to initialize if handle created
                 if (pictureBox1.IsHandleCreated && !isDisposing)
                 {
-                    BeginInvoke((Action)(() => {
+                    BeginInvoke((Action)(() =>
+                    {
                         if (!isDisposing)
                         {
                             InitRender();
@@ -616,91 +643,98 @@ namespace StreamAndroid
             float baseFontSize = Math.Max(8f, Math.Min((float)Math.Round(42f * scale), 18f));
 
             float fontSize = baseFontSize;
-            Font font = null;
-            List<string> lines = null;
-            List<SizeF> lineSizes = null;
+            Font? font = null;
+            List<string>? lines = null;
+            List<SizeF>? lineSizes = null;
             float totalHeight = 0;
             float maxLineWidth = 0;
             float lineSpacing = 0;
 
-            while (fontSize >= 8f)
+            try
             {
-                font?.Dispose();
-                font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
-
-                lineSpacing = fontSize * 0.08f;
-
-                lines = WrapText(text, font, maxWidth, out lineSizes);
-
-                totalHeight = 0;
-                maxLineWidth = 0;
-
-                for (int i = 0; i < lineSizes.Count; i++)
+                while (fontSize >= 8f)
                 {
-                    totalHeight += lineSizes[i].Height;
-                    if (i < lineSizes.Count - 1)
-                        totalHeight += lineSpacing;
+                    font?.Dispose();
+                    font = new Font("Segoe UI", fontSize, FontStyle.Bold, GraphicsUnit.Pixel);
 
-                    maxLineWidth = Math.Max(maxLineWidth, lineSizes[i].Width);
+                    lineSpacing = fontSize * 0.08f;
+
+                    lines = WrapText(text, font, maxWidth, out lineSizes);
+
+                    totalHeight = 0;
+                    maxLineWidth = 0;
+
+                    for (int i = 0; i < lineSizes.Count; i++)
+                    {
+                        totalHeight += lineSizes[i].Height;
+                        if (i < lineSizes.Count - 1)
+                            totalHeight += lineSpacing;
+
+                        maxLineWidth = Math.Max(maxLineWidth, lineSizes[i].Width);
+                    }
+
+                    if (totalHeight <= maxHeight && maxLineWidth <= maxWidth)
+                        break;
+
+                    fontSize -= 1f;
                 }
 
-                if (totalHeight <= maxHeight && maxLineWidth <= maxWidth)
-                    break;
+                if (font == null || lines == null || lines.Count == 0)
+                    return;
 
-                fontSize -= 1f;
-            }
+                int containerX = updateRect.w > 0 ? updateRect.x : 0;
+                int containerY = updateRect.h > 0 ? updateRect.y : 0;
+                int containerW = updateRect.w > 0 ? updateRect.w :
+                                 (pictureBox1?.ClientSize.Width > 0 ? pictureBox1.ClientSize.Width : 480);
+                int containerH = updateRect.h > 0 ? updateRect.h :
+                                 (pictureBox1?.ClientSize.Height > 0 ? pictureBox1.ClientSize.Height : 720);
 
-            if (font == null || lines == null || lines.Count == 0)
-                return;
+                int startY = containerY + (int)((containerH - totalHeight) / 2);
+                float currentY = startY;
 
-            int containerX = updateRect.w > 0 ? updateRect.x : 0;
-            int containerY = updateRect.h > 0 ? updateRect.y : 0;
-            int containerW = updateRect.w > 0 ? updateRect.w :
-                             (pictureBox1?.ClientSize.Width > 0 ? pictureBox1.ClientSize.Width : 480);
-            int containerH = updateRect.h > 0 ? updateRect.h :
-                             (pictureBox1?.ClientSize.Height > 0 ? pictureBox1.ClientSize.Height : 720);
+                byte alpha = (byte)(overlayTextOpacity * 255 / 100);
 
-            int startY = containerY + (int)((containerH - totalHeight) / 2);
-            float currentY = startY;
-
-            byte alpha = (byte)(overlayTextOpacity * 255 / 100);
-
-            for (int i = 0; i < lines.Count; i++)
-            {
-                var line = lines[i];
-                if (string.IsNullOrWhiteSpace(line))
-                    continue;
-
-                int borderThickness = Math.Max(1, Math.Min((int)(fontSize * 0.08f), 3));
-                int shadowOffset = Math.Max(1, Math.Min((int)(fontSize * 0.06f), 2));
-
-                var tex = CreateOutlinedTextTexture(renderer, line, font,
-                    textColor, Color.FromArgb(30, 30, 30), borderThickness, shadowOffset);
-
-                if (tex == IntPtr.Zero)
-                    continue;
-
-                SDL.SDL_QueryTexture(tex, out _, out _, out int w, out int h);
-                SDL.SDL_SetTextureAlphaMod(tex, alpha);
-
-                int x = containerX + (containerW - w) / 2;
-
-                SDL.SDL_Rect dst = new SDL.SDL_Rect
+                for (int i = 0; i < lines.Count; i++)
                 {
-                    x = x,
-                    y = (int)currentY,
-                    w = w,
-                    h = h
-                };
-                SDL.SDL_RenderCopy(renderer, tex, IntPtr.Zero, ref dst);
-                SDL.SDL_DestroyTexture(tex);
+                    var line = lines[i];
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
 
-                currentY += h + (i < lines.Count - 1 ? lineSpacing : 0);
+                    int borderThickness = Math.Max(1, Math.Min((int)(fontSize * 0.08f), 3));
+                    int shadowOffset = Math.Max(1, Math.Min((int)(fontSize * 0.06f), 2));
+
+                    var tex = CreateOutlinedTextTexture(renderer, line, font,
+                        textColor, Color.FromArgb(30, 30, 30), borderThickness, shadowOffset);
+
+                    if (tex == IntPtr.Zero)
+                        continue;
+
+                    SDL.SDL_QueryTexture(tex, out _, out _, out int w, out int h);
+                    SDL.SDL_SetTextureAlphaMod(tex, alpha);
+
+                    int x = containerX + (containerW - w) / 2;
+
+                    SDL.SDL_Rect dst = new SDL.SDL_Rect
+                    {
+                        x = x,
+                        y = (int)currentY,
+                        w = w,
+                        h = h
+                    };
+                    SDL.SDL_RenderCopy(renderer, tex, IntPtr.Zero, ref dst);
+
+                    // ✅ CRITICAL: Destroy texture immediately
+                    SDL.SDL_DestroyTexture(tex);
+
+                    currentY += h + (i < lines.Count - 1 ? lineSpacing : 0);
+                }
             }
-
-            font?.Dispose();
+            finally
+            {
+                // ✅ CRITICAL: Always dispose font
+                font?.Dispose();
+            }
         }
-
         private List<string> WrapText(string text, Font font, int maxWidth, out List<SizeF> lineSizes)
         {
             var lines = new List<string>();
@@ -775,7 +809,7 @@ namespace StreamAndroid
 
             if (showOverlayText && e.Button == MouseButtons.Right)
             {
-                var ucMenuscrip = new ucMenuscripDevice(false) { Height = this.Size.Height };
+                var ucMenuscrip = new ucMenuscripDevice(device) { Height = this.Size.Height };
                 var config = new AntdUI.Popover.Config(pictureBox1, ucMenuscrip)
                 {
                     ArrowAlign = AntdUI.TAlign.Right,
@@ -951,7 +985,8 @@ namespace StreamAndroid
                    p.Y >= rect.y && p.Y <= rect.y + rect.h;
         }
 
-        private IntPtr CreateOutlinedTextTexture(IntPtr renderer, string text, Font font, Color fillColor, Color borderColor, int borderThickness = 2, int shadowOffset = 3)
+        private IntPtr CreateOutlinedTextTexture(IntPtr renderer, string text, Font font,
+     Color fillColor, Color borderColor, int borderThickness = 2, int shadowOffset = 3)
         {
             if (string.IsNullOrEmpty(text) || renderer == IntPtr.Zero || font == null)
                 return IntPtr.Zero;
@@ -969,19 +1004,28 @@ namespace StreamAndroid
             int w = (int)Math.Ceiling(textSize.Width) + padding * 2;
             int h = (int)Math.Ceiling(textSize.Height) + padding * 2;
 
-            using (var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb))
-            using (var g = Graphics.FromImage(bmp))
-            using (var brushFill = new SolidBrush(fillColor))
-            using (var brushBorder = new SolidBrush(borderColor))
-            using (var brushShadow = new SolidBrush(Color.FromArgb(150, borderColor)))
+            Bitmap? bmp = null;
+            Graphics? g2 = null;
+            SolidBrush? brushFill = null;
+            SolidBrush? brushBorder = null;
+            SolidBrush? brushShadow = null;
+
+            try
             {
-                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-                g.Clear(Color.Transparent);
+                bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb);
+                g2 = Graphics.FromImage(bmp);
+                brushFill = new SolidBrush(fillColor);
+                brushBorder = new SolidBrush(borderColor);
+                brushShadow = new SolidBrush(Color.FromArgb(150, borderColor));
+
+                g2.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                g2.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                g2.Clear(Color.Transparent);
 
                 var sf = StringFormat.GenericTypographic;
 
-                g.DrawString(text, font, brushShadow, new PointF(padding + shadowOffset, padding + shadowOffset), sf);
+                g2.DrawString(text, font, brushShadow,
+                    new PointF(padding + shadowOffset, padding + shadowOffset), sf);
 
                 for (int dy = -radius; dy <= radius; dy++)
                 {
@@ -989,15 +1033,17 @@ namespace StreamAndroid
                     {
                         if (dx * dx + dy * dy <= radius * radius)
                         {
-                            g.DrawString(text, font, brushBorder, new PointF(padding + dx, padding + dy), sf);
+                            g2.DrawString(text, font, brushBorder,
+                                new PointF(padding + dx, padding + dy), sf);
                         }
                     }
                 }
 
-                g.DrawString(text, font, brushFill, new PointF(padding, padding), sf);
+                g2.DrawString(text, font, brushFill, new PointF(padding, padding), sf);
 
                 var rect = new Rectangle(0, 0, bmp.Width, bmp.Height);
                 var bmpData = bmp.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+
                 IntPtr texture = SDL.SDL_CreateTexture(
                     renderer,
                     SDL.SDL_PIXELFORMAT_ARGB8888,
@@ -1013,7 +1059,17 @@ namespace StreamAndroid
                 bmp.UnlockBits(bmpData);
                 return texture;
             }
+            finally
+            {
+                // ✅ CRITICAL: Dispose ALL GDI+ objects
+                brushShadow?.Dispose();
+                brushBorder?.Dispose();
+                brushFill?.Dispose();
+                g2?.Dispose();
+                bmp?.Dispose();
+            }
         }
+
 
         private void DrawOverlayTextCached(IntPtr renderer, string line1, string line2)
         {
@@ -1051,46 +1107,65 @@ namespace StreamAndroid
             float bigSize = Math.Max(12f, Math.Min((float)Math.Round(baseBig * scale), 120f));
             float smallSize = Math.Max(10f, Math.Min((float)Math.Round(baseSmall * scale), 88f));
 
-            using var fontBig = new Font("Segoe UI", bigSize, FontStyle.Bold, GraphicsUnit.Pixel);
-            using var fontSmall = new Font("Segoe UI", smallSize, FontStyle.Bold, GraphicsUnit.Pixel);
+            Font? fontBig = null;
+            Font? fontSmall = null;
+            IntPtr tex1 = IntPtr.Zero;
+            IntPtr tex2 = IntPtr.Zero;
 
-            var tex1 = CreateOutlinedTextTexture(renderer, line1, fontBig, Color.White, Color.FromArgb(60, 60, 60), 2, 3);
-            var tex2 = CreateOutlinedTextTexture(renderer, line2, fontSmall, Color.White, Color.FromArgb(60, 60, 60), 2, 3);
-
-            if (tex1 == IntPtr.Zero && tex2 == IntPtr.Zero)
-                return;
-
-            int w1 = 0, h1 = 0, w2 = 0, h2 = 0;
-            if (tex1 != IntPtr.Zero)
-                SDL.SDL_QueryTexture(tex1, out _, out _, out w1, out h1);
-            if (tex2 != IntPtr.Zero)
-                SDL.SDL_QueryTexture(tex2, out _, out _, out w2, out h2);
-
-            byte alpha = (byte)(overlayTextOpacity * 255 / 100);
-
-            if (tex1 != IntPtr.Zero)
-                SDL.SDL_SetTextureAlphaMod(tex1, alpha);
-            if (tex2 != IntPtr.Zero)
-                SDL.SDL_SetTextureAlphaMod(tex2, alpha);
-
-            int containerX = updateRect.w > 0 ? updateRect.x : 10;
-            int containerW = updateRect.w > 0 ? updateRect.w : Math.Max(Math.Max(w1, w2) + 20, 200);
-            int centerX = containerX + containerW / 2;
-            int startY = (updateRect.h > 0 ? updateRect.y : 10) + 10;
-
-            if (tex1 != IntPtr.Zero)
+            try
             {
-                SDL.SDL_Rect dst1 = new SDL.SDL_Rect { x = centerX - w1 / 2, y = startY, w = w1, h = h1 };
-                SDL.SDL_RenderCopy(renderer, tex1, IntPtr.Zero, ref dst1);
-                SDL.SDL_DestroyTexture(tex1);
+                fontBig = new Font("Segoe UI", bigSize, FontStyle.Bold, GraphicsUnit.Pixel);
+                fontSmall = new Font("Segoe UI", smallSize, FontStyle.Bold, GraphicsUnit.Pixel);
+
+                tex1 = CreateOutlinedTextTexture(renderer, line1, fontBig,
+                    Color.White, Color.FromArgb(60, 60, 60), 2, 3);
+                tex2 = CreateOutlinedTextTexture(renderer, line2, fontSmall,
+                    Color.White, Color.FromArgb(60, 60, 60), 2, 3);
+
+                if (tex1 == IntPtr.Zero && tex2 == IntPtr.Zero)
+                    return;
+
+                int w1 = 0, h1 = 0, w2 = 0, h2 = 0;
+                if (tex1 != IntPtr.Zero)
+                    SDL.SDL_QueryTexture(tex1, out _, out _, out w1, out h1);
+                if (tex2 != IntPtr.Zero)
+                    SDL.SDL_QueryTexture(tex2, out _, out _, out w2, out h2);
+
+                byte alpha = (byte)(overlayTextOpacity * 255 / 100);
+
+                if (tex1 != IntPtr.Zero)
+                    SDL.SDL_SetTextureAlphaMod(tex1, alpha);
+                if (tex2 != IntPtr.Zero)
+                    SDL.SDL_SetTextureAlphaMod(tex2, alpha);
+
+                int containerX = updateRect.w > 0 ? updateRect.x : 10;
+                int containerW = updateRect.w > 0 ? updateRect.w : Math.Max(Math.Max(w1, w2) + 20, 200);
+                int centerX = containerX + containerW / 2;
+                int startY = (updateRect.h > 0 ? updateRect.y : 10) + 10;
+
+                if (tex1 != IntPtr.Zero)
+                {
+                    SDL.SDL_Rect dst1 = new SDL.SDL_Rect { x = centerX - w1 / 2, y = startY, w = w1, h = h1 };
+                    SDL.SDL_RenderCopy(renderer, tex1, IntPtr.Zero, ref dst1);
+                }
+                if (tex2 != IntPtr.Zero)
+                {
+                    SDL.SDL_Rect dst2 = new SDL.SDL_Rect { x = centerX - w2 / 2, y = startY + h1, w = w2, h = h2 };
+                    SDL.SDL_RenderCopy(renderer, tex2, IntPtr.Zero, ref dst2);
+                }
             }
-            if (tex2 != IntPtr.Zero)
+            finally
             {
-                SDL.SDL_Rect dst2 = new SDL.SDL_Rect { x = centerX - w2 / 2, y = startY + h1, w = w2, h = h2 };
-                SDL.SDL_RenderCopy(renderer, tex2, IntPtr.Zero, ref dst2);
-                SDL.SDL_DestroyTexture(tex2);
+                // ✅ CRITICAL: Destroy textures immediately
+                if (tex1 != IntPtr.Zero) SDL.SDL_DestroyTexture(tex1);
+                if (tex2 != IntPtr.Zero) SDL.SDL_DestroyTexture(tex2);
+
+                // ✅ CRITICAL: Dispose fonts
+                fontBig?.Dispose();
+                fontSmall?.Dispose();
             }
         }
+
 
         private void DrawSDLButtons(IntPtr renderer)
         {
@@ -1126,23 +1201,35 @@ namespace StreamAndroid
             SDL.SDL_RenderDrawRect(renderer, ref rect);
 
             int iconSize = Math.Max(12, rect.w / 3);
-            using var font = new Font("Segoe UI Symbol", iconSize, FontStyle.Bold, GraphicsUnit.Pixel);
-            var iconTex = CreateOutlinedTextTexture(renderer, icon, font, Color.White, Color.Black, 1, 1);
+            Font? font = null;
+            IntPtr iconTex = IntPtr.Zero;
 
-            if (iconTex != IntPtr.Zero)
+            try
             {
-                SDL.SDL_QueryTexture(iconTex, out _, out _, out int w, out int h);
-                var iconRect = new SDL.SDL_Rect
+                font = new Font("Segoe UI Symbol", iconSize, FontStyle.Bold, GraphicsUnit.Pixel);
+                iconTex = CreateOutlinedTextTexture(renderer, icon, font, Color.White, Color.Black, 1, 1);
+
+                if (iconTex != IntPtr.Zero)
                 {
-                    x = rect.x + (rect.w - w) / 2,
-                    y = rect.y + (rect.h - h) / 2,
-                    w = w,
-                    h = h
-                };
-                SDL.SDL_RenderCopy(renderer, iconTex, IntPtr.Zero, ref iconRect);
-                SDL.SDL_DestroyTexture(iconTex);
+                    SDL.SDL_QueryTexture(iconTex, out _, out _, out int w, out int h);
+                    var iconRect = new SDL.SDL_Rect
+                    {
+                        x = rect.x + (rect.w - w) / 2,
+                        y = rect.y + (rect.h - h) / 2,
+                        w = w,
+                        h = h
+                    };
+                    SDL.SDL_RenderCopy(renderer, iconTex, IntPtr.Zero, ref iconRect);
+                }
+            }
+            finally
+            {
+                // ✅ CRITICAL: Destroy texture and dispose font
+                if (iconTex != IntPtr.Zero) SDL.SDL_DestroyTexture(iconTex);
+                font?.Dispose();
             }
         }
+
 
         private unsafe void VideoStreamDecoder_NewFrameEvent(AVFrame frame)
         {
@@ -1164,6 +1251,13 @@ namespace StreamAndroid
                     return;
                 }
 
+                // ✅ CRITICAL: Drop frames if UI can't keep up (backpressure)
+                if (Interlocked.CompareExchange(ref renderScheduled, 0, 0) == 1)
+                {
+                    frameDropCounter++;
+                    return; // UI still rendering previous frame, drop this one
+                }
+
                 if (Interlocked.CompareExchange(ref processingFrame, 1, 0) == 1)
                 {
                     return;
@@ -1177,6 +1271,7 @@ namespace StreamAndroid
                         return;
                     }
 
+                    // ✅ CRITICAL: Dispose old frame immediately
                     lock (latestFrameLock)
                     {
                         latestFrame?.Dispose();

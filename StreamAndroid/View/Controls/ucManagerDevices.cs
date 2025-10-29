@@ -1,4 +1,5 @@
 ﻿using AntdUI;
+using Newtonsoft.Json.Linq;
 using StreamAndroid.Helper;
 using StreamAndroid.Services;
 using StreamAndroid.View;
@@ -518,11 +519,17 @@ namespace StreamAndroid
         private void slider1_ValueChanged(object sender, IntEventArgs e)
         {
             SetOverlayTextOpacity(slider1.Value);
+            SetRenderSize(slider3.Value, rotationAngle);
         }
 
         private void button9_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void slider4_ValueChanged(object sender, IntEventArgs e)
+        {
+            deviceManagerService.SetValueToSlider(slider4.Value);
         }
     }
 }

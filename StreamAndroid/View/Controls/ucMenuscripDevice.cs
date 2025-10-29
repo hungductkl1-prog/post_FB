@@ -1,65 +1,66 @@
-﻿using Sunny.Subdy.Common.Helper;
+﻿using AntdUI;
+using Sunny.Subdy.Common.Helper;
+using Sunny.Subdy.Data.Models;
 
 namespace StreamAndroid
 {
     public partial class ucMenuscripDevice : UserControl
     {
         private Form? targetForm;
-        private Form? parentForm; 
+        private Control? parentForm;
         public event EventHandler? SettingsButtonClicked;
-        public ucMenuscripDevice(bool check, Form form = null, Form formCha = null)
+        private DeviceModel Device;
+        public ucMenuscripDevice(DeviceModel device, Form form , Control formCha )
         {
             InitializeComponent();
-            button9.Visible = check;
-            if (check)
-            {
-                targetForm = form;
-                parentForm = formCha;
-                new DragHandler(label2, targetForm, parentForm);
-            }
-            // ToolStrip Buttons Config
-            ConfigureToolStripButton(toolStripButton1, "Khởi động lại");
-            ConfigureToolStripButton(toolStripButton6, "Cài đặt APK");
-            ConfigureToolStripButton(toolStripButton5, "Xuất tệp");
-            ConfigureToolStripButton(toolStripButton4, "Xuất bảng nhớ");
-            ConfigureToolStripDropDown(toolStripButton2, "Lệnh ADB", quảnLýLệnhToolStripMenuItem, "Quản lý lệnh");
-            ConfigureToolStripButton(toolStripButton12, "Vuốt tự động");
-            ConfigureToolStripButton(toolStripButton11, "Ghi lại hành động");
-            ConfigureToolStripButton(toolStripButton10, "Thực hiện hành động");
-            ConfigureToolStripButton(toolStripButton9, "Thực hiện nhiệm vụ");
-            ConfigureToolStripButton(toolStripButton8, "Kết thúc nhiệm vụ");
-            ConfigureToolStripDropDown(toolStripDropDownButton1, "Chuyển đổi phương", toolStripMenuItem1, "Quản lý lệnh");
-            ConfigureToolStripButton(toolStripButton3, "Xoay phải");
+            Device = device;
+            button9.Visible = true;
+            targetForm = form;
+            parentForm = formCha;
+            new DragHandler(label2, targetForm, parentForm);
+            this.Load += UcMenuscripDevice_Load;
+        }
+        public ucMenuscripDevice(DeviceModel device)
+        {
+            InitializeComponent();
+            Device = device;
+            button9.Visible = false;
+            label2.Cursor = Cursors.Default;
+            this.Load += UcMenuscripDevice_Load;
+        }
+
+        private void UcMenuscripDevice_Load(object? sender, EventArgs e)
+        {
+           
+            label2.Suffix = $" {Device.NameDevice}";
+            label2.Text = Device.Id.ToString();
+            CreateMenu();
             // Buttons bottom
             ConfigureAntdButton(button1, "BorderOutlined");
             ConfigureAntdButton(button2, "HomeOutlined");
             ConfigureAntdButton(button3, "DoubleLeftOutlined");
         }
 
-
-        private void ConfigureToolStripButton(ToolStripButton btn, string text)
+        private void CreateMenu()
         {
-            btn.Font = new Font("Segoe UI", 9.75F);
-            btn.ForeColor = Color.Black;
-           // btn.Image = Properties.Resources.facebook;
-            btn.ImageAlign = ContentAlignment.MiddleLeft;
-            btn.ImageTransparentColor = Color.Magenta;
-            btn.Text = text;
-            btn.TextAlign = ContentAlignment.MiddleLeft;
-            btn.Padding = new Padding(2);
-            btn.AutoSize = true;
+            menu3.Items.Clear();
+            MenuItem itemReboot = CreateMenuItem("Khởi động lại", "PoweroffOutlined");
+            MenuItem itemInstallApk = CreateMenuItem("Cài đặt APK", "AppstoreAddOutlined");
+            MenuItem itemImportFile = CreateMenuItem("Xoay phải", "RotateRightOutlined");
+            MenuItem itemExportClipboard = CreateMenuItem("Xuất Clipboard", "CopyOutlined");
+            menu3.Items.AddRange(new MenuItem[] { itemReboot, itemInstallApk, itemImportFile, itemExportClipboard });
+        }
+        private MenuItem CreateMenuItem(string text, string icon)
+        {
+            MenuItem menuItem = new MenuItem(text);
+            menuItem.Text = text;
+            menuItem.IconSvg = icon;
+
+            return menuItem;
         }
 
-        private void ConfigureToolStripDropDown(ToolStripDropDownButton btn, string text, ToolStripMenuItem item, string subText)
-        {
-            btn.Font = new Font("Segoe UI", 9.75F);
-            btn.ForeColor = Color.Black;
-          //  btn.Image = Properties.Resources.facebook;
-            btn.ImageAlign = ContentAlignment.MiddleLeft;
-            btn.Text = text;
-            item.Text = subText;
-            btn.DropDownItems.Add(item);
-        }
+
+
 
         private void ConfigureAntdButton(AntdUI.Button btn, string icon)
         {
@@ -69,17 +70,23 @@ namespace StreamAndroid
             btn.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
             btn.ForeColor = Color.Black;
             btn.IconSvg = icon;
-            btn.IconRatio = 0.9F;
+            btn.IconRatio = 0.8F;
             btn.Radius = 10;
+            btn.BackHover = Color.FromArgb(233, 247, 239);
         }
 
         private void button9_Click(object sender, EventArgs e)
         {
-            if(targetForm != null && parentForm != null)
+            if (targetForm != null && parentForm != null)
             {
                 SettingsButtonClicked?.Invoke(this, EventArgs.Empty);
 
             }
+        }
+
+        private void menu3_SelectChanged(object sender, MenuSelectEventArgs e)
+        {
+
         }
     }
 }

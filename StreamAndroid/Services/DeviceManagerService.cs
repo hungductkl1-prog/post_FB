@@ -1,4 +1,5 @@
-﻿using AutoAndroid;
+﻿using AntdUI;
+using AutoAndroid;
 using SharpAdbClient;
 using StreamAndroid.Models;
 using StreamAndroid.View;
@@ -8,6 +9,7 @@ using Sunny.Subdy.Data.Models;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
+using System.Windows.Forms;
 
 namespace StreamAndroid.Services
 {
@@ -32,6 +34,7 @@ namespace StreamAndroid.Services
 
         public static SortableBindingList<DeviceModel> DeviceModels { get; private set; } = new SortableBindingList<DeviceModel>(new List<DeviceModel>());
 
+        private readonly fShowDevice childFormDevice;
         public DeviceManagerService(ucManagerDevices ucManagerDevices)
         {
             ADBHelper.StartServer();
@@ -57,6 +60,8 @@ namespace StreamAndroid.Services
                 }
             };
             _statsUpdateTimer.Start();
+            childFormDevice = new fShowDevice(ucManagerDevices); 
+            childFormDevice.SettingsButtonClicked += ucMenuscripDevice_HideForm;
         }
 
         public async Task HookDeviceEvents()
@@ -127,6 +132,7 @@ namespace StreamAndroid.Services
                     Width = 300,
                     Height = 533
                 };
+
                 control.Load += (s, e2) => control.SetCenterText("Điện thoại đã ngắt kết nối, vui lòng kiểm tra.", Color.OrangeRed);
                 control.SetCenterText("Điện thoại đã ngắt kết nối, vui lòng kiểm tra.", Color.OrangeRed);
                 _flowPanel.Controls.Add(control);
@@ -245,25 +251,6 @@ namespace StreamAndroid.Services
             await _uiSemaphore.WaitAsync();
             try
             {
-                //if (_instances.TryGetValue(serial, out var deviceView))
-                //{
-                //    if (deviceView.UCControlAndroid != null)
-                //    {
-                //        try
-                //        {
-                //            await InvokeUIAsync(() =>
-                //            {
-                //                deviceView.UCControlAndroid?.OnDeviceDisconnected();
-                //            });
-
-                //            await Task.Delay(50);
-                //        }
-                //        catch (Exception ex)
-                //        {
-                //            Debug.WriteLine($"⚠️ Error notifying disconnect: {ex.Message}");
-                //        }
-                //    }
-                //}
 
                 StopDeviceBySerial(serial);
                 ScheduleStatsUpdate();
@@ -390,7 +377,7 @@ namespace StreamAndroid.Services
                         try
                         {
                             deviceView.UCControlAndroid.ClearAllText();
-                            deviceView.UCControlAndroid.SetCenterText("Đang kết nối lại...", Color.Orange);
+                            deviceView.UCControlAndroid.SetCenterText("Đang kết nối lại...", Color.Green);
                         }
                         catch (Exception ex)
                         {
@@ -415,11 +402,17 @@ namespace StreamAndroid.Services
                         }
 
                         Debug.WriteLine($"▶️ Starting new scrcpy instance for {serial}");
-                        deviceView.Scrcpy = new Scrcpy(deviceView.DeviceData, deviceView.DeviceModel.Port);
+                        deviceView.Scrcpy = new Scrcpy(deviceView.DeviceData, deviceView.DeviceModel.Port)
+                        {
+                            MaxSize = 720,
+                            MaxFps = 20,
+                            Bitrate = 2000000
+                        };
                         deviceView.Scrcpy.Start();
 
                         if (deviceView.UCControlAndroid != null)
                         {
+                            deviceView.UCControlAndroid.SettingsButtonClicked += UcDevice_SettingsButtonClicked;
                             deviceView.UCControlAndroid.AttachInstance(deviceView.Scrcpy);
                             deviceView.UCControlAndroid.OnDeviceReconnected();
                         }
@@ -480,16 +473,24 @@ namespace StreamAndroid.Services
                     var deviceData = _adb.GetDevices().Find(d => d.Serial == serial);
                     if (deviceData == null) return null;
 
+                    // ✅ CRITICAL: Create Scrcpy with MaxSize and MaxFps
+                    var scrcpy = new Scrcpy(deviceData, client.Device.Port)
+                    {
+                        MaxSize = 720,      // ✅ Downscale from 1440p → 720p (saves 75% memory!)
+                        MaxFps = 20,        // ✅ Limit to 20 FPS (saves CPU)
+                        Bitrate = 2000000   // ✅ Lower bitrate (2 Mbps instead of 8)
+                    };
+
                     var view = new DeviceView
                     {
                         DeviceModel = client.Device,
                         DeviceData = deviceData,
-                        Scrcpy = new Scrcpy(deviceData, client.Device.Port)
+                        Scrcpy = scrcpy
                     };
 
                     EnsureDeviceDefaults(view.DeviceModel);
 
-                    view.Scrcpy.Start();
+                    scrcpy.Start();
 
                     InvokeUIAsync(() =>
                     {
@@ -503,6 +504,7 @@ namespace StreamAndroid.Services
                             _flowPanel.Controls.Add(control);
                             view.UCControlAndroid = control;
                             control.AttachInstance(view.Scrcpy);
+                            control.SettingsButtonClicked += UcDevice_SettingsButtonClicked;
                         }
                         else
                         {
@@ -522,7 +524,6 @@ namespace StreamAndroid.Services
                 }
             }
         }
-
         public void StopDeviceBySerial(string serial)
         {
             lock (_lockObj)
@@ -579,7 +580,6 @@ namespace StreamAndroid.Services
                 Debug.WriteLine($"⚠️ Lỗi ShowDisconnectedText({serial}): {ex.Message}");
             }
         }
-
         private Task InvokeUIAsync(Action action)
         {
             var tcs = new TaskCompletionSource<bool>();
@@ -614,7 +614,6 @@ namespace StreamAndroid.Services
 
             return tcs.Task;
         }
-
         public void Dispose()
         {
             _statsUpdateTimer?.Stop();
@@ -645,7 +644,6 @@ namespace StreamAndroid.Services
             DeviceModels.Clear();
             _uiSemaphore?.Dispose();
         }
-
         private async void OnDataGridViewSelectionChanged(object sender, DeviceSelectionChangedEventArgs e)
         {
             Debug.WriteLine($"🔍 Selection changed: {e.SelectionCount} devices selected");
@@ -712,7 +710,73 @@ namespace StreamAndroid.Services
                 Debug.WriteLine($"⚠️ Error in HandleSelectionChanged: {ex.Message}");
             }
         }
+        private ucControlAndroid ucControlAndroid;
+        private void UcDevice_SettingsButtonClicked(object? sender, EventArgs e)
+        {
+            if (sender is not ucControlAndroid deviceView) return;
 
+            if (childFormDevice.isDragging) return;
+            try
+            {
+                // Lưu lại chỉ số vị trí cũ của ucDeviceView trong FlowLayoutPanel
+                deviceView.showOverlayText = false;
+                deviceView.OnDeviceDisconnected();
+                deviceView.SetCenterText("Đang điều khiển", Color.Green);
+
+                deviceView.AttachInstance(null);
+                ucControlAndroid = deviceView;
+                // Cấu hình form con (chi tiết thiết bị)
+                childFormDevice.Owner = Application.OpenForms[0]; // Giữ form con luôn nằm trên form cha
+                childFormDevice.ShowInTaskbar = false;
+                childFormDevice.TopMost = false;
+
+                // Đặt vị trí hiển thị — ví dụ canh giữa theo form chính
+                childFormDevice.StartPosition = FormStartPosition.Manual;
+                childFormDevice.Location = new System.Drawing.Point(
+                    _managerDevices.Location.X + (_managerDevices.Width - childFormDevice.Width) / 2,
+                   _managerDevices.Location.Y + (_managerDevices.Height - childFormDevice.Height) / 2
+                );
+                ucControlAndroid uc = new ucControlAndroid(deviceView.DeviceView);
+                uc.AttachInstance(deviceView.DeviceView.Scrcpy);
+                childFormDevice.Load(uc);
+                childFormDevice.SetRenderSize(_managerDevices.slider4.Value);
+                childFormDevice.Show();
+            }
+            finally
+            {
+                childFormDevice.isDragging = true;
+            }
+
+        }
+        private void ucMenuscripDevice_HideForm(object? sender, EventArgs e)
+        {
+            if (sender is not fShowDevice fshow) return;
+            try
+            {
+                if (ucControlAndroid != null)
+                {
+                    ucControlAndroid.AttachInstance(fshow.ucDevice.DeviceView.Scrcpy);
+                    ucControlAndroid.showOverlayText = true;
+                    ucControlAndroid.OnDeviceReconnected();
+                    fshow.Hide();
+                }
+            }
+            finally
+            {
+                childFormDevice.isDragging = false;
+            }
+
+        }
+        public void SetValueToSlider(int value)
+        {
+            if (!childFormDevice.isDragging) return;
+            SetRenderSizeBig(value);
+
+        }
+        private void SetRenderSizeBig(int size)
+        {
+            childFormDevice.SetRenderSize(size);
+        }
         public async Task FilterDevices(string state, string search)
         {
             try

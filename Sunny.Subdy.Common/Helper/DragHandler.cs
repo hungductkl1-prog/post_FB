@@ -8,7 +8,8 @@ namespace Sunny.Subdy.Common.Helper
         private bool dragging;
         private Point dragOffset;
         private Form targetForm;
-        private Form parentForm;
+        private Control parentForm;
+
 
         public DragHandler(Control triggerControl, Form formToMove)
         {
@@ -78,7 +79,7 @@ namespace Sunny.Subdy.Common.Helper
             }
         }
 
-        public DragHandler(Control triggerControl, Form formToMove, Form formCha)
+        public DragHandler(Control triggerControl, Form formToMove, Control formCha)
         {
             targetForm = formToMove;
             parentForm = formCha;
@@ -88,44 +89,39 @@ namespace Sunny.Subdy.Common.Helper
                 if (e.Button == MouseButtons.Left)
                 {
                     dragging = true;
-                    // Lấy khoảng cách giữa chuột và góc trên trái form
-                    dragOffset = new Point(e.X + triggerControl.Left, e.Y + triggerControl.Top);
+                    // Lưu vị trí chuột so với form (tọa độ màn hình)
+                    var mouseScreenPos = triggerControl.PointToScreen(e.Location);
+                    dragOffset = new Point(mouseScreenPos.X - targetForm.Left, mouseScreenPos.Y - targetForm.Top);
                 }
             };
 
             triggerControl.MouseMove += (s, e) =>
             {
-                if (dragging)
-                {
-                    Point currentScreenPos = triggerControl.PointToScreen(e.Location);
+                if (!dragging) return;
 
-                    // Tính toán vị trí mới
-                    int newX = currentScreenPos.X - dragOffset.X;
-                    int newY = currentScreenPos.Y - dragOffset.Y;
+                Point currentScreenPos = triggerControl.PointToScreen(e.Location);
 
-                    // Giới hạn trong ranh giới của formCha
-                    // Giới hạn trái
-                    if (newX < parentForm.Left)
-                        newX = parentForm.Left;
+                // Tính vị trí mới của form
+                int newX = currentScreenPos.X - dragOffset.X;
+                int newY = currentScreenPos.Y - dragOffset.Y;
 
-                    // Giới hạn trên - ĐẢM BẢO triggerControl LUÔN HIỂN THỊ
-                    // Không cho form đi lên cao quá, phải để lại ít nhất chiều cao của triggerControl
-                    if (newY < parentForm.Top)
-                        newY = parentForm.Top;
+                // Nếu parentForm là control, cần lấy tọa độ thật trên màn hình
+                Rectangle parentBounds = parentForm is Form f
+                    ? f.Bounds
+                    : new Rectangle(parentForm.PointToScreen(Point.Empty), parentForm.Size);
 
-                    // Giới hạn phải
-                    if (newX + targetForm.Width > parentForm.Right)
-                        newX = parentForm.Right - targetForm.Width;
+                // Giới hạn form trong vùng hiển thị của parent
+                if (newX < parentBounds.Left)
+                    newX = parentBounds.Left;
+                if (newY < parentBounds.Top)
+                    newY = parentBounds.Top;
+                if (newX + targetForm.Width > parentBounds.Right)
+                    newX = parentBounds.Right - targetForm.Width;
+                if (newY + triggerControl.Height > parentBounds.Bottom)
+                    newY = parentBounds.Bottom - triggerControl.Height;
 
-                    // Giới hạn dưới - ĐẢM BẢO triggerControl KHÔNG BỊ CHE MẤT
-                    // Form không được đi xuống quá, phải để lại ít nhất chiều cao của triggerControl trong vùng nhìn thấy
-                    int minVisibleHeight = triggerControl.Height + triggerControl.Top; // Chiều cao tối thiểu cần hiển thị
-                    if (newY + minVisibleHeight > parentForm.Bottom)
-                        newY = parentForm.Bottom - minVisibleHeight;
-
-                    // Di chuyển form với vị trí đã được giới hạn
-                    targetForm.Location = new Point(newX, newY);
-                }
+                // Cập nhật vị trí
+                targetForm.Location = new Point(newX, newY);
             };
 
             triggerControl.MouseUp += (s, e) =>
