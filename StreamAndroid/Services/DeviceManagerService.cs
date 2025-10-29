@@ -76,6 +76,7 @@ namespace StreamAndroid.Services
 
             foreach (var device in devices)
             {
+                EnsureDeviceDefaults(device);
                 Debug.WriteLine($"{device.Id} - {device.NameDevice}");
 
                 if (connectedSerials.Contains(device.Serial))
@@ -89,6 +90,19 @@ namespace StreamAndroid.Services
             }
 
             _managerDevices.SetRenderSize(_managerDevices.slider3.Value);
+        }
+
+        private static void EnsureDeviceDefaults(DeviceModel device)
+        {
+            try
+            {
+                if (device == null) return;
+                if (string.IsNullOrWhiteSpace(device.NameDevice))
+                {
+                    device.NameDevice = $"DTA-{device.Id}";
+                }
+            }
+            catch { }
         }
 
         private async Task AddDisconnectedDeviceAsync(DeviceModel device)
@@ -335,88 +349,117 @@ namespace StreamAndroid.Services
 
         private async Task ReconnectExistingDeviceAsync(string serial)
         {
-            var deviceView = _instances[serial];
-            if (deviceView?.UCControlAndroid != null)
+            if (!_instances.TryGetValue(serial, out var deviceView))
             {
-                Debug.WriteLine($"⏭️ Device {serial} đã có control, refresh renderer...");
-
-                try
-                {
-                    await InvokeUIAsync(() =>
-                    {
-                        deviceView.UCControlAndroid?.ClearAllText();
-                    });
-
-                    if (deviceView.Scrcpy == null || deviceView.DeviceData == null)
-                    {
-                        await InvokeUIAsync(() =>
-                        {
-                            var client = new ADBClient(deviceView.DeviceModel);
-                            client.Connect();
-
-                            deviceView.DeviceData = _adb.GetDevices().Find(d => d.Serial == serial);
-                            if (deviceView.DeviceData != null)
-                            {
-                                deviceView.Scrcpy = new Scrcpy(deviceView.DeviceData, deviceView.DeviceModel.Port);
-                                deviceView.Scrcpy.Start();
-                            }
-                        });
-                    }
-
-                    await InvokeUIAsync(() =>
-                    {
-                        deviceView.UCControlAndroid?.AttachInstance(deviceView.Scrcpy);
-                        deviceView.UCControlAndroid?.OnDeviceReconnected();
-                    });
-
-                    deviceView.DeviceModel.IsScrcpy = true;
-                    deviceView.DeviceModel.State = "Đã kết nối";
-                    deviceView.DeviceModel.TypeColor = 2;
-                    deviceView.DeviceModel.Status = "Đã kết nối";
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"⚠️ Error refreshing renderer: {ex.Message}");
-                }
-
+                Debug.WriteLine($"⚠️ Device {serial} not found in instances");
                 return;
             }
 
             try
             {
+                Debug.WriteLine($"🔄 Starting reconnect for {serial}");
+
+                // CRITICAL: Stop old scrcpy instance FIRST (if still running)
+                if (deviceView.Scrcpy != null)
+                {
+                    try
+                    {
+                        Debug.WriteLine($"🛑 Stopping old scrcpy instance for {serial}");
+                        deviceView.Scrcpy.Stop();
+                        await Task.Delay(300); // Wait for cleanup
+                    }
+                    catch (Exception ex)
+                    {
+                        // Ignore "Not connected" - device already disconnected
+                        if (!ex.Message.Contains("Not connected"))
+                        {
+                            Debug.WriteLine($"⚠️ Error stopping old scrcpy: {ex.Message}");
+                        }
+                    }
+                    finally
+                    {
+                        deviceView.Scrcpy = null;
+                    }
+                }
+
+                // Clear UI state
+                if (deviceView.UCControlAndroid != null)
+                {
+                    await InvokeUIAsync(() =>
+                    {
+                        try
+                        {
+                            deviceView.UCControlAndroid.ClearAllText();
+                            deviceView.UCControlAndroid.SetCenterText("Đang kết nối lại...", Color.Orange);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"⚠️ Error clearing UI: {ex.Message}");
+                        }
+                    });
+                }
+
+                // Connect fresh
                 await InvokeUIAsync(() =>
                 {
-                    var client = new ADBClient(deviceView.DeviceModel);
-                    client.Connect();
-
-                    deviceView.DeviceData = _adb.GetDevices().Find(d => d.Serial == serial);
-                    if (deviceView.DeviceData == null) return;
-
-                    deviceView.Scrcpy = new Scrcpy(deviceView.DeviceData, deviceView.DeviceModel.Port);
-                    deviceView.Scrcpy.Start();
-
-                    var control = new ucControlAndroid(deviceView)
+                    try
                     {
-                        Name = $"ucControlAndroid_{serial}",
-                        Width = 300,
-                        Height = 533
-                    };
+                        var client = new ADBClient(deviceView.DeviceModel);
+                        client.Connect();
 
-                    _flowPanel.Controls.Add(control);
-                    deviceView.UCControlAndroid = control;
+                        deviceView.DeviceData = _adb.GetDevices().Find(d => d.Serial == serial);
+                        if (deviceView.DeviceData == null)
+                        {
+                            Debug.WriteLine($"⚠️ Device data not found for {serial}");
+                            return;
+                        }
 
-                    control.AttachInstance(deviceView.Scrcpy);
-                    control.OnDeviceReconnected();
+                        Debug.WriteLine($"▶️ Starting new scrcpy instance for {serial}");
+                        deviceView.Scrcpy = new Scrcpy(deviceView.DeviceData, deviceView.DeviceModel.Port);
+                        deviceView.Scrcpy.Start();
 
-                    deviceView.DeviceModel.IsScrcpy = true;
-                    deviceView.DeviceModel.State = "Đã kết nối";
-                    deviceView.DeviceModel.TypeColor = 2;
-                    deviceView.DeviceModel.Status = "Đã kết nối";
+                        if (deviceView.UCControlAndroid != null)
+                        {
+                            deviceView.UCControlAndroid.AttachInstance(deviceView.Scrcpy);
+                            deviceView.UCControlAndroid.OnDeviceReconnected();
+                        }
+                        else
+                        {
+                            // Create new control if missing
+                            var control = new ucControlAndroid(deviceView)
+                            {
+                                Name = $"ucControlAndroid_{serial}",
+                                Width = 300,
+                                Height = 533
+                            };
+                            _flowPanel.Controls.Add(control);
+                            deviceView.UCControlAndroid = control;
+                            control.AttachInstance(deviceView.Scrcpy);
+                        }
+
+                        deviceView.DeviceModel.IsScrcpy = true;
+                        deviceView.DeviceModel.State = "Đã kết nối";
+                        deviceView.DeviceModel.TypeColor = 2;
+                        deviceView.DeviceModel.Status = "Đã kết nối";
+
+                        Debug.WriteLine($"✅ Reconnect successful for {serial}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"❌ Error in reconnect UI action: {ex.Message}");
+                        if (deviceView.UCControlAndroid != null)
+                        {
+                            deviceView.UCControlAndroid.SetCenterText(
+                                "Không thể kết nối lại. Vui lòng kiểm tra thiết bị.",
+                                Color.OrangeRed
+                            );
+                        }
+                    }
                 });
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"⚠️ Lỗi reconnect {serial}: {ex.Message}");
+                Debug.WriteLine($"❌ ReconnectExistingDeviceAsync failed for {serial}: {ex.Message}");
             }
         }
 
@@ -443,6 +486,8 @@ namespace StreamAndroid.Services
                         DeviceData = deviceData,
                         Scrcpy = new Scrcpy(deviceData, client.Device.Port)
                     };
+
+                    EnsureDeviceDefaults(view.DeviceModel);
 
                     view.Scrcpy.Start();
 
