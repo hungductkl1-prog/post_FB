@@ -17,7 +17,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             InitializeComponent();
             _link = link;
             _version = version;
-            _updateFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "UpdateTemp");
+            _updateFolder = Path.Combine(AppContext.BaseDirectory, "UpdateTemp");
             _zipPath = Path.Combine(_updateFolder, "update.zip");
             this.Load += FUpdate_Load;
             FontUtil.ApplyFontToAllControls(this);
@@ -143,7 +143,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             try
             {
                 string exePath = Application.ExecutablePath;
-                string folderPath = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+                string folderPath = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
                 string exeName = Path.GetFileName(exePath);
                 string renamedExe = Path.GetFileNameWithoutExtension(exeName) + "-" + _version + ".exe";
                 string newExeName = exeName; // keep same exe name after update

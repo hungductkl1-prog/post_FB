@@ -1,18 +1,14 @@
 ﻿using AntdUI;
-using AutoAndroid;
 using LamToolAutoPhonePrime.Utils;
 using LamToolAutoPhonePrime.Views.Controls;
 using LamToolAutoPhonePrime.Views.Forms;
-using Org.BouncyCastle.Asn1.X509;
 using Sunny.Subdy.Common.API;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Common.Services;
-using Sunny.Subdy.Data.Models;
 using Sunny.Subdy.UI.View.Pages;
 using System.Diagnostics;
 using System.Reflection;
-using System.Windows.Forms;
 
 
 namespace LamToolAutoPhonePrime
@@ -37,10 +33,9 @@ namespace LamToolAutoPhonePrime
         {
             InitializeComponent();
 
-            // Tạo menu động
+            // Tạo menu động (thứ tự ngược do DockStyle.Top stacking)
             CreateMenu("Lịch sử", "history", Properties.Resources.icons8_history_30);
-            CreateMenu("Instagram", "instagram", Properties.Resources.icons8_instagram_30);
-            CreateMenu("Facebook", "facebook", Properties.Resources.icons8_facebook_30);
+            CreateMenu("Tài khoản", "facebook", Properties.Resources.icons8_facebook_30);
             CreateMenu("Thiết bị", "android", Properties.Resources.icons8_android_30_New);
 
             this.Load += fMain_Load;
@@ -57,6 +52,14 @@ namespace LamToolAutoPhonePrime
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
             windowBar.SubText = $"v{version}";
             Globals.CoinLable = label8;
+
+            // Tooltip cho các nút title bar và logout
+            var toolTip = new ToolTip { AutoPopDelay = 3000, InitialDelay = 300, ReshowDelay = 200 };
+            toolTip.SetToolTip(btn_mode, "Thu nhỏ");
+            toolTip.SetToolTip(btn_global, "Phóng to / Thu nhỏ");
+            toolTip.SetToolTip(btn_setting, "Đóng");
+            toolTip.SetToolTip(button9, "Đăng xuất");
+
         }
 
         #region ==== Menu ====
@@ -147,8 +150,7 @@ namespace LamToolAutoPhonePrime
             string labelText = btn.Text switch
             {
                 "Thiết bị" => "Quản lý thiết bị",
-                "Facebook" => "Quản lý tài khoản Facebook",
-                "Instagram" => "Quản lý tài khoản Instagram",
+                "Tài khoản" => "Quản lý tài khoản Facebook",
                 "Lịch sử" => "Lịch sử hoạt động",
                 _ => btn.Text
             };
@@ -158,9 +160,11 @@ namespace LamToolAutoPhonePrime
             {
                 case "btn_android": _ucDevices.BringToFront(); break;
                 case "btn_facebook": _ucFacebook.BringToFront(); break;
-                case "btn_instagram": _ucInstagram.BringToFront(); break;
                 case "btn_history": _ucHistoriesJob.BringToFront(); break;
             }
+
+            // Chỉ hiện button thu gọn/mở rộng panel khi ở tab Thiết bị
+            _ucDevices.TogglePanelButtonVisible = btn.Name == "btn_android";
         }
 
         private void ResetButtonStyle(System.Windows.Forms.Button btn)
@@ -174,7 +178,6 @@ namespace LamToolAutoPhonePrime
         {
             "btn_android" => Properties.Resources.icons8_android_30_Acti,
             "btn_facebook" => Properties.Resources.icons8_facebook_30_Acti,
-            "btn_instagram" => Properties.Resources.icons8_instagram_30_Acti,
             "btn_history" => Properties.Resources.icons8_history_30_Acti,
             _ => null
         };
@@ -183,7 +186,6 @@ namespace LamToolAutoPhonePrime
         {
             "btn_android" => Properties.Resources.icons8_android_30_New,
             "btn_facebook" => Properties.Resources.icons8_facebook_30,
-            "btn_instagram" => Properties.Resources.icons8_instagram_30,
             "btn_history" => Properties.Resources.icons8_history_30,
             _ => null
         };
@@ -213,7 +215,7 @@ namespace LamToolAutoPhonePrime
             Controls.Add(_loadingOverlay);
             _loadingOverlay.BringToFront();
 
-            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "LamTool xin chào!" };
+            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Subdy Phone Farm xin chào!" };
 
             _loadingCts = new CancellationTokenSource();
             var token = _loadingCts.Token;
@@ -269,20 +271,35 @@ namespace LamToolAutoPhonePrime
 
         private async void fMain_Load(object sender, EventArgs e)
         {
-            await LoadData();
+            // Register UI control for ThrottledPropertyNotifier so PropertyChanged events
+            // are always marshalled to the UI thread via BeginInvoke (not SynchronizationContext,
+            // which may be null at Program.Main time).
+            Sunny.Subdy.Data.Models.ThrottledPropertyNotifier.Initialize();
 
+            // Hiển thị thông tin tài khoản từ Globals.User
+            UpdateUserInfo();
+
+            // Bắt đầu tải dữ liệu nền song song với việc tạo UI controls
+            var dataTask = LoadData();
+
+            // Tạo controls trên UI thread trong khi dữ liệu đang tải
             _ucDevices = new ucManagerDevices(this);
             _ucFacebook = new ucdgvAccount(this, PlatformModel.Facebook);
-            _ucInstagram = new ucdgvAccount(this, PlatformModel.Instagram);
             _ucHistoriesJob = new ucHistoriesJob();
 
-            foreach (var uc in new Control[] { _ucDevices, _ucFacebook, _ucInstagram, _ucHistoriesJob })
+            pContent.SuspendLayout();
+            foreach (var uc in new Control[] { _ucDevices, _ucFacebook, _ucHistoriesJob })
             {
                 uc.Dock = DockStyle.Fill;
                 pContent.Controls.Add(uc);
                 EnableDoubleBuffer(uc);
             }
+            pContent.ResumeLayout(false);
+            pContent.PerformLayout();
 
+            // Chờ dữ liệu tải xong
+            await dataTask;
+           await _ucDevices.LoadDevices();
             pMenu.Enabled = true;
             HideLoading();
 
@@ -292,20 +309,34 @@ namespace LamToolAutoPhonePrime
                 MenuButton_Click(first, EventArgs.Empty);
         }
 
+        private void UpdateUserInfo()
+        {
+            var user = Globals.User;
+            if (user == null) return;
+
+            label4.Text = user.FullName ?? user.UserName ?? "Subdy.net";
+            label8.Text = $"{user.Balance:N0} xu";
+            label9.Text = user.Email ?? "";
+        }
+
         private async Task LoadData()
         {
             try
             {
-                await Task.Run(() => ADBHelper.InitADB());
-                if (!File.Exists(@"C:\DTAHelper\sdk\platform-tools\adb.exe"))
-                {
-                    CommonMethod.ShowMessageWarning("Chưa cài thư viện DTAHelper, vui lòng cài đặt lại.");
-                    OpenBrowser("https://www.dropbox.com/scl/fi/3bediza9mih9gmekxqi4n/DTAHelper.zip?dl=1");
-                    TempLoginStorage.Clear();
-                    Application.Restart();
-                }
+                // Chạy song song ADB init và Device models
+               // var adbTask = Task.Run(() => ADBHelper.InitADB());
+                var deviceTask = Task.Run(() => DeviceServices.GetDeviceModels());
 
-                await Task.Run(() => DeviceServices.GetDeviceModels());
+                await Task.WhenAll(deviceTask);
+
+                // if (!File.Exists(@"C:\DTAHelper\sdk\platform-tools\adb.exe"))
+                // {
+                //     CommonMethod.ShowMessageWarning("Chưa cài thư viện DTAHelper, vui lòng cài đặt lại.");
+                //     OpenBrowser("https://www.dropbox.com/scl/fi/3bediza9mih9gmekxqi4n/DTAHelper.zip?dl=1");
+                //     TempLoginStorage.Clear();
+                //     Application.Restart();
+                // }
+
                 _ = UpdateUiLoop();
             }
             catch (Exception ex)
@@ -326,14 +357,27 @@ namespace LamToolAutoPhonePrime
                     var now = DateTime.Now;
                     bool minimized = this.WindowState == FormWindowState.Minimized;
 
-                    if ((now - _lastUiUpdate).TotalMilliseconds >= (minimized ? 5000 : 1000))
+                    if ((now - _lastUiUpdate).TotalMilliseconds >= (minimized ? 10000 : 3000))
                     {
-                        ControlHelper.SetToolStripLabelTextSafe(uiLabel5, $"{await SystemUsageMonitor.GetCpuUsage():0.00}%");
-                        ControlHelper.SetToolStripLabelTextSafe(uiLabel6, $"{SystemUsageMonitor.GetRamUsage():0.00}%");
+                        var cpuTask = SystemUsageMonitor.GetCpuUsage();
+                        var ram = SystemUsageMonitor.GetRamUsage();
+                        var cpu = await cpuTask;
+                        ControlHelper.SetToolStripLabelTextSafe(uiLabel5, $"{cpu:0.00}%");
+                        ControlHelper.SetToolStripLabelTextSafe(uiLabel6, $"{ram:0.00}%");
                         _lastUiUpdate = now;
                     }
 
-                    if ((now - _lastHistoriesUpdate).TotalMilliseconds >= (minimized ? 10000 : 2000))
+                    if (StartTime.HasValue)
+                    {
+                        var elapsed = DateTime.Now - StartTime.Value;
+                        ControlHelper.SetToolStripLabelTextSafe(toolStripLabel5, elapsed.ToString(@"hh\:mm\:ss"));
+                    }
+                    else
+                    {
+                        ControlHelper.SetToolStripLabelTextSafe(toolStripLabel5, "00:00:00");
+                    }
+
+                    if ((now - _lastHistoriesUpdate).TotalMilliseconds >= (minimized ? 15000 : 5000))
                     {
                         await Task.Run(() => _ucHistoriesJob.UpdateView());
                         _lastHistoriesUpdate = now;
@@ -341,14 +385,14 @@ namespace LamToolAutoPhonePrime
 
                     if (_lastCheckUpdateTime == null || (now - _lastCheckUpdateTime.Value).TotalMinutes >= 30)
                     {
-                        this.BeginInvoke(new Action(CheckUpdateVersion));
+                       this.BeginInvoke(new Action(CheckUpdateVersion));
                         _lastCheckUpdateTime = now;
                     }
 
-                    await Task.Delay(minimized ? 2000 : 250, token);
+                    await Task.Delay(minimized ? 5000 : 1000, token);
                 }
                 catch (TaskCanceledException) { break; }
-                catch { await Task.Delay(500, token); }
+                catch { await Task.Delay(2000, token); }
             }
         }
         private void btn_global_SelectedValueChanged(object sender, EventArgs e)
@@ -369,7 +413,6 @@ namespace LamToolAutoPhonePrime
             if (CommonMethod.ShowConfirmWarning("Bạn có chắc muốn đóng phần mềm?"))
             {
                 _ucFacebook.SaveConfig();
-                _ucInstagram.SaveConfig();
                 this.Close();
                 Environment.Exit(0);
             }
@@ -379,6 +422,7 @@ namespace LamToolAutoPhonePrime
         {
             if (CommonMethod.ShowConfirmWarning("Bạn có chắc muốn đăng xuất tài khoản ra khỏi phần mềm?"))
             {
+                Program.SetStartup(false);
                 TempLoginStorage.Clear();
                 Application.Restart();
                 Environment.Exit(0);
@@ -393,17 +437,7 @@ namespace LamToolAutoPhonePrime
         {
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
             var (ok, vs, url) = LamToolClient.GetApiResponseAsync(Globals.DeviceId, Globals.NameApp, version);
-
-            if (!ok)
-            {
-                MessageBox.Show("Đã xảy ra lỗi vui lòng liên hệ admin để được hỗ trợ!",
-                    "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                TempLoginStorage.Clear();
-                Application.Restart();
-                Environment.Exit(0);
-                return;
-            }
-
+            
             if (LamToolClient.IsNewerVersion(version, vs))
             {
                 string title = "Thông báo";
@@ -440,7 +474,6 @@ namespace LamToolAutoPhonePrime
             {
                 typeof(Control).GetProperty("DoubleBuffered", BindingFlags.NonPublic | BindingFlags.Instance)
                     ?.SetValue(ctrl, true, null);
-                foreach (Control child in ctrl.Controls) EnableDoubleBuffer(child);
             }
             catch { }
         }

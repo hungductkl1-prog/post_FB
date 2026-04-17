@@ -389,9 +389,9 @@ namespace ScrcpyNet
         /// </summary>
         private void MobileServerCleanup()
         {
-            // Remove any existing network stuff.
-            adb.RemoveAllForwards(device);
-            adb.RemoveAllReverseForwards(device);
+            // Chỉ xóa reverse forward của chính device này, không dùng RemoveAll
+            // vì RemoveAll sẽ xóa luôn forward của các device khác đang chạy song song
+            try { adb.CreateReverseForward(device, "localabstract:scrcpy", $"tcp:{this.port}", true); } catch { }
         }
 
         /// <summary>

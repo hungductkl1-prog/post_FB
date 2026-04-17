@@ -99,15 +99,6 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void txtLines_TextChanged(object sender, EventArgs e)
         {
             groupBox1.Text = $"Danh sách {TypeForm} ({txtLines.Lines.Count()}):";
-
-            if (TypeForm == "addAccountTraoDoiSub")
-            {
-                groupBox1.Text = $"Danh sách tài khoản traodoisub ({txtLines.Lines.Count()}):";
-            }
-            else if (TypeForm == "addAccountTuongTacCheo")
-            {
-                groupBox1.Text = $"Danh sách tài khoản tuongtaccheo  ({txtLines.Lines.Count()}):";
-            }
         }
 
         private async void btn_Ok_Click(object sender, EventArgs e)
@@ -133,12 +124,6 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     case "useragent":
                         {
                             message = await UpdateUserAgent();
-                            break;
-                        }
-                    case "addAccountTraoDoiSub":
-                        {
-
-                            message = await UpdateAddAcountTDS();
                             break;
                         }
                     case TokenJob:
@@ -251,56 +236,6 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
 
             return "Đã thêm useragent thành công";
-        }
-        private async Task<string> UpdateAddAcountTDS()
-        {
-            try
-            {
-                List<string> list = new List<string>();
-                foreach (var item in txtLines.Lines)
-                {
-                    if (string.IsNullOrEmpty(item)) continue;
-                    if (item.Split('|').Count() <= 1) continue;
-                    list.Add(item);
-                }
-                if (!list.Any())
-                {
-                    return "Không có dữ liệu nào phù hợp";
-                }
-                if (rdb_Random.Checked)
-                {
-                    list = SubdyHelper.Shuffle(list);
-                }
-                int index = Convert.ToInt32(nudAccount_Proxy.Value);
-                var context = new AccountContext();
-                foreach (var uid in Uids)
-                {
-                    if (list.Count <= 0)
-                    {
-                        break;
-                    }
-                    var account = context.Get(Guid.Parse(uid));
-                    if (account == null) continue;
-                    if (!string.IsNullOrEmpty(account.TokenJob) && cb_NoProxyAccount.Checked) continue;
-
-                    string line = list[0].ToString();
-                    account.TokenJob = line;
-                    context.Update(account);
-                    index--;
-                    if (index <= 0)
-                    {
-                        list.RemoveAt(0);
-                        index = Convert.ToInt32(nudAccount_Proxy.Value);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogManager.Error(ex);
-                return "Đã xảy ra lỗi ERROR: " + ex.Message;
-            }
-
-            return "Đã thêm tài khoản traodoisub thành công";
         }
         private async Task<string> UpdateAddAcountTTC()
         {

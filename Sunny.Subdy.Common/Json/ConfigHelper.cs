@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
 using System.Windows.Forms;
@@ -8,7 +8,9 @@ namespace Sunny.Subdy.Common.Json
 {
     public class ConfigHelper
     {
-        private readonly JObject jConfig = new();
+        private static readonly JsonSerializerOptions _indentedOptions = new() { WriteIndented = true };
+
+        private readonly JsonObject jConfig = new();
         private readonly Form? form;
         private readonly UserControl? uc;
         private readonly string? configFile;
@@ -53,10 +55,10 @@ namespace Sunny.Subdy.Common.Json
             uc.Load += ControlLoad;
             uc.Disposed += ControlClosing;
         }
-      
+
         private string InitConfigFile(string filename)
         {
-            string folder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs");
+            string folder = Path.Combine(AppContext.BaseDirectory, "configs");
             FileHelper.CreateFolder(folder);
             return Path.Combine(folder, $"{filename}.json");
         }
@@ -66,9 +68,12 @@ namespace Sunny.Subdy.Common.Json
             {
                 if (!string.IsNullOrWhiteSpace(content))
                 {
-                    var parsed = JObject.Parse(content);
-                    foreach (var prop in parsed)
-                        jConfig[prop.Key] = prop.Value;
+                    var parsed = JsonNode.Parse(content)?.AsObject();
+                    if (parsed != null)
+                    {
+                        foreach (var prop in parsed)
+                            jConfig[prop.Key] = prop.Value?.DeepClone();
+                    }
                 }
             }
             catch (Exception ex)
@@ -85,9 +90,12 @@ namespace Sunny.Subdy.Common.Json
                     var content = File.ReadAllText(configFile!);
                     if (!string.IsNullOrWhiteSpace(content))
                     {
-                        var parsed = JObject.Parse(content);
-                        foreach (var prop in parsed)
-                            jConfig[prop.Key] = prop.Value;
+                        var parsed = JsonNode.Parse(content)?.AsObject();
+                        if (parsed != null)
+                        {
+                            foreach (var prop in parsed)
+                                jConfig[prop.Key] = prop.Value?.DeepClone();
+                        }
                     }
                 }
             }
@@ -109,7 +117,7 @@ namespace Sunny.Subdy.Common.Json
                 if (adapter == null)
                     continue;
 
-                if (jConfig.TryGetValue(adapter.Name, out var value))
+                if (jConfig.TryGetPropertyValue(adapter.Name, out var value))
                 {
                     try { adapter.LoadValue(value); } catch (Exception ex) { LogManager.Error(ex); }
                 }
@@ -120,13 +128,17 @@ namespace Sunny.Subdy.Common.Json
             onLoadAction?.Invoke();
         }
 
+        private bool _saved = false;
         public void ControlClosing(object? sender, EventArgs e)
         {
+            if (_saved) return;
+            _saved = true;
+
             SaveAllControlValues();
 
             if (!string.IsNullOrEmpty(configFile))
             {
-                try { File.WriteAllText(configFile!, jConfig.ToString()); } catch (Exception ex) { LogManager.Error(ex); }
+                try { File.WriteAllText(configFile!, jConfig.ToJsonString(_indentedOptions)); } catch (Exception ex) { LogManager.Error(ex); }
             }
 
             onCloseAction?.Invoke();
@@ -151,14 +163,14 @@ namespace Sunny.Subdy.Common.Json
                 {
                     var value = adapter.GetValue();
                     if (value != null)
-                        jConfig[adapter.Name] = JToken.FromObject(value);
+                        jConfig[adapter.Name] = value;
                 }
                 catch (Exception ex)
                 {
                     LogManager.Error(ex);
                 }
             }
-           
+
         }
 
         private void ValueChanged(object? sender, EventArgs e)
@@ -175,9 +187,9 @@ namespace Sunny.Subdy.Common.Json
                 var value = adapter.GetValue();
                 if (value != null)
                 {
-                    jConfig[adapter.Name] = JToken.FromObject(value);
+                    jConfig[adapter.Name] = value;
                     if (!string.IsNullOrEmpty(configFile))
-                        File.WriteAllText(configFile!, jConfig.ToString());
+                        File.WriteAllText(configFile!, jConfig.ToJsonString(_indentedOptions));
                 }
             }
             catch (Exception ex)
@@ -240,16 +252,29 @@ namespace Sunny.Subdy.Common.Json
             return null;
         }
 
-        public void AddValue(string key, object value)
+        public void AddValue(string key, bool value) => jConfig[key] = JsonValue.Create(value);
+        public void AddValue(string key, int value) => jConfig[key] = JsonValue.Create(value);
+        public void AddValue(string key, decimal value) => jConfig[key] = JsonValue.Create(value);
+        public void AddValue(string key, string? value) => jConfig[key] = JsonValue.Create(value);
+        public void AddValue(string key, object? value)
         {
-            try { jConfig[key] = JToken.FromObject(value); }
-            catch (Exception ex) { LogManager.Error(ex); }
+            jConfig[key] = value switch
+            {
+                bool b => JsonValue.Create(b),
+                int i => JsonValue.Create(i),
+                long l => JsonValue.Create(l),
+                decimal d => JsonValue.Create(d),
+                double db => JsonValue.Create(db),
+                float f => JsonValue.Create(f),
+                string s => JsonValue.Create(s),
+                _ => JsonValue.Create(value?.ToString())
+            };
         }
 
         public string GetJsonString()
         {
             SaveAllControlValues();
-            return jConfig.ToString(Formatting.None);
+            return jConfig.ToJsonString();
         }
     }
 

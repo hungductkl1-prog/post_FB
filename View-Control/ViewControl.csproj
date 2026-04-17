@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <WindowsSupportedOSPlatformVersion>5.1</WindowsSupportedOSPlatformVersion>
+    <TargetPlatformMinVersion>5.1</TargetPlatformMinVersion>
+
+    <!-- Assembly info -->
+    <AssemblyName>ViewControl</AssemblyName>
+    <Product>ViewControl</Product>
+    <Company>Subdy</Company>
+    <Title>ViewControl - Android View</Title>
+
+    <CustomResourceTypesSupport>true</CustomResourceTypesSupport>
+
+    <!-- Publish as single file self-contained (no AOT — ScrcpyNet không hỗ trợ) -->
+    <PublishAot>false</PublishAot>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <!-- Packages -->
+  <ItemGroup>
+    <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
+    <PackageReference Include="WinFormsComInterop" Version="0.5.0" />
+  </ItemGroup>
+
+  <!-- Project references -->
+  <ItemGroup>
+    <ProjectReference Include="..\AntdUI\AntdUI.csproj" />
+    <ProjectReference Include="..\AntdUI.EmojiFluentFlat\AntdUI.EmojiFluentFlat.csproj" />
+    <ProjectReference Include="..\ScrcpyNet\ScrcpyNet.csproj" />
+    <ProjectReference Include="..\AutoAndroid\AutoAndroid.csproj" />
+    <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
+    <ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
+  </ItemGroup>
+
+  <!-- Share ucDeviceView and ScrcpyManager from main project via Compile Link -->
+  <ItemGroup>
+    <Compile Include="..\LamToolAutoPhonePrime\ucDeviceView.cs" Link="ucDeviceView.cs" />
+    <Compile Include="..\LamToolAutoPhonePrime\ucDeviceView.Designer.cs" Link="ucDeviceView.Designer.cs" />
+    <EmbeddedResource Include="..\LamToolAutoPhonePrime\ucDeviceView.resx" Link="ucDeviceView.resx" />
+    <Compile Include="..\LamToolAutoPhonePrime\ScrcpyManager.cs" Link="ScrcpyManager.cs" />
+    <Compile Include="..\LamToolAutoPhonePrime\KeycodeHelper.cs" Link="KeycodeHelper.cs" />
+    <Compile Include="..\LamToolAutoPhonePrime\ucMenuscripDevice.cs" Link="ucMenuscripDevice.cs" />
+    <Compile Include="..\LamToolAutoPhonePrime\ucMenuscripDevice.Designer.cs" Link="ucMenuscripDevice.Designer.cs" />
+    <EmbeddedResource Include="..\LamToolAutoPhonePrime\ucMenuscripDevice.resx" Link="ucMenuscripDevice.resx" />
+    <Compile Include="..\LamToolAutoPhonePrime\Utils\AntdHelper.cs" Link="Utils\AntdHelper.cs" />
+  </ItemGroup>
+
+  <!-- WinForms binding support -->
+  <PropertyGroup>
+    <_WinFormsBindingSupport>true</_WinFormsBindingSupport>
+  </PropertyGroup>
+
+  <!-- Copy ScrcpyNet native DLLs (FFmpeg, SDL2, adb, scrcpy-server) to output -->
+  <Target Name="CopyScrcpyNativeDeps" AfterTargets="Build">
+    <ItemGroup>
+      <ScrcpyNativeDep Include="$(MSBuildThisFileDirectory)..\ScrcpyNet\bin\$(Configuration)\netstandard2.1\ScrcpyNet\*.*" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)ScrcpyNet" />
+    <Copy SourceFiles="@(ScrcpyNativeDep)" DestinationFolder="$(OutDir)ScrcpyNet" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Copy ScrcpyNet native DLLs when publishing -->
+  <Target Name="CopyScrcpyNativeDepForPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <ScrcpyNativeDepPub Include="$(MSBuildThisFileDirectory)..\ScrcpyNet\bin\$(Configuration)\netstandard2.1\ScrcpyNet\*.*" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)ScrcpyNet" />
+    <Copy SourceFiles="@(ScrcpyNativeDepPub)" DestinationFolder="$(PublishDir)ScrcpyNet" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

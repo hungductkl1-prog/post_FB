@@ -20,18 +20,38 @@
 		<Assembly Name="System.Reflection" Dynamic="Required All"/>
 		<Assembly Name="System.Runtime" Dynamic="Required All"/>
 		<Assembly Name="System.ComponentModel" Dynamic="Required All" />
-		<Assembly Name="System.ComponentModel.TypeConverter" Dynamic="Required All" />
+		<Assembly Name="System.ComponentModel.TypeConverter" Dynamic="Required All">
+			<Type Name="System.ComponentModel.TypeDescriptor" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.ReflectTypeDescriptionProvider" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.PropertyDescriptorCollection" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.PropertyDescriptor" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.ITypedList" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.IBindingList" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.IBindingListView" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.BindingList`1" Dynamic="Required All" />
+		</Assembly>
 		<Assembly Name="System.Globalization">
 			<Type Name="System.Globalization.CultureInfo" Dynamic="Required All"/>
 		</Assembly>
 		<Assembly Name="System.Drawing" Dynamic="Required All" />
 
 		<!-- WinForms binding + runtime -->
-		<Assembly Name="System.Windows.Forms">
+		<Assembly Name="System.Windows.Forms" Dynamic="Required All">
 			<Type Name="System.Windows.Forms.Form" Dynamic="Required All" Preserve="All" />
 			<Type Name="System.Windows.Forms.UserControl" Dynamic="Required All" />
 			<Type Name="System.Windows.Forms.Control" Dynamic="Required All" />
 			<Type Name="System.Windows.Forms.Application" Dynamic="Required All" />
+			<!-- Binding infrastructure -->
+			<Type Name="System.Windows.Forms.BindingContext" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.BindingSource" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Binding" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.BindingManagerBase" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.CurrencyManager" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.PropertyManager" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.ContainerControl" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridView" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridView+DataGridViewDataConnection" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.SplitContainer" Dynamic="Required All" />
 		</Assembly>
 
 		<!-- Project assemblies -->
@@ -43,11 +63,15 @@
 		<Assembly Name="Sunny.Subdy.Server" Dynamic="Required All" />
 
 		<!-- Models sử dụng binding (chỉ rõ kiểu cần giữ metadata) -->
-		<Assembly Name="AutoAndroid">
-			<Type Name="AutoAndroid.DeviceModel" DynamicallyAccessedMemberTypes="All" />
-		</Assembly>
 		<Assembly Name="Sunny.Subdy.Data">
-			<Type Name="Sunny.Subdy.Data.Models.Account" DynamicallyAccessedMemberTypes="All" />
+			<Type Name="Sunny.Subdy.Data.Models.Account" Dynamic="Required All" />
+			<Type Name="Sunny.Subdy.Data.Models.DeviceModel" Dynamic="Required All" />
+			<Type Name="Sunny.Subdy.Data.Models.JobHistory" Dynamic="Required All" />
+			<Type Name="Sunny.Subdy.Data.Models.Script" Dynamic="Required All" />
+			<Type Name="Sunny.Subdy.Data.Models.ScriptAction" Dynamic="Required All" />
+			<Type Name="Sunny.Subdy.Data.Models.Folder" Dynamic="Required All" />
+			<Type Name="Sunny.Subdy.Data.Models.SettingDefault" Dynamic="Required All" />
+			<Type Name="Sunny.Subdy.Data.Models.FormatAccount" Dynamic="Required All" />
 		</Assembly>
 		<Assembly Name="BouncyCastle.Crypto">
 			<Type Name="Org.BouncyCastle.Security.DigestUtilities" Dynamic="Required All" />

@@ -1,11 +1,8 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using RestSharp;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
 using System.Net;
-using System.Security.Policy;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Sunny.Subdy.Common.API.Jobs.GoLike
 {
@@ -31,18 +28,18 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
 
             try
             {
-                var responseObj = JObject.Parse(json);
+                var responseObj = JsonNode.Parse(json)!.AsObject();
 
-                bool isSuccess = responseObj["success"]?.ToObject<bool>() == true;
+                bool isSuccess = responseObj["success"]?.GetValue<bool>() == true;
                 if (isSuccess)
                 {
-                    var currentCoin = responseObj["current_coin"]?.ToObject<int>() ?? 0;
+                    var currentCoin = responseObj["current_coin"]?.GetValue<int>() ?? 0;
                     return currentCoin.ToString();
                 }
 
                 return "";
             }
-            catch (JsonReaderException ex)
+            catch (JsonException ex)
             {
                 return "";
             }
@@ -52,7 +49,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             }
         }
 
-        public async Task<JToken> GetFacebookJob(string uid, string token, string job_type = "")
+        public async Task<JsonNode?> GetFacebookJob(string uid, string token, string job_type = "")
         {
             string url = $"{UrlGetJob}{uid}";
 
@@ -70,12 +67,12 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
 
             try
             {
-                var responseObj = JObject.Parse(json);
+                var responseObj = JsonNode.Parse(json)!.AsObject();
 
-                bool isSuccess = Convert.ToBoolean(responseObj["success"]);
+                bool isSuccess = Convert.ToBoolean(responseObj["success"]?.ToString());
                 if (isSuccess)
                 {
-                    var jobs = responseObj["data"] as JArray;
+                    var jobs = responseObj["data"]?.AsArray();
                     if (jobs != null && jobs.Any())
                         return responseObj;
 
@@ -85,7 +82,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
 
                 throw new Exception(responseObj["message"]?.ToString() ?? "Phản hồi từ server không thành công:\n" + json);
             }
-            catch (JsonReaderException ex)
+            catch (JsonException ex)
             {
                 throw new Exception("Lỗi phân tích JSON:\n" + ex.Message + "\nRaw:\n" + json);
             }
@@ -113,14 +110,14 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
 
             try
             {
-                var responseObj = JObject.Parse(json);
-                bool isSuccess = responseObj["success"] != null && Convert.ToBoolean(responseObj["success"]);
+                var responseObj = JsonNode.Parse(json)!.AsObject();
+                bool isSuccess = responseObj["success"] != null && Convert.ToBoolean(responseObj["success"]?.ToString());
 
                 if (!isSuccess)
                     throw new Exception(responseObj["message"]?.ToString() ?? "Phản hồi không thành công:\n" + json);
 
 
-                var packageArray = responseObj["data"]?["facebook"]?["package_name"] as JArray;
+                var packageArray = responseObj["data"]?["facebook"]?["package_name"]?.AsArray();
 
                 if (packageArray == null)
                 {
@@ -135,7 +132,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 }
                 return lines;
             }
-            catch (JsonReaderException ex)
+            catch (JsonException ex)
             {
                 throw new Exception("Lỗi phân tích JSON:\n" + ex.Message + "\nRaw:\n" + json);
             }
@@ -145,7 +142,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             }
         }
 
-        public async Task<JToken> ReportFacebookJob(string uid, string fullname, string token, JobModel job)
+        public async Task<JsonNode?> ReportFacebookJob(string uid, string fullname, string token, JobModel job)
         {
             var headers = new Dictionary<string, string>
             {
@@ -169,7 +166,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             if (job.Type == JobTypes.Comment && !string.IsNullOrEmpty(job.CommentId))
                 body["comment_id"] = job.CommentId;
 
-            string jsonBody = JsonConvert.SerializeObject(body);
+            string jsonBody = System.Text.Json.JsonSerializer.Serialize(body);
             string json = HttpRequestHelper.POST_JSON(UrlReportJob, headers: headers, jsonBody: jsonBody);
 
             if (string.IsNullOrWhiteSpace(json))
@@ -177,7 +174,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
 
             try
             {
-                var responseObj = JObject.Parse(json);
+                var responseObj = JsonNode.Parse(json)!.AsObject();
                 bool isSuccess = Convert.ToBoolean(responseObj["success"].ToString());
 
                 if (isSuccess)
@@ -185,7 +182,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
 
                 throw new Exception(responseObj["message"]?.ToString() ?? "Phản hồi không thành công:\n" + json);
             }
-            catch (JsonReaderException ex)
+            catch (JsonException ex)
             {
                 throw new Exception("Lỗi phân tích JSON:\n" + ex.Message + "\nRaw:\n" + json);
             }
@@ -200,30 +197,25 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             Dictionary<string, string> result = new Dictionary<string, string>();
             try
             {
-                var options = new RestClientOptions("https://gateway.golike.net")
-                {
-                    
-                };
-                var client = new RestClient(options);
-                var request = new RestRequest("/api/instagram-account", Method.Get);
-                request.AddHeader("authorization", $"Bearer {token}");
-                request.AddHeader("t", "VFZSak1VNUVUVEpPZW1kNFRsRTlQUT09");
-                request.AddHeader("accept", "application/json, text/plain, */*");
-                request.AddHeader("accept-language", "en-US,en;q=0.9");
-               // request.AddHeader("content-type", "application/json;charset=utf-8");
-                request.AddHeader("origin", "https://app.golike.net");
-                request.AddHeader("sec-ch-ua", "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"138\", \"Microsoft Edge\";v=\"138\"");
-                request.AddHeader("sec-ch-ua-mobile", "?0");
-                request.AddHeader("sec-ch-ua-platform", "\"Windows\"");
-                request.AddHeader("sec-fetch-dest", "empty");
-                request.AddHeader("sec-fetch-mode", "cors");
-                request.AddHeader("sec-fetch-site", "same-site");
-                request.AddHeader("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0");
-                RestResponse response = await client.ExecuteAsync(request);
-                string json = response.Content;
-                var jObject = JObject.Parse(json);
+                var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://gateway.golike.net/api/instagram-account");
+                request.Headers.Add("authorization", $"Bearer {token}");
+                request.Headers.Add("t", "VFZSak1VNUVUVEpPZW1kNFRsRTlQUT09");
+                request.Headers.Add("accept", "application/json, text/plain, */*");
+                request.Headers.Add("accept-language", "en-US,en;q=0.9");
+                request.Headers.Add("origin", "https://app.golike.net");
+                request.Headers.Add("sec-ch-ua", "\"Not)A;Brand\";v=\"8\", \"Chromium\";v=\"138\", \"Microsoft Edge\";v=\"138\"");
+                request.Headers.Add("sec-ch-ua-mobile", "?0");
+                request.Headers.Add("sec-ch-ua-platform", "\"Windows\"");
+                request.Headers.Add("sec-fetch-dest", "empty");
+                request.Headers.Add("sec-fetch-mode", "cors");
+                request.Headers.Add("sec-fetch-site", "same-site");
+                request.Headers.Add("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0");
+                var response = await client.SendAsync(request);
+                string json = await response.Content.ReadAsStringAsync();
+                var jObject = JsonNode.Parse(json)!.AsObject();
                 var data = jObject["data"];
-                foreach (var item in data)
+                foreach (var item in data.AsArray())
                 {
                     string username = item["instagram_username"]?.ToString();
                     string id = item["id"]?.ToString();
@@ -260,10 +252,10 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 }
                 if (response != null && response.StatusCode != HttpStatusCode.OK)
                 {
-                    result["error"] = JObject.Parse(json!)["message"].ToString();
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"].ToString();
                     return result;
                 }
-                result["success"] = JObject.Parse(json!)["message"].ToString();
+                result["success"] = JsonNode.Parse(json!)!.AsObject()["message"].ToString();
             }
             catch (Exception ex)
             {
@@ -291,10 +283,10 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 }
                 if (response != null && response.StatusCode != HttpStatusCode.OK)
                 {
-                    result["error"] = JObject.Parse(json!)["message"].ToString();
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"].ToString();
                     return result;
                 }
-                var data = JObject.Parse(json!);
+                var data = JsonNode.Parse(json!)!.AsObject();
                 result["coin"] = data["data"]["coin"].ToString();
                 result["code"] = data["data"]["instagram_verify_code"].ToString();
             }
@@ -322,19 +314,19 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 }
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
-                    throw new Exception(JObject.Parse(json!)["message"].ToString());
+                    throw new Exception(JsonNode.Parse(json!)!.AsObject()["message"].ToString());
                 }
-                var jGolike = JObject.Parse(json!);
+                var jGolike = JsonNode.Parse(json!)!.AsObject();
                 var dataToken = jGolike["data"];
-                if (dataToken == null || dataToken.Type != JTokenType.Array)
+                if (dataToken == null || dataToken is not JsonArray)
                 {
                     throw new Exception("Dữ liệu job không hợp lệ.");
                 }
 
-                var jJobs = (JArray)dataToken;
+                var jJobs = (JsonArray)dataToken;
                 var jobs = jJobs
-                    .OfType<JObject>()
-                    .Select(j => new JobModel(j, JobServices.GoLike))
+                    .OfType<JsonObject>()
+                    .Select(j => new JobModel(j, "https://app.golike.net/"))
                     .ToList();
                 return jobs;
             }
@@ -364,7 +356,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 }
                 if (response != null && response.StatusCode != HttpStatusCode.OK)
                 {
-                    result["error"] = JObject.Parse(json!)["message"].ToString();
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"].ToString();
                     return result;
                 }
                 result["success"] = "Bỏ qua job thành công.";
@@ -396,10 +388,10 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 }
                 if (response != null && response.StatusCode != HttpStatusCode.OK)
                 {
-                    result["error"] = JObject.Parse(json!)["message"].ToString();
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"].ToString();
                     return result;
                 }
-                result["success"] = JObject.Parse(json!)["message"].ToString();
+                result["success"] = JsonNode.Parse(json!)!.AsObject()["message"].ToString();
             }
             catch (Exception ex)
             {

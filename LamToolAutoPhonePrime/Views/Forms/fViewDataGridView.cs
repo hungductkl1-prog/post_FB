@@ -19,6 +19,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         }
         private void AddCheckBoxesToFlowLayoutPanel(List<string> cases, string name)
         {
+            _dgvName = name;
             flowLayoutPanel1.Controls.Clear();
             flowLayoutPanel1.FlowDirection = FlowDirection.TopDown;
 
@@ -77,6 +78,8 @@ namespace LamToolAutoPhonePrime.Views.Forms
             var lines = config.Select(kvp => $"{kvp.Key}|{kvp.Value.ToString().ToLower()}");
             File.WriteAllLines(configFile, lines);
         }
+        private string _dgvName = "";
+
         private void button9_Click(object sender, EventArgs e)
         {
             Close();
@@ -90,6 +93,34 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void button1_Click(object sender, EventArgs e)
         {
             this.Close();
+        }
+
+        private void btnShowAll_Click(object sender, EventArgs e)
+        {
+            foreach (Control ctrl in flowLayoutPanel1.Controls)
+            {
+                if (ctrl is CheckBox cb)
+                    cb.Checked = true;
+            }
+        }
+
+        private void btnShowOptimal_Click(object sender, EventArgs e)
+        {
+            // Danh sách cột tối ưu cần hiển thị
+            var optimalColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Họ và tên", "Mật khẩu", "2FA", "Cookie",
+                "Số điện thoại", "Email", "Nhóm", "Kịch bản",
+                "Proxy", "Ghi chú", "Hôm nay", "Total",
+                "Job success", "Job fail", "Lần tương tác cuối",
+                "Thiết bị", "Tình trạng", "Trạng thái"
+            };
+
+            foreach (Control ctrl in flowLayoutPanel1.Controls)
+            {
+                if (ctrl is CheckBox cb)
+                    cb.Checked = optimalColumns.Contains(cb.Text.Trim());
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System.Text.Json.Nodes;
 using Sunny.Subd.Core.Proxies;
 using Sunny.Subd.Core.Utils;
 using Sunny.Subdy.Common.API;
@@ -171,8 +171,8 @@ namespace Sunny.Subd.Core.Instagram
                     foreach (var task in jobs)
                     {
                         string result = await _instagramClient.Like(task.FromId, _account.Cookie, csrf);
-                        var json = JObject.Parse(result);
-                        string status = json["status"]?.ToString();
+                        var json = JsonNode.Parse(result)!.AsObject();
+                        string status = json["status"]?.GetValue<string>();
                         if (status != "ok")
                         {
                             _jobWorking["faillientiep"]++;
@@ -211,8 +211,8 @@ namespace Sunny.Subd.Core.Instagram
                             try
                             {
                                 string result = await _instagramClient.Follow(id, _account.Cookie, csrf);
-                                var json = JObject.Parse(result);
-                                if (json["status"]?.ToString() != "ok")
+                                var json = JsonNode.Parse(result)!.AsObject();
+                                if (json["status"]?.GetValue<string>() != "ok")
                                 {
                                     hasError = true;
                                     _jobWorking["faillientiep"]++;

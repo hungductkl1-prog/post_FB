@@ -1,11 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
-using RestSharp;
+using System.Text.Json.Nodes;
 using Sunny.Subd.Core.Utils;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
@@ -24,14 +23,10 @@ namespace Sunny.Subd.Core.Email
                     return string.Empty;
                 }
                 string email = (SubdyHelper.RandomString(length: SubdyHelper.RandomValue(6, 20)) + "@" + domain).ToLower();
-                var options = new RestClientOptions("https://inboxes.com")
-                {
-                    Timeout = TimeSpan.FromSeconds(60),
-                };
-                var client = new RestClient(options);
-                var request = new RestRequest($"/api/v2/inbox/{email}", Method.Get);
-                RestResponse response = await client.ExecuteAsync(request);
-                if (response.Content.Contains("msgs"))
+                var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+                var response = await client.GetAsync($"https://inboxes.com/api/v2/inbox/{email}");
+                string content = await response.Content.ReadAsStringAsync();
+                if (content.Contains("msgs"))
                 {
                     return email;
                 }
@@ -42,25 +37,22 @@ namespace Sunny.Subd.Core.Email
                 return string.Empty;
             }
         }
+
         private static async Task<string> GetDomain()
         {
             try
             {
                 for (var i = 0; i < 10; i++)
                 {
-                    var options = new RestClientOptions("https://inboxes.com")
-                    {
-                        Timeout = TimeSpan.FromSeconds(60),
-                    };
-                    var client = new RestClient(options);
-                    var request = new RestRequest($"/api/v2/domain", Method.Get);
-                    RestResponse response = await client.ExecuteAsync(request);
-                    if (response.Content.Contains("domains"))
+                    var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+                    var response = await client.GetAsync("https://inboxes.com/api/v2/domain");
+                    string content = await response.Content.ReadAsStringAsync();
+                    if (content.Contains("domains"))
                     {
                         string pattern = @"""qdn"":\s*""([^""]+)""";
 
                         // Find all matches
-                        MatchCollection matches = Regex.Matches(response.Content, pattern);
+                        MatchCollection matches = Regex.Matches(content, pattern);
 
                         if (matches.Count > 0)
                         {
@@ -83,6 +75,7 @@ namespace Sunny.Subd.Core.Email
             }
             return "";
         }
+
         public static async Task<string> GetCode(string email)
         {
             try
@@ -90,17 +83,17 @@ namespace Sunny.Subd.Core.Email
                 string urlId = string.Empty;
 
                 var repont = await RequestService.Get($"https://inboxes.com/api/v2/inbox/{email}");
-                var data = JObject.Parse(repont);
-                JArray messages = (JArray)data["msgs"];
+                var data = JsonNode.Parse(repont)!.AsObject();
+                JsonArray messages = data["msgs"]!.AsArray();
                 urlId = messages
-.FirstOrDefault(msg => msg["f"]?.ToString() == "Facebook")?["uid"]?.ToString();
+.FirstOrDefault(msg => msg?["f"]?.GetValue<string>() == "Facebook")?["uid"]?.GetValue<string>();
                 if (string.IsNullOrEmpty(urlId))
                 {
                     return string.Empty;
                 }
                 var content = await RequestService.Get($"https://inboxes.com/api/v2/message/{urlId}");
-                data = JObject.Parse(content);
-                string textContent = data["text"]?.ToString();
+                data = JsonNode.Parse(content)!.AsObject();
+                string textContent = data["text"]?.GetValue<string>();
                 string cleanedText = Regex.Replace(textContent, @"[^\d\s]", "");
                 string pattern = @"\b\d{4,8}(?!\S)";
                 MatchCollection matches = Regex.Matches(cleanedText, pattern);

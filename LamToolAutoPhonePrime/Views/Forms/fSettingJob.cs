@@ -12,40 +12,18 @@ namespace LamToolAutoPhonePrime.Views.Forms
     {
         private string _platform = "";
         private string _server = "";
+        private Sunny.Subdy.Common.Json.ConfigHelper _configHelper;
         public fSettingJob(string platform, string server)
         {
             InitializeComponent();
-            switch (platform)
-            {
-                case PlatformModel.TikTok:
-                case PlatformModel.Instagram:
-                    {
-                        panel4.Visible = checkBox8.Visible = false;
-                        panel9.Visible = checkBox2.Visible = false;
-                        panel11.Visible = checkBox3.Visible = false;
-                        panel10.Visible = checkBox4.Visible = false;
-                        panel5.Visible = checkBox5.Visible = false;
-                        panel17.Visible = checkBox15.Visible = false;
-                        panel18.Visible = checkBox18.Visible = false;
-                        panel7.Visible = checkBox17.Visible = false;
-                        panel19.Visible = checkBox7.Visible = false;
-                        break;
-                    }
-            }
             _platform = platform;
-            check_AddAccount.Visible = true;
-            if (server != JobServices.VipIG)
-            {
-                check_AddAccount.Visible = false;
-            }
             _server = server;
-            new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fSettingJob)}_{_platform}_{_server}", onLoad: new System.Action(() =>
+            _configHelper = new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fSettingJob)}_{_platform}", onLoad: new System.Action(() =>
             {
                 btn_Click(null, null);
 
             }), shouldExit: false);
             tabs3.SelectedIndex = 0;
-            tabPageSettingCaptcha.Visible = server != JobServices.GoLike;
             cbb_ListTypeProxy.Items.AddRange(CaptchaService.SitesV2.ToArray());
             if (string.IsNullOrEmpty(cbb_ListTypeProxy.Text))
             {
@@ -73,17 +51,11 @@ namespace LamToolAutoPhonePrime.Views.Forms
             panel18.Enabled = checkBox18.Checked;
             panel7.Enabled = checkBox17.Checked;
             panel19.Enabled = checkBox7.Checked;
-            groupBox1.Enabled = checkBox19.Checked;
         }
         private void btn_setting_Click(object sender, EventArgs e)
         {
             this.Close();
         }
-        private void textBox1_TextChanged(object sender, EventArgs e)
-        {
-            groupBox1.Text = $"({textBox1.Lines.Count()}) Token";
-        }
-
         private void button9_Click(object sender, EventArgs e)
         {
             this.Close();

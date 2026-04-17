@@ -698,6 +698,15 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
             Name = "fHDDangStory";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Cấu hình tương tác";
+            checkBox5.CheckedChanged += ckbDefault_CheckedChanged;
+            checkBox6.CheckedChanged += ckbDefault_CheckedChanged;
+            checkBox7.CheckedChanged += ckbDefault_CheckedChanged;
+            radioButton5.CheckedChanged += ckbDefault_CheckedChanged;
+            txtLinks.TextChanged += txtLinks_TextChanged;
+            textBox1.TextChanged += txtLinks_TextChanged;
+            btnCancel.Click += btnCancel_Click;
+            btnSave.Click += btnSave_Click;
+            btn_setting.Click += btnCancel_Click;
             D316AB1E.ResumeLayout(false);
             ((ISupportInitialize)E51CE89C).EndInit();
             panel1.ResumeLayout(false);

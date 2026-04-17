@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System.Text.Json.Nodes;
 
 namespace Sunny.Subd.Core.Proxies
 {
@@ -19,8 +19,8 @@ namespace Sunny.Subd.Core.Proxies
                 error = json.Trim();
                 try
                 {
-                    JObject jObject = JObject.Parse(json);
-                    return phoneNumber = jObject["data"]?["http"]?.ToString();
+                    JsonObject jObject = JsonNode.Parse(json)!.AsObject();
+                    return phoneNumber = jObject["data"]?["http"]?.GetValue<string>();
                 }
                 catch
                 {
@@ -49,8 +49,8 @@ namespace Sunny.Subd.Core.Proxies
                 error = json.Trim();
                 try
                 {
-                    JObject jObject = JObject.Parse(json);
-                    return phoneNumber = jObject["data"]?["http"]?.ToString();
+                    JsonObject jObject = JsonNode.Parse(json)!.AsObject();
+                    return phoneNumber = jObject["data"]?["http"]?.GetValue<string>();
                 }
                 catch
                 {

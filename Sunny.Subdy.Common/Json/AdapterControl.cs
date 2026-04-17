@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 using System.Windows.Forms;
 
 namespace Sunny.Subdy.Common.Json
@@ -8,21 +8,21 @@ namespace Sunny.Subdy.Common.Json
         private readonly CheckBox control;
         public CheckBoxGetterAdapter(CheckBox c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Checked;
+        public JsonNode? GetValue() => JsonValue.Create(control.Checked);
     }
     public class UICheckBoxGetterAdapter : IConfigurableControl
     {
         private readonly AntdUI.Checkbox control;
         public UICheckBoxGetterAdapter(AntdUI.Checkbox c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Checked;
+        public JsonNode? GetValue() => JsonValue.Create(control.Checked);
     }
     public class TextBoxGetterAdapter : IConfigurableControl
     {
         private readonly TextBox control;
         public TextBoxGetterAdapter(TextBox c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Text;
+        public JsonNode? GetValue() => JsonValue.Create(control.Text);
     }
 
     public class ComboBoxGetterAdapter : IConfigurableControl
@@ -30,7 +30,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly ComboBox control;
         public ComboBoxGetterAdapter(ComboBox c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.SelectedIndex;
+        public JsonNode? GetValue() => JsonValue.Create(control.SelectedIndex);
     }
 
     public class UIComboBoxGetterAdapter : IConfigurableControl
@@ -38,7 +38,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly AntdUI.Select control;
         public UIComboBoxGetterAdapter(AntdUI.Select c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.SelectedIndex;
+        public JsonNode? GetValue() => JsonValue.Create(control.SelectedIndex);
     }
 
     public class UITextBoxGetterAdapter : IConfigurableControl
@@ -46,7 +46,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly AntdUI.Input control;
         public UITextBoxGetterAdapter(AntdUI.Input c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Text;
+        public JsonNode? GetValue() => JsonValue.Create(control.Text);
     }
 
     public class NumericUpDownGetterAdapter : IConfigurableControl
@@ -54,7 +54,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly NumericUpDown control;
         public NumericUpDownGetterAdapter(NumericUpDown c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Value;
+        public JsonNode? GetValue() => JsonValue.Create(control.Value);
     }
 
     public class RadioButtonGetterAdapter : IConfigurableControl
@@ -62,21 +62,21 @@ namespace Sunny.Subdy.Common.Json
         private readonly RadioButton control;
         public RadioButtonGetterAdapter(RadioButton c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Checked;
+        public JsonNode? GetValue() => JsonValue.Create(control.Checked);
     }
     public class UIRadioButtonGetterAdapter : IConfigurableControl
     {
         private readonly AntdUI.Radio control;
         public UIRadioButtonGetterAdapter(AntdUI.Radio c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Checked;
+        public JsonNode? GetValue() => JsonValue.Create(control.Checked);
     }
     public class UITimePickerGetterAdapter : IConfigurableControl
     {
         private readonly AntdUI.TimePicker control;
         public UITimePickerGetterAdapter(AntdUI.TimePicker c) => control = c;
         public string Name => control.Name;
-        public object? GetValue() => control.Value;
+        public JsonNode? GetValue() => JsonValue.Create(control.Value.ToString());
     }
     // === Binder Adapters (LoadValue + BindEvent) ===
     public class TextBoxBinderAdapter : IControlAdapter
@@ -84,7 +84,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly TextBox control;
         public TextBoxBinderAdapter(TextBox c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.Text = value.ToString();
+        public void LoadValue(JsonNode? value) => control.Text = value?.ToString() ?? "";
         public void BindEvent(EventHandler handler) => control.TextChanged += handler;
     }
 
@@ -93,7 +93,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly AntdUI.Input control;
         public UITextBoxBinderAdapter(AntdUI.Input c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.Text = value.ToString();
+        public void LoadValue(JsonNode? value) => control.Text = value?.ToString() ?? "";
         public void BindEvent(EventHandler handler) => control.TextChanged += handler;
     }
 
@@ -102,7 +102,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly CheckBox control;
         public CheckBoxBinderAdapter(CheckBox c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.Checked = value.ToObject<bool>();
+        public void LoadValue(JsonNode? value) => control.Checked = value?.GetValue<bool>() ?? false;
         public void BindEvent(EventHandler handler) => control.CheckedChanged += handler;
     }
 
@@ -111,7 +111,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly AntdUI.Checkbox control;
         public UICheckBoxBinderAdapter(AntdUI.Checkbox c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.Checked = value.ToObject<bool>();
+        public void LoadValue(JsonNode? value) => control.Checked = value?.GetValue<bool>() ?? false;
         public void BindEvent(EventHandler handler)
         {
             control.CheckedChanged += (s, val) =>
@@ -121,13 +121,13 @@ namespace Sunny.Subdy.Common.Json
         }
     }
 
-   
+
     public class ComboBoxBinderAdapter : IControlAdapter
     {
         private readonly ComboBox control;
         public ComboBoxBinderAdapter(ComboBox c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.SelectedIndex = value.ToObject<int>();
+        public void LoadValue(JsonNode? value) => control.SelectedIndex = value?.GetValue<int>() ?? 0;
         public void BindEvent(EventHandler handler) => control.SelectedIndexChanged += handler;
     }
 
@@ -136,7 +136,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly AntdUI.Select control;
         public UIComboBoxBinderAdapter(AntdUI.Select c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.SelectedIndex = value.ToObject<int>();
+        public void LoadValue(JsonNode? value) => control.SelectedIndex = value?.GetValue<int>() ?? 0;
         public void BindEvent(EventHandler handler)
         {
             control.SelectedIndexChanged += (s, val) =>
@@ -151,7 +151,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly RadioButton control;
         public RadioButtonBinderAdapter(RadioButton c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.Checked = value.ToObject<bool>();
+        public void LoadValue(JsonNode? value) => control.Checked = value?.GetValue<bool>() ?? false;
         public void BindEvent(EventHandler handler) => control.CheckedChanged += handler;
     }
     public class UIRadioButtonBinderAdapter : IControlAdapter
@@ -159,7 +159,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly AntdUI.Radio control;
         public UIRadioButtonBinderAdapter(AntdUI.Radio c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.Checked = value.ToObject<bool>();
+        public void LoadValue(JsonNode? value) => control.Checked = value?.GetValue<bool>() ?? false;
         public void BindEvent(EventHandler handler)
         {
             control.CheckedChanged += (s, val) =>
@@ -173,7 +173,7 @@ namespace Sunny.Subdy.Common.Json
         private readonly NumericUpDown control;
         public NumericUpDownBinderAdapter(NumericUpDown c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value) => control.Value = value.ToObject<decimal>();
+        public void LoadValue(JsonNode? value) => control.Value = value?.GetValue<decimal>() ?? 0;
         public void BindEvent(EventHandler handler) => control.ValueChanged += handler;
     }
     public class UITimePickerBinderAdapter : IControlAdapter
@@ -181,11 +181,10 @@ namespace Sunny.Subdy.Common.Json
         private readonly AntdUI.TimePicker control;
         public UITimePickerBinderAdapter(AntdUI.TimePicker c) => control = c;
         public string Name => control.Name;
-        public void LoadValue(JToken value)
+        public void LoadValue(JsonNode? value)
         {
-            // Nếu dữ liệu JSON lưu DateTime
-            var dateTimeValue = value.ToObject<DateTime>();
-            control.Value = dateTimeValue.TimeOfDay;
+            if (DateTime.TryParse(value?.ToString(), out var dateTimeValue))
+                control.Value = dateTimeValue.TimeOfDay;
         }
         public void BindEvent(EventHandler handler)
         {

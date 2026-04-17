@@ -1,27 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using RestSharp;
 
 namespace Sunny.Subd.Core.Utils
 {
-    internal class RestShapService
+    public static class RestShapService
     {
-        public static RestClient RestClientUrl(string baseUrl, WebProxy? proxy, string userAgent, bool useProxy = true)
+        public static HttpClient CreateClient(string baseUrl, WebProxy? proxy = null, string? userAgent = null, bool useProxy = true)
         {
-            var options = new RestClientOptions(baseUrl)
-            {
-                Timeout = TimeSpan.FromSeconds(60),
-                UserAgent = userAgent,
-            };
+            var handler = new HttpClientHandler();
             if (proxy != null && useProxy)
+                handler.Proxy = proxy;
+
+            var client = new HttpClient(handler)
             {
-                options.Proxy = proxy;
-            }
-            return new RestClient(options);
+                BaseAddress = new Uri(baseUrl),
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+
+            if (!string.IsNullOrEmpty(userAgent))
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
+
+            return client;
         }
     }
 }

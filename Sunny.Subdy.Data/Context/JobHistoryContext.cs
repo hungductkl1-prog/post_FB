@@ -1,10 +1,10 @@
-﻿using Sunny.Subdy.Common.Helper;
+﻿using Microsoft.Data.Sqlite;
+using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.Data.Models;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SQLite;
 using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -100,7 +100,7 @@ namespace Sunny.Subdy.Data.Context
             object? result = _db.ExecuteScalar(query, parameters);
             return result != null && int.TryParse(result.ToString(), out int count) ? count : 0;
         }
-        private JobHistory MapToJob(SQLiteDataReader reader)
+        private JobHistory MapToJob(SqliteDataReader reader)
         {
             return new JobHistory
             {
@@ -284,6 +284,48 @@ WHERE Uid = @uid AND Status = @status";
         }
         public List<JobHistory> GetAll(string query, Dictionary<string, object>? parameters = null)
     => _db.GetAllEntities(query, MapToJob, parameters);
+
+        /// <summary>
+        /// Bulk query: lấy số job success/fail hôm nay cho nhiều uid cùng lúc.
+        /// Trả về Dictionary[uid] = (success, fail, coin)
+        /// </summary>
+        public Dictionary<string, (int success, int fail, double coin)> GetTodayCountsByUids(IEnumerable<string> uids, string platform)
+        {
+            var result = new Dictionary<string, (int success, int fail, double coin)>(StringComparer.OrdinalIgnoreCase);
+            var uidList = uids.Where(u => !string.IsNullOrEmpty(u)).ToList();
+            if (uidList.Count == 0) return result;
+
+            string dateStr = System.DateTime.Now.ToString("dd/MM/yyyy");
+            var parameters = new Dictionary<string, object>
+            {
+                ["@platform"] = platform,
+                ["@date"] = dateStr
+            };
+            for (int i = 0; i < uidList.Count; i++)
+                parameters[$"@uid{i}"] = uidList[i];
+
+            string inClause = string.Join(",", Enumerable.Range(0, uidList.Count).Select(i => $"@uid{i}"));
+            string query = $@"SELECT Uid, Status, Coin FROM {TableName}
+WHERE Platform = @platform AND DateTime = @date AND Uid IN ({inClause})";
+
+            var rows = _db.GetAllEntities(query, r => (
+                uid: r["Uid"]?.ToString() ?? "",
+                status: r["Status"]?.ToString() ?? "",
+                coin: r["Coin"]?.ToString() ?? ""
+            ), parameters);
+
+            foreach (var (uid, status, coin) in rows)
+            {
+                if (!result.ContainsKey(uid)) result[uid] = (0, 0, 0);
+                var cur = result[uid];
+                double.TryParse(coin, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double coinVal);
+                if (status == "Success")
+                    result[uid] = (cur.success + 1, cur.fail, cur.coin + coinVal);
+                else
+                    result[uid] = (cur.success, cur.fail + 1, cur.coin);
+            }
+            return result;
+        }
         public (int distinctUidCount, int totalCount) GetUidStatsByPlatform(string platform)
         {
             var parameters = new Dictionary<string, object>
@@ -326,6 +368,40 @@ WHERE Uid = @uid AND Status = @status";
                 LogManager.Error(ex);
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Lấy danh sách UID không trùng trong khoảng ngày cho một platform.
+        /// fromDate / toDate định dạng "yyyy-MM-dd".
+        /// </summary>
+        public List<string> GetDistinctUidsByDateRange(string platform, string fromDate, string toDate)
+        {
+            var result = new List<string>();
+            try
+            {
+                string query = $@"
+SELECT DISTINCT {nameof(JobHistory.Uid)} FROM {TableName}
+WHERE {nameof(JobHistory.Platform)} = @platform
+  AND {nameof(JobHistory.Uid)} IS NOT NULL
+  AND {nameof(JobHistory.Uid)} != ''
+  AND date(substr({nameof(JobHistory.DateTime)}, 7, 4) || '-' || substr({nameof(JobHistory.DateTime)}, 4, 2) || '-' || substr({nameof(JobHistory.DateTime)}, 1, 2))
+      BETWEEN @fromDate AND @toDate";
+
+                var parameters = new Dictionary<string, object>
+                {
+                    ["@platform"] = platform,
+                    ["@fromDate"] = fromDate,
+                    ["@toDate"] = toDate
+                };
+
+                var rows = _db.GetAllEntities(query, r => r["Uid"]?.ToString() ?? "", parameters);
+                result.AddRange(rows.Where(u => !string.IsNullOrEmpty(u)));
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+            }
+            return result;
         }
     }
 }

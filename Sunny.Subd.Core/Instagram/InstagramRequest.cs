@@ -1,6 +1,4 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Org.BouncyCastle.Crypto;
+﻿using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Encodings;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Modes;
@@ -660,7 +658,7 @@ namespace Sunny.Subd.Core.Instagram
             string json = Encoding.UTF8.GetString(data);
 
             // Giải mã JSON dùng System.Text.Json (thân thiện AOT)
-            var cookieDict = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
+            var cookieDict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
             // Tạo chuỗi cookie
             StringBuilder cookieString = new StringBuilder();
             foreach (var kvp in cookieDict)
@@ -815,8 +813,8 @@ namespace Sunny.Subd.Core.Instagram
 
                     if (response.IsSuccessStatusCode)
                     {
-                        var json = JObject.Parse(result);
-                        var value = json["form_data"]?["username"]?.ToString();
+                        var json = JsonNode.Parse(result)!.AsObject();
+                        var value = json["form_data"]?["username"]?.GetValue<string>();
                         if (!string.IsNullOrEmpty(value))
                         {
                             string username = value.ToString();
@@ -831,7 +829,6 @@ namespace Sunny.Subd.Core.Instagram
             catch (Exception ex)
             {
                 throw new Exception($"Lỗi khi xác thực cookie: [{result}] - " + ex.Message);
-                Console.WriteLine("Lỗi khi xác thực cookie: " + ex.Message);
             }
 
             return (false, null, null);

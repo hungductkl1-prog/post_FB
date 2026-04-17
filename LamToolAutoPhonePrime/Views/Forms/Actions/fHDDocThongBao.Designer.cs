@@ -327,6 +327,10 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
             Name = "fHDDocThongBao";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Cấu hình tương tác";
+            Load += fHDDocThongBao_Load;
+            btnCancel.Click += btnCancel_Click;
+            btnSave.Click += btnSave_Click;
+            btn_setting.Click += btnCancel_Click;
             pnlHeader.ResumeLayout(false);
             ((ISupportInitialize)E62B6A03).EndInit();
             panel1.ResumeLayout(false);

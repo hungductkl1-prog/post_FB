@@ -36,7 +36,6 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void btn_setting_Click(object sender, EventArgs e)
         {
             _control.button2.Visible = false;
-            _control.button3.Visible = false;
             this.Close();
         }
 

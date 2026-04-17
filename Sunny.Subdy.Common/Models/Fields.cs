@@ -15,6 +15,10 @@
         public const string MailAdress = "Mail khôi phục";
         public const string Username = "Username";
         public const string Phone = "Phone";
+        public const string Birthday = "Ngày sinh";
+        public const string UserAgent = "User Agent";
+        public const string PassMailRecover = "Pass mail recover";
+        public const string Note = "Ghi chú";
         public const string Empty = "";
     }
 }

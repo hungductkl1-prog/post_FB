@@ -182,6 +182,56 @@ namespace AntdUI
         public static Task open(Control control, string text, Action<Config> action, Action? end = null) => open(control, new Config { Text = text }, action, end);
 
         /// <summary>
+        /// Spin 加载中 (async overload)
+        /// </summary>
+        public static Task open(Control control, string text, Func<Config, Task> action, Action? end = null) => open(control, new Config { Text = text }, action, end);
+
+        /// <summary>
+        /// Spin 加载中 (async overload)
+        /// </summary>
+        public static Task open(Control control, Config config, Func<Config, Task> action, Action? end = null)
+        {
+            var parent = control.FindPARENT();
+            if (parent is LayeredFormAsynLoad model)
+            {
+                if (model.IsLoad)
+                {
+                    var Event = new ManualResetEvent(false);
+                    model.LoadCompleted += () => Event.SetWait();
+                    return ITask.Run(() =>
+                    {
+                        if (Event.Wait(1000)) return;
+                        open_core_async(control, true, parent, config, action, end)?.Wait();
+                    });
+                }
+                else return open_core_async(control, control.InvokeRequired, parent, config, action, end);
+            }
+            return open_core_async(control, control.InvokeRequired, parent, config, action, end);
+        }
+
+        static Task open_core_async(Control control, bool InvokeRequired, Form? parent, Config config, Func<Config, Task> action, Action? end = null)
+        {
+            var frm = open_core(control, InvokeRequired, parent, config);
+            return ITask.Run(async () =>
+            {
+                if (frm == null) return;
+                Exception? ex = null;
+                try
+                {
+                    await action(config).ConfigureAwait(false);
+                }
+                catch (Exception e) { ex = e; }
+                if (frm.IsDisposed) return;
+                try
+                {
+                    frm.Invoke(() => frm.Dispose());
+                }
+                catch { }
+                if (ex != null) throw ex;
+            }, end);
+        }
+
+        /// <summary>
         /// Spin 加载中
         /// </summary>
         /// <param name="control">控件主体</param>

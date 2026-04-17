@@ -1,5 +1,8 @@
-﻿namespace Sunny.Subdy.Data.Models
+using System.Diagnostics.CodeAnalysis;
+
+namespace Sunny.Subdy.Data.Models
 {
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
     public class FormatAccount
     {
         [AppDbContext.SqlKey]

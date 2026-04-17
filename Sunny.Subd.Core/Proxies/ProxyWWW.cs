@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 
 namespace Sunny.Subd.Core.Proxies
 {
@@ -24,9 +24,9 @@ namespace Sunny.Subd.Core.Proxies
                 error = json.Trim();
                 try
                 {
-                    JObject jObject = JObject.Parse(json);
-                    string host = jObject["data"]?["ipAddress"]?.ToString();
-                    string port = jObject["data"]?["port"]?.ToString();
+                    JsonObject jObject = JsonNode.Parse(json)!.AsObject();
+                    string host = jObject["data"]?["ipAddress"]?.GetValue<string>();
+                    string port = jObject["data"]?["port"]?.GetValue<string>();
 
                     if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
                     {
@@ -57,9 +57,9 @@ namespace Sunny.Subd.Core.Proxies
 
                 try
                 {
-                    JObject jObject = JObject.Parse(json);
-                    string host = jObject["data"]?["ipAddress"]?.ToString();
-                    string port = jObject["data"]?["port"]?.ToString();
+                    JsonObject jObject = JsonNode.Parse(json)!.AsObject();
+                    string host = jObject["data"]?["ipAddress"]?.GetValue<string>();
+                    string port = jObject["data"]?["port"]?.GetValue<string>();
 
                     if (!string.IsNullOrEmpty(host) && !string.IsNullOrEmpty(port))
                     {

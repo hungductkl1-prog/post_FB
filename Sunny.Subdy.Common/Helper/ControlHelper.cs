@@ -2,6 +2,7 @@
 using Sunny.Subdy.Common.API.Jobs;
 using Sunny.Subdy.Common.ControlMethod;
 using Sunny.Subdy.Common.Logs;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
@@ -26,7 +27,7 @@ namespace Sunny.Subdy.Common.Helper
         {
             try
             {
-                string FormatFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs", FormatFileName);
+                string FormatFilePath = Path.Combine(AppContext.BaseDirectory, "configs", FormatFileName);
                 if (File.Exists(FormatFilePath))
                 {
                     string formattedString = File.ReadAllText(FormatFilePath);
@@ -40,7 +41,7 @@ namespace Sunny.Subdy.Common.Helper
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine(ex);
+                            Debug.WriteLine(ex);
                         }
                     }
                 }
@@ -55,17 +56,17 @@ namespace Sunny.Subdy.Common.Helper
             {
                 List<string> listFormats = cbxs.Select(cbx => cbx.Text).ToList();
                 string formattedString = string.Join("|", listFormats);
-                string FormatFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs", FormatFileName);
-                if (!Directory.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs")))
+                string FormatFilePath = Path.Combine(AppContext.BaseDirectory, "configs", FormatFileName);
+                if (!Directory.Exists(Path.Combine(AppContext.BaseDirectory, "configs")))
                 {
-                    Directory.CreateDirectory(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "configs"));
+                    Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "configs"));
                 }
                 File.WriteAllText(FormatFilePath, formattedString);
 
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error saving format: {ex.Message}");
+                Debug.WriteLine($"Error saving format: {ex.Message}");
             }
         }
         public static void LoadConfigColums(DataGridView dgv, List<string> listHide)
@@ -107,7 +108,6 @@ namespace Sunny.Subdy.Common.Helper
                 {
                     label.Text = text;
                 }
-                label.GetCurrentParent()?.Refresh();
             }
             catch
             {
@@ -126,7 +126,6 @@ namespace Sunny.Subdy.Common.Helper
                 {
                     label.Text = text;
                 }
-                label.GetCurrentParent()?.Refresh();
             }
             catch
             {
@@ -139,18 +138,16 @@ namespace Sunny.Subdy.Common.Helper
 
             try
             {
-                if (label.InvokeRequired) // đúng cách kiểm tra thread
+                if (label.InvokeRequired)
                 {
                     label.BeginInvoke(new Action(() =>
                     {
                         label.Text = text;
-                        label.Refresh();
                     }));
                 }
                 else
                 {
                     label.Text = text;
-                    label.Refresh();
                 }
             }
             catch

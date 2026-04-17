@@ -4,6 +4,7 @@ using LamToolAutoPhonePrime.Views.Forms;
 using LamToolAutoPhonePrime.Views.Forms.Actions;
 using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Context;
+using Sunny.Subdy.Data.Models;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 
@@ -12,26 +13,58 @@ namespace LamToolAutoPhonePrime.Views
     public partial class fQuanLyKichBan : AntdUI.Window
     {
         private ScriptContext _scriptContext;
+        private ScriptActionContext _scriptActionContext;
         private string _platform = "";
+        private Sunny.Subdy.Common.Json.ConfigHelper _configHelper;
         public fQuanLyKichBan(string platform)
         {
             InitializeComponent();
             _platform = platform;
             _scriptContext = new ScriptContext();
+            _scriptActionContext = new ScriptActionContext();
             txt_search.PrefixClick += txt_search_PrefixClick;
             txt_search.TextChanged += txt_search_TextChanged;
             virtualPanel.ItemClick += ItemClick;
-           
-            checkBox2.CheckedChanged += radioButton1_CheckedChanged;
-            checkBox3.CheckedChanged += radioButton1_CheckedChanged;
-            checkBox4.CheckedChanged += radioButton1_CheckedChanged;
-            checkBox5.CheckedChanged += radioButton1_CheckedChanged;
-            new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fQuanLyKichBan)}_{_platform}", onLoad: new System.Action(() =>
+
+            radioButton4.CheckedChanged += UpdateConfigPanels;
+            checkBox2.CheckedChanged += UpdateConfigPanels;
+            checkBox3.CheckedChanged += UpdateConfigPanels;
+            checkBox4.CheckedChanged += UpdateConfigPanels;
+            _configHelper = new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fQuanLyKichBan)}_{_platform}", onLoad: new System.Action(() =>
             {
-                radioButton1_CheckedChanged(null, null);
+                UpdateConfigPanels(null, null);
 
             }), shouldExit: false);
+            EnsureDefaultScripts();
             LoadList();
+        }
+
+        void EnsureDefaultScripts()
+        {
+            if (_platform != "Facebook") return;
+            if (_scriptContext.GetByName("FarmXu", "Facebook") != null) return;
+
+            var script = new Script
+            {
+                Id = Guid.NewGuid(),
+                Platform = "Facebook",
+                Name = "FarmXu",
+                DateCreate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")
+            };
+            _scriptContext.Add(script);
+
+            var actions = new List<ScriptAction>
+            {
+                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
+                    Name = "Đọc thông báo", Type = FacebookFarmingType.HDDocThongBao, ByOrder = 1, Json = "{}" },
+                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
+                    Name = "Xem Watch", Type = FacebookFarmingType.HDXemWatch, ByOrder = 2, Json = "{}" },
+                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
+                    Name = "Tương tác newfeed", Type = FacebookFarmingType.HDTuongTacNewfeed, ByOrder = 3, Json = "{}" },
+                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
+                    Name = "Nghỉ giải lao", Type = FacebookFarmingType.HDNghiGiaiLao, ByOrder = 4, Json = "{}" },
+            };
+            _scriptActionContext.AddRange(actions);
         }
 
         
@@ -255,13 +288,29 @@ namespace LamToolAutoPhonePrime.Views
                 this.WindowState = FormWindowState.Maximized;
         }
 
-        private void radioButton1_CheckedChanged(object sender, EventArgs e)
+        private void UpdateConfigPanels(object sender, EventArgs e)
         {
-           
-            numericUpDown5.Enabled = numericUpDown4.Enabled = checkBox2.Checked;
-            numericUpDown7.Enabled = numericUpDown6.Enabled = checkBox3.Checked;
-            numericUpDown8.Enabled = numericUpDown9.Enabled = checkBox4.Checked;
-            numericUpDown10.Enabled = numericUpDown11.Enabled = checkBox5.Checked;
+            bool lap = radioButton4.Checked;
+            lblSoLanLap.Enabled = nudSoLanLap.Enabled = lblLuot.Enabled =
+                lblChoLuot.Enabled = nudChoLuotFrom.Enabled = lblDenLuot.Enabled =
+                nudChoLuotTo.Enabled = lblPhutLuot.Enabled = lap;
+
+            bool taiKhoan = checkBox2.Checked;
+            nudTaiKhoanFrom.Enabled = lblDenTaiKhoan.Enabled =
+                nudTaiKhoanTo.Enabled = lblPhutTaiKhoan.Enabled = taiKhoan;
+
+            bool kichBan = checkBox3.Checked;
+            nudKichBanFrom.Enabled = lblDenKichBan.Enabled =
+                nudKichBanTo.Enabled = lblPhutKichBan.Enabled = kichBan;
+
+            bool ngayMoi = checkBox4.Checked;
+            lblThoiGianBatDau.Enabled = timepickerFrom.Enabled =
+                lblDenNgay.Enabled = timepickerTo.Enabled = ngayMoi;
+        }
+
+        private void llbHuongDan_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://www.youtube.com/watch?v=CFpL_YVw3q4") { UseShellExecute = true }); } catch { }
         }
     }
 }

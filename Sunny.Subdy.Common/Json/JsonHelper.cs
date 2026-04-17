@@ -1,13 +1,16 @@
-﻿using Newtonsoft.Json.Linq;
-using System;
+using System.Diagnostics;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Sunny.Subdy.Common.Json
 {
     public class JsonHelper
     {
+        private static readonly JsonSerializerOptions _indentedOptions = new() { WriteIndented = true };
+
         private string configurationFile;
 
-        private JObject _jobject;
+        private JsonObject _jobject;
 
         /// <summary>
         /// Khởi tạo một đối tượng JsonHelper.
@@ -22,7 +25,7 @@ namespace Sunny.Subdy.Common.Json
                 {
                     configurationString = "{}";
                 }
-                _jobject = JObject.Parse(configurationString);
+                _jobject = JsonNode.Parse(configurationString)?.AsObject() ?? new JsonObject();
                 return;
             }
             try
@@ -34,7 +37,7 @@ namespace Sunny.Subdy.Common.Json
                 }
                 else
                 {
-                    configurationFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"configs\\{configurationString}.json");
+                    configurationFile = Path.Combine(AppContext.BaseDirectory, $"configs\\{configurationString}.json");
                 }
                 if (!File.Exists(configurationFile))
                 {
@@ -42,41 +45,44 @@ namespace Sunny.Subdy.Common.Json
                     {
                     }
                 }
-                _jobject = JObject.Parse(File.ReadAllText(configurationFile));
+                var content = File.ReadAllText(configurationFile);
+                _jobject = string.IsNullOrWhiteSpace(content) ? new JsonObject() : JsonNode.Parse(content)?.AsObject() ?? new JsonObject();
             }
             catch
             {
-                _jobject = new JObject();
+                _jobject = new JsonObject();
             }
         }
         /// <summary>
-        /// Chuyển đổi một đối tượng JObject thành một từ điển (Dictionary) có kiểu dữ liệu chung (object).
+        /// Chuyển đổi một đối tượng JsonObject thành một từ điển (Dictionary) có kiểu dữ liệu chung (object).
         /// </summary>
-        /// <param name="jObject">Đối tượng JObject đầu vào.</param>
-        /// <returns>Từ điển (Dictionary) chứa thông tin từ đối tượng JObject.</returns>
-        public Dictionary<string, object> ConvertJObjectToDictionary(JObject jObject)
+        /// <param name="jObject">Đối tượng JsonObject đầu vào.</param>
+        /// <returns>Từ điển (Dictionary) chứa thông tin từ đối tượng JsonObject.</returns>
+        public Dictionary<string, object> ConvertJObjectToDictionary(JsonObject jObject)
         {
             Dictionary<string, object> dictionary = new Dictionary<string, object>();
             try
             {
-                dictionary = jObject.ToObject<Dictionary<string, object>>();
-                List<string> objectKeys = (from kvp in dictionary
-                                           where kvp.Value.GetType() == typeof(JObject)
-                                           select kvp.Key).ToList();
-
-                List<string> arrayKeys = (from kvp in dictionary
-                                          where kvp.Value.GetType() == typeof(JArray)
-                                          select kvp.Key).ToList();
-
-                arrayKeys.ForEach(key =>
+                foreach (var kvp in jObject)
                 {
-                    dictionary[key] = ((JArray)dictionary[key]).Values().Select(x => ((JValue)x).Value).ToArray();
-                });
-
-                objectKeys.ForEach(key =>
-                {
-                    dictionary[key] = ConvertJObjectToDictionary(dictionary[key] as JObject);
-                });
+                    var node = kvp.Value;
+                    if (node is JsonObject childObj)
+                    {
+                        dictionary[kvp.Key] = ConvertJObjectToDictionary(childObj);
+                    }
+                    else if (node is JsonArray arr)
+                    {
+                        dictionary[kvp.Key] = arr.Select(x => x?.GetValue<object>()).ToArray();
+                    }
+                    else if (node is JsonValue val)
+                    {
+                        dictionary[kvp.Key] = val.GetValue<object>();
+                    }
+                    else
+                    {
+                        dictionary[kvp.Key] = node?.ToString() ?? "";
+                    }
+                }
             }
             catch
             {
@@ -85,10 +91,10 @@ namespace Sunny.Subdy.Common.Json
         }
         public JsonHelper()
         {
-            _jobject = new JObject();
+            _jobject = new JsonObject();
         }
         /// <summary>
-        /// Lấy giá trị từ một chuỗi đầu vào trong đối tượng JObject.
+        /// Lấy giá trị từ một chuỗi đầu vào trong đối tượng JsonObject.
         /// </summary>
         /// <param name="key">Khóa (key) của giá trị cần lấy.</param>
         /// <param name="defaultValue">Giá trị mặc định trả về nếu không tìm thấy giá trị.</param>
@@ -98,7 +104,7 @@ namespace Sunny.Subdy.Common.Json
             string result = defaultValue;
             try
             {
-                result = (_jobject[key] == null) ? defaultValue : _jobject[key].ToString();
+                result = (_jobject[key] == null) ? defaultValue : _jobject[key]!.ToString();
             }
             catch
             {
@@ -110,7 +116,7 @@ namespace Sunny.Subdy.Common.Json
             DateTime? result = defaultValue;
             try
             {
-                result = (_jobject[key] == null) ? defaultValue : DateTime.Parse(_jobject[key].ToString());
+                result = (_jobject[key] == null) ? defaultValue : DateTime.Parse(_jobject[key]!.ToString());
             }
             catch
             {
@@ -129,7 +135,7 @@ namespace Sunny.Subdy.Common.Json
             try
             {
                 // Lấy giá trị từ _jobject
-                string trimmedInput = (_jobject[key] == null) ? "" : _jobject[key].ToString();
+                string trimmedInput = (_jobject[key] == null) ? "" : _jobject[key]!.ToString();
 
                 if (!trimmedInput.Contains("{") && !trimmedInput.Contains("}"))
                 {
@@ -199,7 +205,7 @@ namespace Sunny.Subdy.Common.Json
             catch (Exception ex)
             {
                 // Bạn có thể log lại nếu cần
-                Console.WriteLine($"[GetValuesList] Error: {ex.Message}");
+                Debug.WriteLine($"[GetValuesList] Error: {ex.Message}");
             }
 
             return values;
@@ -292,7 +298,7 @@ namespace Sunny.Subdy.Common.Json
             }
         }
         /// <summary>
-        /// Thêm hoặc cập nhật một thuộc tính trong đối tượng JObject.
+        /// Thêm hoặc cập nhật một thuộc tính trong đối tượng JsonObject.
         /// </summary>
         /// <param name="key">Khóa (key) của thuộc tính cần thêm hoặc cập nhật.</param>
         /// <param name="value">Giá trị của thuộc tính cần thêm hoặc cập nhật.</param>
@@ -300,21 +306,14 @@ namespace Sunny.Subdy.Common.Json
         {
             try
             {
-                if (!_jobject.ContainsKey(key))
-                {
-                    _jobject.Add(key, JToken.FromObject(value));
-                }
-                else
-                {
-                    _jobject[key] = JToken.FromObject(value);
-                }
+                _jobject[key] = JsonValue.Create(value);
             }
             catch (Exception)
             {
             }
         }
         /// <summary>
-        /// Thêm giá trị vào thuộc tính trong đối tượng JObject.
+        /// Thêm giá trị vào thuộc tính trong đối tượng JsonObject.
         /// </summary>
         /// <param name="key">Khóa (key) của thuộc tính cần thêm giá trị.</param>
         /// <param name="value">Giá trị cần thêm.</param>
@@ -322,7 +321,7 @@ namespace Sunny.Subdy.Common.Json
         {
             try
             {
-                _jobject[key] = JToken.FromObject(value.ToString());
+                _jobject[key] = JsonValue.Create(value.ToString());
             }
             catch
             {
@@ -341,11 +340,11 @@ namespace Sunny.Subdy.Common.Json
 
                 if (containsNewLine)
                 {
-                    _jobject[string_1] = (JToken)string.Join("\n|\n", list_0);
+                    _jobject[string_1] = JsonValue.Create(string.Join("\n|\n", list_0));
                 }
                 else
                 {
-                    _jobject[string_1] = (JToken)string.Join("\n", list_0);
+                    _jobject[string_1] = JsonValue.Create(string.Join("\n", list_0));
                 }
             }
             catch
@@ -354,7 +353,7 @@ namespace Sunny.Subdy.Common.Json
             }
         }
         /// <summary>
-        /// Cập nhật giá trị của thuộc tính trong đối tượng JObject từ danh sách các chuỗi.
+        /// Cập nhật giá trị của thuộc tính trong đối tượng JsonObject từ danh sách các chuỗi.
         /// </summary>
         /// <param name="key">Khóa (key) của thuộc tính cần cập nhật giá trị.</param>
         /// <param name="list">Danh sách chuỗi cần cập nhật.</param>
@@ -364,14 +363,14 @@ namespace Sunny.Subdy.Common.Json
             try
             {
                 string separator = (formatType == 0) ? "\n" : "\n|\n";
-                _jobject[key] = JToken.FromObject(string.Join(separator, list));
+                _jobject[key] = JsonValue.Create(string.Join(separator, list));
             }
             catch
             {
             }
         }
         /// <summary>
-        /// Cập nhật giá trị của thuộc tính trong đối tượng JObject từ danh sách các chuỗi.
+        /// Cập nhật giá trị của thuộc tính trong đối tượng JsonObject từ danh sách các chuỗi.
         /// </summary>
         /// <param name="key">Khóa (key) của thuộc tính cần cập nhật giá trị.</param>
         /// <param name="list">Danh sách chuỗi cần cập nhật.</param>
@@ -389,14 +388,14 @@ namespace Sunny.Subdy.Common.Json
                     }
                 }
                 string separator = hasNewLine ? "\n|\n" : "\n";
-                _jobject[key] = JToken.FromObject(string.Join(separator, list));
+                _jobject[key] = JsonValue.Create(string.Join(separator, list));
             }
             catch
             {
             }
         }
         /// <summary>
-        /// Xóa thuộc tính khỏi đối tượng JObject.
+        /// Xóa thuộc tính khỏi đối tượng JsonObject.
         /// </summary>
         /// <param name="key">Khóa (key) của thuộc tính cần xóa.</param>
         public void Delete(string key)
@@ -410,7 +409,7 @@ namespace Sunny.Subdy.Common.Json
             }
         }
         /// <summary>
-        /// Lưu đối tượng JObject thành một tệp tin JSON.
+        /// Lưu đối tượng JsonObject thành một tệp tin JSON.
         /// </summary>
         /// <param name="filePath">Đường dẫn và tên tệp tin để lưu JSON (tùy chọn).</param>
         public void SaveJsonToFile(string filePath = "")
@@ -421,22 +420,22 @@ namespace Sunny.Subdy.Common.Json
                 {
                     filePath = configurationFile;
                 }
-                File.WriteAllText(filePath, _jobject.ToString());
+                File.WriteAllText(filePath, _jobject.ToJsonString(_indentedOptions));
             }
             catch (Exception ex)
             {
             }
         }
         /// <summary>
-        /// Trả về chuỗi JSON đại diện cho đối tượng JObject.
+        /// Trả về chuỗi JSON đại diện cho đối tượng JsonObject.
         /// </summary>
-        /// <returns>Chuỗi JSON đại diện cho đối tượng JObject.</returns>
+        /// <returns>Chuỗi JSON đại diện cho đối tượng JsonObject.</returns>
         public string GetJsonString()
         {
             string result = "";
             try
             {
-                result = _jobject.ToString().Replace("\r\n", "");
+                result = _jobject.ToJsonString();
             }
             catch (Exception ex)
             {

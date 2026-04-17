@@ -394,6 +394,9 @@
             Name = "fHDAddMail";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Cấu hình tương tác";
+            btnCancel.Click += btnCancel_Click;
+            btnSave.Click += btnSave_Click;
+            btn_setting.Click += btnCancel_Click;
             pnlHeader.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
             DD2A77B2.ResumeLayout(false);

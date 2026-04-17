@@ -118,11 +118,6 @@
             label48 = new Label();
             tabPageSettingAndroid = new AntdUI.TabPage();
             tabPage1 = new AntdUI.TabPage();
-            panel21 = new Panel();
-            groupBox1 = new GroupBox();
-            textBox1 = new TextBox();
-            checkBox19 = new CheckBox();
-            check_AddAccount = new CheckBox();
             panel19 = new Panel();
             numericUpDown36 = new NumericUpDown();
             label15 = new Label();
@@ -232,8 +227,6 @@
             ((System.ComponentModel.ISupportInitialize)nudJobDelayFrom).BeginInit();
             tabPageSettingAndroid.SuspendLayout();
             tabPage1.SuspendLayout();
-            panel21.SuspendLayout();
-            groupBox1.SuspendLayout();
             panel19.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericUpDown36).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericUpDown37).BeginInit();
@@ -296,7 +289,7 @@
             // 
             btn_mode.Dock = DockStyle.Right;
             btn_mode.Ghost = true;
-            btn_mode.Icon = LamToolAutoPhonePrime.Properties.Resources.icons8_circle_16_Green;
+            btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(981, 0);
             btn_mode.Name = "btn_mode";
             btn_mode.Radius = 0;
@@ -1247,7 +1240,6 @@
             // 
             // tabPage1
             // 
-            tabPage1.Controls.Add(panel21);
             tabPage1.Controls.Add(panel19);
             tabPage1.Controls.Add(checkBox7);
             tabPage1.Controls.Add(panel7);
@@ -1277,69 +1269,6 @@
             tabPage1.Size = new Size(995, 404);
             tabPage1.TabIndex = 2;
             tabPage1.Text = "Cấu hình loại job";
-            // 
-            // panel21
-            // 
-            panel21.Controls.Add(groupBox1);
-            panel21.Controls.Add(checkBox19);
-            panel21.Controls.Add(check_AddAccount);
-            panel21.Dock = DockStyle.Bottom;
-            panel21.Location = new Point(0, 270);
-            panel21.Name = "panel21";
-            panel21.Size = new Size(995, 134);
-            panel21.TabIndex = 46;
-            // 
-            // groupBox1
-            // 
-            groupBox1.Controls.Add(textBox1);
-            groupBox1.Dock = DockStyle.Fill;
-            groupBox1.Location = new Point(0, 42);
-            groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(995, 92);
-            groupBox1.TabIndex = 207;
-            groupBox1.TabStop = false;
-            groupBox1.Text = "(0) Token";
-            // 
-            // textBox1
-            // 
-            textBox1.Dock = DockStyle.Fill;
-            textBox1.Location = new Point(3, 21);
-            textBox1.MaxLength = int.MaxValue;
-            textBox1.Multiline = true;
-            textBox1.Name = "textBox1";
-            textBox1.PlaceholderText = "Chạy bao nhiêu luồng nhập bấy nhiêu token, mỗi token 1 dòng...";
-            textBox1.Size = new Size(989, 68);
-            textBox1.TabIndex = 0;
-            textBox1.TextChanged += textBox1_TextChanged;
-            // 
-            // checkBox19
-            // 
-            checkBox19.AutoSize = true;
-            checkBox19.Dock = DockStyle.Top;
-            checkBox19.ImageAlign = ContentAlignment.MiddleLeft;
-            checkBox19.Location = new Point(0, 21);
-            checkBox19.Name = "checkBox19";
-            checkBox19.Size = new Size(995, 21);
-            checkBox19.TabIndex = 206;
-            checkBox19.Text = "Tự động đổi Token job tránh bị trùng.";
-            checkBox19.TextImageRelation = TextImageRelation.TextAboveImage;
-            checkBox19.UseVisualStyleBackColor = true;
-            checkBox19.Click += btn_Click;
-            // 
-            // check_AddAccount
-            // 
-            check_AddAccount.AutoSize = true;
-            check_AddAccount.Checked = true;
-            check_AddAccount.CheckState = CheckState.Checked;
-            check_AddAccount.Dock = DockStyle.Top;
-            check_AddAccount.ForeColor = Color.ForestGreen;
-            check_AddAccount.Location = new Point(0, 0);
-            check_AddAccount.Name = "check_AddAccount";
-            check_AddAccount.Size = new Size(995, 21);
-            check_AddAccount.TabIndex = 205;
-            check_AddAccount.Text = "Cấu hình tài khoản nhanh";
-            check_AddAccount.UseVisualStyleBackColor = true;
-            check_AddAccount.Visible = false;
             // 
             // panel19
             // 
@@ -2131,10 +2060,6 @@
             tabPageSettingAndroid.ResumeLayout(false);
             tabPage1.ResumeLayout(false);
             tabPage1.PerformLayout();
-            panel21.ResumeLayout(false);
-            panel21.PerformLayout();
-            groupBox1.ResumeLayout(false);
-            groupBox1.PerformLayout();
             panel19.ResumeLayout(false);
             panel19.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)numericUpDown36).EndInit();
@@ -2336,11 +2261,6 @@
         private NumericUpDown numericUpDown38;
         private Label label12;
         private NumericUpDown numericUpDown39;
-        private Panel panel21;
-        private GroupBox groupBox1;
-        private TextBox textBox1;
-        private CheckBox checkBox19;
-        private CheckBox check_AddAccount;
         private AntdUI.TabPage tabPageSettingCaptcha;
         private Label label39;
         private ComboBox cbb_ListTypeProxy;

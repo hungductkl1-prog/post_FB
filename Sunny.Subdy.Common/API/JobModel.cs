@@ -1,10 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.API.Jobs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Sunny.Subdy.Common.API
 {
@@ -24,11 +19,11 @@ namespace Sunny.Subdy.Common.API
         public JobModel()
         {
         }
-        public JobModel(JObject job, string jobService, string job_type = "")
+        public JobModel(JsonObject job, string jobService, string job_type = "")
         {
             switch (jobService)
             {
-                case JobServices.GoLike:
+                case "https://app.golike.net/":
                     if (job.ContainsKey("id"))
                     {
                         JobId = job["id"]!.ToString();
@@ -43,11 +38,11 @@ namespace Sunny.Subdy.Common.API
                     }
                     if (job.ContainsKey("fix_coin_job"))
                     {
-                        Coin = Convert.ToDouble(job["fix_coin_job"]);
+                        Coin = Convert.ToDouble(job["fix_coin_job"]!.ToString());
                     }
                     if (job.ContainsKey("price_per_after_cost"))
                     {
-                        Coin = Convert.ToDouble(job["price_per_after_cost"]);
+                        Coin = Convert.ToDouble(job["price_per_after_cost"]!.ToString());
                     }
                     if (job.ContainsKey("data_comment"))
                     {
@@ -59,7 +54,7 @@ namespace Sunny.Subdy.Common.API
                         Link = job["link"]!.ToString();
                     }
                     break;
-                case JobServices.TuongTacCheo:
+                case "https://tuongtaccheo.com/":
                     if (job.ContainsKey("idpost"))
                     {
                         JobId = job["idpost"]!.ToString();

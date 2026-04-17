@@ -14,7 +14,7 @@ namespace Sunny.Subdy.Server
         {
             try
             {
-                Console.WriteLine($"🔍 Đang kiểm tra cổng {port}...");
+                Debug.WriteLine($"🔍 Đang kiểm tra cổng {port}...");
 
                 var startInfo = new ProcessStartInfo
                 {

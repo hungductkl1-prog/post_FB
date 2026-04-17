@@ -364,6 +364,14 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
             Name = "fHDDoiTen";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Cấu hình tương tác";
+            rdTenRandom.CheckedChanged += ckbDefault_CheckedChanged;
+            rdTenTuDat.CheckedChanged += ckbDefault_CheckedChanged;
+            txtLinks.TextChanged += txtLinks_TextChanged;
+            textBox1.TextChanged += txtLinks_TextChanged;
+            textBox2.TextChanged += txtLinks_TextChanged;
+            btnCancel.Click += btnCancel_Click;
+            btnSave.Click += btnSave_Click;
+            btn_setting.Click += btnCancel_Click;
             ((ISupportInitialize)CA09732E).EndInit();
             A18B8922.ResumeLayout(false);
             A18B8922.PerformLayout();

@@ -93,17 +93,17 @@ namespace LamToolAutoPhonePrime
             windowBar.SubGap = 1;
             windowBar.SubText = "v18.12.08.2025";
             windowBar.TabIndex = 7;
-            windowBar.Text = "LamTool Auto Phone Farm";
+            windowBar.Text = "Subdy Phone Farm";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
             // 
             // label1
             // 
             label1.Dock = DockStyle.Fill;
-            label1.Location = new Point(266, 0);
+            label1.Location = new Point(217, 0);
             label1.Name = "label1";
             label1.Padding = new Padding(20, 0, 0, 0);
-            label1.Size = new Size(758, 35);
+            label1.Size = new Size(779, 35);
             label1.TabIndex = 9;
             label1.Text = "Quản lý thiết bị";
             // 
@@ -115,7 +115,7 @@ namespace LamToolAutoPhonePrime
             toolStrip1.GripStyle = ToolStripGripStyle.Hidden;
             toolStrip1.Items.AddRange(new ToolStripItem[] { uiLabel6, toolStripLabel2, uiLabel5, toolStripLabel4, toolStripLabel5 });
             toolStrip1.LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow;
-            toolStrip1.Location = new Point(1024, 0);
+            toolStrip1.Location = new Point(996, 0);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Padding = new Padding(0, 0, 5, 0);
             toolStrip1.RenderMode = ToolStripRenderMode.System;
@@ -172,14 +172,13 @@ namespace LamToolAutoPhonePrime
             // 
             btn_mode.Dock = DockStyle.Right;
             btn_mode.Ghost = true;
-            btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
-            btn_mode.IconSvg = "";
-            btn_mode.Location = new Point(1220, 0);
+            btn_mode.IconSvg = "MinusOutlined";
+            btn_mode.Location = new Point(1192, 0);
             btn_mode.Name = "btn_mode";
             btn_mode.Radius = 0;
-            btn_mode.Size = new Size(26, 35);
+            btn_mode.Size = new Size(36, 35);
             btn_mode.TabIndex = 6;
-            btn_mode.ToggleIconSvg = "MoonOutlined";
+            btn_mode.ToggleIconSvg = "";
             btn_mode.WaveSize = 0;
             btn_mode.Click += btn_mode_Click;
             // 
@@ -187,12 +186,11 @@ namespace LamToolAutoPhonePrime
             // 
             btn_global.Dock = DockStyle.Right;
             btn_global.Ghost = true;
-            btn_global.Icon = Properties.Resources.icons8_circle_16_Yellow;
-            btn_global.IconSvg = "";
-            btn_global.Location = new Point(1246, 0);
+            btn_global.IconSvg = "ExpandOutlined";
+            btn_global.Location = new Point(1228, 0);
             btn_global.Name = "btn_global";
             btn_global.Radius = 0;
-            btn_global.Size = new Size(24, 35);
+            btn_global.Size = new Size(36, 35);
             btn_global.TabIndex = 7;
             btn_global.WaveSize = 0;
             btn_global.Click += btn_global_SelectedValueChanged;
@@ -201,12 +199,11 @@ namespace LamToolAutoPhonePrime
             // 
             btn_setting.Dock = DockStyle.Right;
             btn_setting.Ghost = true;
-            btn_setting.Icon = Properties.Resources.icons8_circle_16_Red;
-            btn_setting.IconSvg = "";
-            btn_setting.Location = new Point(1270, 0);
+            btn_setting.IconSvg = "CloseOutlined";
+            btn_setting.Location = new Point(1264, 0);
             btn_setting.Name = "btn_setting";
             btn_setting.Radius = 0;
-            btn_setting.Size = new Size(30, 35);
+            btn_setting.Size = new Size(36, 35);
             btn_setting.TabIndex = 8;
             btn_setting.WaveSize = 0;
             btn_setting.Click += btn_setting_Click;
@@ -221,7 +218,7 @@ namespace LamToolAutoPhonePrime
             panel1.Location = new Point(0, 35);
             panel1.Margin = new Padding(0);
             panel1.Name = "panel1";
-            panel1.Size = new Size(281, 665);
+            panel1.Size = new Size(281, 710);
             panel1.TabIndex = 6;
             // 
             // pMenu
@@ -230,7 +227,7 @@ namespace LamToolAutoPhonePrime
             pMenu.Dock = DockStyle.Fill;
             pMenu.Location = new Point(0, 142);
             pMenu.Name = "pMenu";
-            pMenu.Size = new Size(281, 523);
+            pMenu.Size = new Size(281, 568);
             pMenu.TabIndex = 10;
             // 
             // panel2
@@ -356,9 +353,9 @@ namespace LamToolAutoPhonePrime
             label4.ForeColor = Color.White;
             label4.Location = new Point(61, 15);
             label4.Name = "label4";
-            label4.Size = new Size(108, 23);
+            label4.Size = new Size(91, 23);
             label4.TabIndex = 10;
-            label4.Text = "LamTool.net";
+            label4.Text = "Subdy.net";
             // 
             // pictureBox2
             // 
@@ -377,13 +374,13 @@ namespace LamToolAutoPhonePrime
             pContent.Dock = DockStyle.Fill;
             pContent.Location = new Point(281, 35);
             pContent.Name = "pContent";
-            pContent.Size = new Size(1019, 665);
+            pContent.Size = new Size(1019, 710);
             pContent.TabIndex = 8;
             // 
             // fMain
             // 
             BackColor = Color.FromArgb(245, 247, 250);
-            ClientSize = new Size(1300, 700);
+            ClientSize = new Size(1300, 745);
             Controls.Add(pContent);
             Controls.Add(panel1);
             Controls.Add(windowBar);
@@ -421,8 +418,6 @@ namespace LamToolAutoPhonePrime
         private ToolStripLabel toolStripLabel5;
 
         private ucdgvAccount _ucFacebook;
-        private ucdgvAccount _ucTikTok;
-        private ucdgvAccount _ucInstagram;
         private ucHistoriesJob _ucHistoriesJob;
         public ucManagerDevices _ucDevices;
         private System.Windows.Forms.Panel panel1;

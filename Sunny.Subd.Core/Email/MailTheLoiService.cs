@@ -1,11 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
-using RestSharp;
-using Sunny.Subdy.Common.Helper;
+﻿using Sunny.Subdy.Common.Helper;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -69,13 +68,13 @@ namespace Sunny.Subd.Core.Email
                     {
                         var client = new HttpClient();
                         var response = await client.GetStringAsync("https://mail.theloi.io.vn/api/get_mail.php?apikey=" + token + "&email=" + email);
-                        var jsonResponse = JObject.Parse(response);
+                        var jsonResponse = JsonNode.Parse(response)!.AsObject();
 
-                        if (jsonResponse["status"].Value<bool>())
+                        if (jsonResponse["status"]?.GetValue<bool>() == true)
                         {
-                            var latestEmail = jsonResponse["Data"][0];
-                            var code = latestEmail["Code"];
-                            return code.ToString();
+                            var latestEmail = jsonResponse["Data"]?[0];
+                            var code = latestEmail?["Code"];
+                            return code?.GetValue<string>();
                         }
                     }
                     catch

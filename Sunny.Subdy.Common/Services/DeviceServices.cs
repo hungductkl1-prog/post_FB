@@ -12,16 +12,29 @@ namespace Sunny.Subdy.Common.Services
         {
             var lines = ADBHelper.GetDevices();
             DeviceModels.Clear();
-            foreach (var line in lines)
+
+            // Run ADB commands for each device in parallel (5 ADB calls per device)
+            var tasks = lines.Select(line => Task.Run(() =>
             {
-                var client = new ADBClient(line);
-                if (client?.Device == null) continue;
+                try
+                {
+                    var client = new ADBClient(line);
+                    return client?.Device;
+                }
+                catch { return null; }
+            })).ToArray();
 
-                client.Device.Index = DeviceModels.Count + 1;
-                DeviceModels.Add(client.Device);
+            Task.WaitAll(tasks);
+
+            int index = 1;
+            foreach (var task in tasks)
+            {
+                if (task.Result != null)
+                {
+                    task.Result.Index = index++;
+                    DeviceModels.Add(task.Result);
+                }
             }
-
-
         }
         public static void ADBKill()
         {
@@ -68,8 +81,17 @@ namespace Sunny.Subdy.Common.Services
                             tasks.Add(Task.Run(() =>
                             {
                                 string fileName = Path.GetFileName(apkPath);
-                                new ADBClient(device).InstallApp(apkPath);
-                                device.Status = $"{fileName} thành công";
+                                try
+                                {
+                                    bool success = new ADBClient(device).InstallApp(apkPath);
+                                    device.Status = success ? $"{fileName} thành công" : $"{fileName} thất bại";
+                                    device.TypeColor = success ? 0 : 1;
+                                }
+                                catch (Exception ex)
+                                {
+                                    device.Status = $"{fileName} lỗi: {ex.Message}";
+                                    device.TypeColor = 1;
+                                }
                             }));
                         }
                         break;

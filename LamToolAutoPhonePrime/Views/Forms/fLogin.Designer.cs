@@ -57,7 +57,7 @@
             label1.Name = "label1";
             label1.Size = new Size(213, 47);
             label1.TabIndex = 0;
-            label1.Text = "LamTool.net";
+            label1.Text = "Subdy.net";
             // 
             // label2
             // 

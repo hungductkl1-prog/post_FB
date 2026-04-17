@@ -6,7 +6,7 @@ namespace Sunny.Subdy.Common.Logs
 {
     public static class LogManager
     {
-        private static readonly string BaseLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs");
+        private static readonly string BaseLogPath = Path.Combine(AppContext.BaseDirectory, "logs");
         public static List<string> LogRegsiner = new List<string>();
         private static void WriteLog(string nameLog, string message)
         {
@@ -27,7 +27,6 @@ namespace Sunny.Subdy.Common.Logs
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("Logging failed: " + ex.Message);
             }
         }
 
@@ -50,14 +49,12 @@ namespace Sunny.Subdy.Common.Logs
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine($"Failed to delete folder '{oldest.Name}': {ex.Message}");
                         break;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("Cleanup failed: " + ex.Message);
             }
         }
 

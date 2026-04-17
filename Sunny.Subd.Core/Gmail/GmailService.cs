@@ -51,7 +51,7 @@ namespace Sunny.Subd.Core.Gmail
         }
         public async Task<bool> RemoveAccount()
         {
-
+            facebook._sate = "Xóa tài khoản Google";
             if (!GetAccount().Any())
             {
                 return true;
@@ -82,6 +82,7 @@ namespace Sunny.Subd.Core.Gmail
         }
         public async Task<string> GetCode()
         {
+            facebook._sate = "Lấy mã xác nhận từ Gmail";
             _client.AppStart(PackageGmail, true, true, true);
 
             Stopwatch stopwatch = Stopwatch.StartNew();
@@ -164,7 +165,7 @@ namespace Sunny.Subd.Core.Gmail
                 Stopwatch stopwatch = Stopwatch.StartNew();
                 while (stopwatch.ElapsedMilliseconds < 180000)
                 {
-                    facebook._sate = $"Đang đăng nhập tài khoản google [{i + 1}]";
+                    facebook._sate = $"Đăng nhập tài khoản Google lần {i + 1}";
                     string _case = _client.FindElement("", list, 30);
                     if (string.IsNullOrEmpty(_case))
                     {
@@ -175,7 +176,7 @@ namespace Sunny.Subd.Core.Gmail
                     {
                         break;
                     }
-                    facebook.SetStatus($"Xử lý [{_case}]...", 2);
+                    facebook.SetStatus("Đang xử lý...", 2);
                     switch (_case)
                     {
                         case "//*[@text=\"This account already exists on your device\"]":

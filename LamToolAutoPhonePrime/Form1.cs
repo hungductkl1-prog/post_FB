@@ -6,6 +6,7 @@ using SharpAdbClient;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Data.Models;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
 namespace LamToolAutoPhonePrime
@@ -23,7 +24,7 @@ namespace LamToolAutoPhonePrime
         public Form1(List<DeviceModel> devices)
         {
             AdbServer.Instance.StartServer(Path.Combine(ProcessHelper.ADBPath, "adb.exe"), false);
-            FFmpeg.AutoGen.ffmpeg.RootPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ScrcpyNet");
+            FFmpeg.AutoGen.ffmpeg.RootPath = Path.Combine(AppContext.BaseDirectory, "ScrcpyNet");
             InitializeComponent();
             ucThongBao = new ucThongBaoDeviceView();
             childFormDevice = new fShowDevice(this);
@@ -36,6 +37,7 @@ namespace LamToolAutoPhonePrime
             TryEnableDoubleBuffering(this);
         }
 
+        [DynamicDependency("DoubleBuffered", typeof(Control))]
         private static void TryEnableDoubleBuffering(Control ctrl)
         {
             if (ctrl == null) return;
@@ -46,7 +48,7 @@ namespace LamToolAutoPhonePrime
             }
             catch
             {
-                // ignore if reflection fails
+                // ignore if reflection fails in AOT
             }
         }
 
@@ -309,7 +311,7 @@ namespace LamToolAutoPhonePrime
             Controls.Add(_loadingOverlay);
             _loadingOverlay.BringToFront();
 
-            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "LamTool xin chào!" };
+            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Subdy Phone Farm xin chào!" };
 
             _loadingCts = new CancellationTokenSource();
             var token = _loadingCts.Token;

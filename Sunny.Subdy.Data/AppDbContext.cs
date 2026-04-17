@@ -1,7 +1,8 @@
-﻿using Sunny.Subdy.Common.Logs;
+using Microsoft.Data.Sqlite;
+using Sunny.Subdy.Common.Logs;
+using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
-using System.Data.SQLite;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text;
@@ -13,30 +14,39 @@ namespace Sunny.Subdy.Data
         [AttributeUsage(AttributeTargets.Property)]
         public sealed class SqlKeyAttribute : Attribute { }
 
+        private static readonly ConcurrentDictionary<Type, (PropertyInfo[] allProps, PropertyInfo? keyProp)> _propertyCache = new();
+
+        private static (PropertyInfo[] allProps, PropertyInfo? keyProp) GetCachedTypeInfo(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] Type type)
+        {
+            return _propertyCache.GetOrAdd(type, t =>
+            {
+                var all = t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                           .Where(p => p.GetCustomAttribute<NotMappedAttribute>() == null)
+                           .ToArray();
+                var key = all.FirstOrDefault(p => p.GetCustomAttribute<SqlKeyAttribute>() != null);
+                return (all, key);
+            });
+        }
+
         private readonly string _connectionString;
         private readonly string _dbPath;
 
         public AppDbContext(string databaseName)
         {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var baseDir = AppContext.BaseDirectory;
             var dataDir = Path.Combine(baseDir, "data");
             if (!Directory.Exists(dataDir))
                 Directory.CreateDirectory(dataDir);
 
             _dbPath = Path.Combine(dataDir, $"{databaseName}.db");
-            _connectionString = $"Data Source={_dbPath};Version=3;";
-            EnsureDatabaseFile();
+            _connectionString = $"Data Source={_dbPath}";
         }
 
-        private void EnsureDatabaseFile()
-        {
-            if (!File.Exists(_dbPath))
-                SQLiteConnection.CreateFile(_dbPath);
-        }
         public object ExecuteScalar(string query, Dictionary<string, object>? parameters = null)
         {
             using var conn = GetConnection();
-            using var cmd = new SQLiteCommand(query, conn);
+            using var cmd = new SqliteCommand(query, conn);
 
             if (parameters != null)
             {
@@ -47,6 +57,7 @@ namespace Sunny.Subdy.Data
             }
             return cmd.ExecuteScalar();
         }
+
         private string? MapTypeToSqlite(Type type)
         {
             // Nếu là Nullable<T>, lấy kiểu T
@@ -62,9 +73,9 @@ namespace Sunny.Subdy.Data
             return null;
         }
 
-        public SQLiteConnection GetConnection()
+        public SqliteConnection GetConnection()
         {
-            var conn = new SQLiteConnection(_connectionString);
+            var conn = new SqliteConnection(_connectionString);
             conn.Open();
             return conn;
         }
@@ -73,13 +84,13 @@ namespace Sunny.Subdy.Data
         {
             var type = typeof(T);
             var tableName = type.Name;
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            var (props, _) = GetCachedTypeInfo(type);
 
             using var conn = GetConnection();
 
             // Check existing table
             var existingCols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            using (var cmd = new SQLiteCommand($"PRAGMA table_info({tableName})", conn))
+            using (var cmd = new SqliteCommand($"PRAGMA table_info({tableName})", conn))
             using (var reader = cmd.ExecuteReader())
                 while (reader.Read())
                     existingCols.Add(reader["name"].ToString());
@@ -99,7 +110,7 @@ namespace Sunny.Subdy.Data
                     throw new InvalidOperationException($"Type {type.Name} has no valid properties.");
 
                 string createSql = $"CREATE TABLE IF NOT EXISTS {tableName} (\n{string.Join(",\n", columns)}\n);";
-                using var createCmd = new SQLiteCommand(createSql, conn);
+                using var createCmd = new SqliteCommand(createSql, conn);
                 createCmd.ExecuteNonQuery();
             }
             else
@@ -111,20 +122,20 @@ namespace Sunny.Subdy.Data
                     if (typeStr == null) continue;
 
                     string alterSql = $"ALTER TABLE {tableName} ADD COLUMN {prop.Name} {typeStr};";
-                    using var alterCmd = new SQLiteCommand(alterSql, conn);
+                    using var alterCmd = new SqliteCommand(alterSql, conn);
                     alterCmd.ExecuteNonQuery();
                 }
             }
         }
-        public bool UpdateEntities<T>(List<T> entities)
+
+        public bool UpdateEntities<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(List<T> entities)
         {
             if (entities == null || entities.Count == 0)
                 return false;
 
             var type = typeof(T);
             var tableName = type.Name;
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            var keyProp = props.FirstOrDefault(p => p.GetCustomAttribute<SqlKeyAttribute>() != null);
+            var (props, keyProp) = GetCachedTypeInfo(type);
 
             if (keyProp == null)
                 throw new InvalidOperationException($"Type '{type.Name}' does not contain a property marked with [SqlKey].");
@@ -137,7 +148,7 @@ namespace Sunny.Subdy.Data
                 if (entity == null) continue;
 
                 var setClauses = new List<string>();
-                var parameters = new List<SQLiteParameter>();
+                var parameters = new List<SqliteParameter>();
 
                 foreach (var prop in props)
                 {
@@ -148,7 +159,7 @@ namespace Sunny.Subdy.Data
 
                     string paramName = $"@{prop.Name}";
                     setClauses.Add($"{prop.Name} = {paramName}");
-                    parameters.Add(new SQLiteParameter(paramName, value ?? DBNull.Value));
+                    parameters.Add(new SqliteParameter(paramName, value ?? DBNull.Value));
                 }
 
                 var keyValue = keyProp.GetValue(entity);
@@ -156,10 +167,10 @@ namespace Sunny.Subdy.Data
                     throw new InvalidOperationException("Primary key value cannot be null.");
 
                 if (keyValue is Guid kg) keyValue = kg.ToString();
-                parameters.Add(new SQLiteParameter("@Id", keyValue));
+                parameters.Add(new SqliteParameter("@Id", keyValue));
 
                 string sql = $"UPDATE {tableName} SET {string.Join(", ", setClauses)} WHERE {keyProp.Name} = @Id;";
-                using var cmd = new SQLiteCommand(sql, conn, transaction);
+                using var cmd = new SqliteCommand(sql, conn, transaction);
                 cmd.Parameters.AddRange(parameters.ToArray());
                 cmd.ExecuteNonQuery();
             }
@@ -167,6 +178,7 @@ namespace Sunny.Subdy.Data
             transaction.Commit();
             return true;
         }
+
         //public bool InsertEntity<T>(T entity)
         //{
         //    if (entity == null) return false;
@@ -177,7 +189,7 @@ namespace Sunny.Subdy.Data
 
         //    var columnNames = new List<string>();
         //    var paramNames = new List<string>();
-        //    var parameters = new List<SQLiteParameter>();
+        //    var parameters = new List<SqliteParameter>();
 
         //    foreach (var prop in props)
         //    {
@@ -195,7 +207,7 @@ namespace Sunny.Subdy.Data
         //        columnNames.Add(prop.Name);
         //        string paramName = $"@{prop.Name}";
         //        paramNames.Add(paramName);
-        //        parameters.Add(new SQLiteParameter(paramName, value));
+        //        parameters.Add(new SqliteParameter(paramName, value));
         //    }
 
         //    if (columnNames.Count == 0) return false;
@@ -203,22 +215,21 @@ namespace Sunny.Subdy.Data
         //    string sql = $"INSERT INTO {tableName} ({string.Join(",", columnNames)}) VALUES ({string.Join(",", paramNames)});";
 
         //    using var conn = GetConnection();
-        //    using var cmd = new SQLiteCommand(sql, conn);
+        //    using var cmd = new SqliteCommand(sql, conn);
         //    cmd.Parameters.AddRange(parameters.ToArray());
         //    return cmd.ExecuteNonQuery() > 0;
         //}
-        public bool InsertEntity<T>(T entity)
+        public bool InsertEntity<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(T entity)
         {
             if (entity == null) return false;
 
             var type = typeof(T);
             var tableName = type.Name;
-            var props = type.GetProperties();
-            var keyProp = props.FirstOrDefault(p => p.GetCustomAttribute<SqlKeyAttribute>() != null);
+            var (props, keyProp) = GetCachedTypeInfo(type);
 
             var columnNames = new List<string>();
             var paramNames = new List<string>();
-            var parameters = new List<SQLiteParameter>();
+            var parameters = new List<SqliteParameter>();
 
             foreach (var prop in props)
             {
@@ -239,7 +250,7 @@ namespace Sunny.Subdy.Data
                 columnNames.Add(prop.Name);
                 string paramName = $"@{prop.Name}";
                 paramNames.Add(paramName);
-                parameters.Add(new SQLiteParameter(paramName, value));
+                parameters.Add(new SqliteParameter(paramName, value));
             }
 
             if (columnNames.Count == 0) return false;
@@ -247,16 +258,16 @@ namespace Sunny.Subdy.Data
             string sql = $"INSERT INTO {tableName} ({string.Join(",", columnNames)}) VALUES ({string.Join(",", paramNames)});";
 
             using var conn = GetConnection();
-            using var cmd = new SQLiteCommand(sql, conn);
+            using var cmd = new SqliteCommand(sql, conn);
             cmd.Parameters.AddRange(parameters.ToArray());
             return cmd.ExecuteNonQuery() > 0;
         }
 
-        public List<T> GetAllEntities<T>(string query, Func<SQLiteDataReader, T> map, Dictionary<string, object>? parameters = null)
+        public List<T> GetAllEntities<T>(string query, Func<SqliteDataReader, T> map, Dictionary<string, object>? parameters = null)
         {
             var resultList = new List<T>();
             using var conn = GetConnection();
-            using var cmd = new SQLiteCommand(query, conn);
+            using var cmd = new SqliteCommand(query, conn);
 
             if (parameters != null)
                 foreach (var kv in parameters)
@@ -269,7 +280,7 @@ namespace Sunny.Subdy.Data
             return resultList;
         }
 
-        public bool UpdateEntity<T>(T entity)
+        public bool UpdateEntity<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(T entity)
         {
             if (entity == null) return false;
 
@@ -277,12 +288,9 @@ namespace Sunny.Subdy.Data
             var tableName = type.Name;
 
             // Lọc các property public, readable, và không bị [NotMapped]
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                            .Where(p => p.CanRead && p.GetCustomAttribute<NotMappedAttribute>() == null)
-                            .ToList();
+            var (allProps, keyProp) = GetCachedTypeInfo(type);
+            var props = allProps.Where(p => p.CanRead).ToList();
 
-            // Tìm khóa chính
-            var keyProp = props.FirstOrDefault(p => p.GetCustomAttribute<SqlKeyAttribute>() != null);
             if (keyProp == null)
                 throw new InvalidOperationException($"Type '{type.Name}' is missing [SqlKey] property.");
 
@@ -292,7 +300,7 @@ namespace Sunny.Subdy.Data
 
             // Tạo danh sách set và parameter
             var setClauses = new List<string>();
-            var parameters = new List<SQLiteParameter>();
+            var parameters = new List<SqliteParameter>();
 
             foreach (var prop in props)
             {
@@ -307,16 +315,16 @@ namespace Sunny.Subdy.Data
 
                 string paramName = $"@{prop.Name}";
                 setClauses.Add($"{prop.Name} = {paramName}");
-                parameters.Add(new SQLiteParameter(paramName, value ?? DBNull.Value));
+                parameters.Add(new SqliteParameter(paramName, value ?? DBNull.Value));
             }
 
             // Add parameter khóa chính
-            parameters.Add(new SQLiteParameter("@Id", keyValue is Guid g ? g.ToString() : keyValue));
+            parameters.Add(new SqliteParameter("@Id", keyValue is Guid g ? g.ToString() : keyValue));
 
             string sql = $"UPDATE {tableName} SET {string.Join(", ", setClauses)} WHERE {keyProp.Name} = @Id;";
 
             using var conn = GetConnection();
-            using var cmd = new SQLiteCommand(sql, conn);
+            using var cmd = new SqliteCommand(sql, conn);
             cmd.Parameters.AddRange(parameters.ToArray());
 
             return cmd.ExecuteNonQuery() > 0;
@@ -325,7 +333,7 @@ namespace Sunny.Subdy.Data
         public bool ExecuteNonQuery(string sql, Dictionary<string, object>? parameters = null)
         {
             using var conn = GetConnection();
-            using var cmd = new SQLiteCommand(sql, conn);
+            using var cmd = new SqliteCommand(sql, conn);
 
             if (parameters != null)
                 foreach (var kv in parameters)
@@ -333,16 +341,15 @@ namespace Sunny.Subdy.Data
 
             return cmd.ExecuteNonQuery() > 0;
         }
-        public bool InsertEntities<T>(List<T> entities)
+
+        public bool InsertEntities<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>(List<T> entities)
         {
             if (entities == null || entities.Count == 0)
                 return false;
 
             var type = typeof(T);
             var tableName = type.Name;
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
-
-            var keyProp = props.FirstOrDefault(p => p.GetCustomAttribute<SqlKeyAttribute>() != null);
+            var (props, keyProp) = GetCachedTypeInfo(type);
 
             using var conn = GetConnection();
             using var transaction = conn.BeginTransaction();
@@ -353,7 +360,7 @@ namespace Sunny.Subdy.Data
 
                 var columnNames = new List<string>();
                 var paramNames = new List<string>();
-                var parameters = new List<SQLiteParameter>();
+                var parameters = new List<SqliteParameter>();
 
                 foreach (var prop in props)
                 {
@@ -384,13 +391,13 @@ namespace Sunny.Subdy.Data
 
                     columnNames.Add(name);
                     paramNames.Add(param);
-                    parameters.Add(new SQLiteParameter(param, value));
+                    parameters.Add(new SqliteParameter(param, value));
                 }
 
                 if (columnNames.Count == 0) continue;
 
                 string sql = $"INSERT INTO {tableName} ({string.Join(",", columnNames)}) VALUES ({string.Join(",", paramNames)});";
-                using var cmd = new SQLiteCommand(sql, conn, transaction);
+                using var cmd = new SqliteCommand(sql, conn, transaction);
                 cmd.Parameters.AddRange(parameters.ToArray());
                 cmd.ExecuteNonQuery();
             }
@@ -399,12 +406,12 @@ namespace Sunny.Subdy.Data
             return true;
         }
 
-        public List<T> ExecuteReader<T>(string query, Func<SQLiteDataReader, T> map, Dictionary<string, object>? parameters = null)
+        public List<T> ExecuteReader<T>(string query, Func<SqliteDataReader, T> map, Dictionary<string, object>? parameters = null)
         {
             var result = new List<T>();
 
             using var conn = GetConnection();
-            using var cmd = new SQLiteCommand(query, conn);
+            using var cmd = new SqliteCommand(query, conn);
 
             if (parameters != null)
             {

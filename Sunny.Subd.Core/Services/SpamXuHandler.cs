@@ -16,11 +16,12 @@ using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
-using System.Data.Entity.Core.Common.CommandTrees.ExpressionBuilder;
+
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml.Linq;
 using static System.ComponentModel.Design.ObjectSelectorEditor;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
 
@@ -51,20 +52,17 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
         private string _jobPrefix = string.Empty;
         private async Task<List<JobModel>> GetJob()
         {
-            if (_config.JobService == JobServices.SeedingVip)
-            {
-                return LamToolClient.JobVip.Where(x => x.FromId == _account.Uid).ToList();
-            }
+
             List<JobModel> jobs = new List<JobModel>();
             string error = string.Empty;
             int index = _settingScriptAction.GetIntType("numericUpDown48", 100);
             int delay = _settingScriptAction.GetIntType("numericUpDown46", 3);
-            if (_platform == PlatformModel.Instagram && _jobService == JobServices.VipIG)
+            if (_platform == "Instagram" && _jobService == "https://vipig.net/")
             {
                 var vipigClient = new VipIGClient(_cookieService);
                 for (int i = 0; i < 10; i++)
                 {
-                    _sate = $"{i + 1}/10 Đăng nhập vipig";
+                    _sate = $"Đăng nhập VipIG lần {i + 1}/10";
                     var coin = await vipigClient.GetBalance();
                     if (!string.IsNullOrEmpty(coin))
                     {
@@ -88,25 +86,33 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             }
             for (int i = 1; i <= index; i++)
             {
-                _sate = $"Lấy job {i}/{index}";
+                _sate = $"Lấy danh sách job {i}/{index}";
                 try
                 {
                     _typeJob = SubdyHelper.GetStringRandom(_job_types.ToList());
 
                     if (_platform == PlatformModel.Facebook)
                     {
-                        if (_jobService == JobServices.TuongTacCheo)
+                        if (_jobService == "https://tuongtaccheo.com/")
                         {
                             _jobPrefix = TuongTacCheoClient.GetJobPrefix(_typeJob);
 
                         }
-                        jobs = await JobClient.GetFacebookJob(_jobService, _account.Uid, _tokenJobService, _typeJob, _jobPrefix);
+                        else if (_jobService == "Subdy")
+                        {
+                            jobs = SubdyClient.GetJobs(_tokenJobService, _account.Uid);
+                        }
+                        else
+                        {
+                            jobs = await JobClient.GetFacebookJob(_jobService, _account.Uid, _tokenJobService, _typeJob, _jobPrefix);
+                        }
+
                     }
-                    else if (_platform == PlatformModel.Instagram && _jobService == JobServices.GoLike)
+                    else if (_platform == "Instagram" && _jobService == "https://app.golike.net/")
                     {
                         jobs = await new GoLikeClient().GetInstagramJob(_infoAccountService["id"], _account.TokenJob);
                     }
-                    else if (_platform == PlatformModel.Instagram && _jobService == JobServices.VipIG)
+                    else if (_platform == "Instagram" && _jobService == "https://vipig.net/")
                     {
                         var vipigClient = new VipIGClient(_cookieService);
                         jobs = await vipigClient.GetJobInstagram(_typeJob);
@@ -132,7 +138,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
         private async Task StopScriptAction()
         {
             await Stop();
-            await _facebookService.HanderAccount(_client,_account, 5, this._ct, this);
+            await _facebookService.HanderAccount(_client, _account, 5, this._ct, this);
             if (_timeoutScriptAction > 0 && _stopwatchScriptAction.IsRunning &&
                 _stopwatchScriptAction.ElapsedMilliseconds > _timeoutScriptAction)
             {
@@ -141,7 +147,10 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 throw new TimeoutException();
             }
 
-            if (ShouldStopByJobLimit(_account.JobTotal, _stopJobTatolAccount, "tổng số job")) return;
+            var jobTodayParts = _account.JobToday.Split('/');
+            int jobTodayTotal = (int.TryParse(jobTodayParts.ElementAtOrDefault(0), out var s) ? s : 0)
+                              + (int.TryParse(jobTodayParts.ElementAtOrDefault(1), out var f) ? f : 0);
+            if (ShouldStopByJobLimit(jobTodayTotal, _stopJobTatolAccount, "tổng số job hôm nay")) return;
             if (ShouldStopByJobLimit(_blockJobTuongTac, _stopJobBlockTuongTac, "bị chặn tương tác")) return;
             if (ShouldStopByJobLimit(_jobFail_LienTiep, _stopJobFail, "job thất bại liên tiếp")) return;
 
@@ -158,7 +167,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             await HandleBreakTime();
 
             RemoveOverLimitReactions();
-            if (!_job_types.Any()&& _config.JobService != JobServices.SeedingVip)
+            if (!_job_types.Any() && _config.JobService != "Subdy")
             {
                 await DelayMessageAsync(10,
                   $"Không có loại job nào cần làm!" + " đợi {time} giây", 2);
@@ -185,6 +194,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
 
             if (_settingScriptAction.GetBooleanValue("checkBox2", true) && _countJob > 0 && _countJob % delayCount == 0)
             {
+                _sate = "Nghỉ giải lao";
                 waitForDoJobStart.Reset();
                 int restTime = SubdyHelper.RandomValue(
                     _settingScriptAction.GetIntType("numericUpDown8", 60),
@@ -205,7 +215,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         _client.ADB.Shell("am start -n com.facebook.katana/.IntentUriHandler \"fb://watch\"");
                     }
-                    else if (_platform == PlatformModel.Instagram)
+                    else if (_platform == "Instagram")
                     {
                         _client.ADB.Shell($"am start -a android.intent.action.VIEW -d \"https://www.instagram.com/reels/{SubdyHelper.RandomString(length: SubdyHelper.RandomValue(6, 18))}\" -p com.instagram.android");
                         _client.SwipeByPercent(56, 82, 56, 16, 1000, 3, SubdyHelper.RandomValue(100, 2000));
@@ -253,11 +263,23 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
         {
             try
             {
-                if (_config.JobService != JobServices.SeedingVip)
+                _sate = "Khởi tạo dịch vụ job";
+                await InitSettings();
+                if (string.IsNullOrEmpty(Globals.User.ApiKey))
                 {
-                    await InitSettings();
-
+                    var reponesapiKey = SubdyClient.GetApiKey(Globals.User.Token);
+                    if (reponesapiKey == null || string.IsNullOrEmpty(reponesapiKey.ApiKey))
+                    {
+                        var reponesapi = SubdyClient.CreateApiKey(Globals.User.Token);
+                        Globals.User.ApiKey = reponesapi.ApiKey;
+                    }
+                    else
+                    {
+                        Globals.User.ApiKey = reponesapiKey.ApiKey;
+                    }
                 }
+                _tokenJobService = Globals.User.ApiKey;
+                //SubdyClient.AddPlatformAccount(Globals.User.Token, 1, _account.Uid, _account.FullName);
 
                 _client.AppStart(FacebookHander.Package(_platform), true, true, true);
                 _ = Task.Run(ScrollNewFeed); // background task
@@ -272,10 +294,10 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
 
                         if (jobs == null || !jobs.Any())
                         {
-                            if (_config.JobService == JobServices.SeedingVip)
-                            {
-                                throw new SubdyExtension(SubdyEnum.JobFail, "Hết job để làm.");
-                            }
+                            //if (_config.JobService == "Subdy")
+                            //{
+                            //    throw new SubdyExtension(SubdyEnum.JobFail, "Hết job để làm.");
+                            //}
                             continue;
                         }
                         List<string> listJob = new List<string>();
@@ -288,8 +310,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                 continue;
                             }
                             _typeJob = job.Type.ToLower();
-                            _sate = $"{_typeJob.ToUpper()} {index + 1}/{jobs.Count}";
-                            if (_typeJob == JobTypes.Follow && jobs.Count < 5 && _jobService == JobServices.VipIG && _platform == PlatformModel.Instagram)
+                            _sate = $"Thực hiện {_typeJob.ToUpper()} job {index + 1}/{jobs.Count}";
+                            if (_typeJob == JobTypes.Follow && jobs.Count < 5 && _jobService == "https://vipig.net/" && _platform == "Instagram")
                             {
                                 int second = SubdyHelper.RandomValue(
                                     _settingScriptAction.GetIntType("nudJobDelayFrom", 5),
@@ -319,7 +341,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
 
                                 waitForDoJobStart.Set();
 
-                                if (_jobService == JobServices.VipIG && job.Type == JobTypes.Follow)
+                                if (_jobService == "https://vipig.net/" && job.Type == JobTypes.Follow)
                                 {
                                     listJob.Add(job.JobId);
                                     isClaim = false;
@@ -333,14 +355,18 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                 {
                                     subdy = await ReportJob(job, subdy, listJob);
                                 }
-
+                                else
+                                {
+                                    string messsage = subdy.Message;
+                                    messsage = messsage + " - " + SubdyClient.SkipJob(_tokenJobService, Convert.ToInt32(job.JobId), _account.Uid, subdy.Message);
+                                }
                                 HanderJob(subdy, job);
                             }
                             finally
                             {
                                 if (subdy != null)
                                 {
-                                    UpdateJob(subdy, job);
+                                    await UpdateJob(subdy, job);
                                     int second = SubdyHelper.RandomValue(
                                   _settingScriptAction.GetIntType("nudJobDelayFrom", 5),
                                   _settingScriptAction.GetIntType("nudJobDelayTo", 10)
@@ -352,11 +378,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             }
 
                         }
-                        if (_config.JobService == JobServices.SeedingVip)
-                        {
-                            LamToolClient.JobVip.RemoveAll(x => x.FromId == _account.Uid);
-                            break;
-                        }
+
                     }
                     catch (Exception ex)
                     {
@@ -418,23 +440,28 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 _account.Summary_Skip += $"{displayKey}: {kv.Value.Skip} ";
             }
             _account.JobToday = $"{countTodaySuccess}/{countTodayFail}";
+
+            // Cộng dồn xu hôm nay (chỉ khi job success và có coin)
+            if (subdy?.SubdyEnum == SubdyEnum.Success && job.Coin > 0)
+            {
+                double.TryParse(_account.XuToday, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double currentXu);
+                currentXu += job.Coin;
+                _account.XuToday = currentXu.ToString("0.##");
+            }
+
             _accountContext.Update(_account);
             loadJobTotals();
             if (subdy.SubdyEnum == SubdyEnum.Success)
             {
-                (string status, string coin) = LamToolClient.SubtractBalance(Globals.User.UserName, 1.0, $"{_account.Uid} đã làm 1 job {job.Type} thành công!");
-                if (status.Contains("error", StringComparison.OrdinalIgnoreCase))
-                {
-                    _account.Status = status;
-                    throw new Exception(status);
-                }
-                ControlHelper.SetLabelTextSafe(Globals.CoinLable, Convert.ToInt32(coin).ToMoneyString() + " xu");
+                var balance = SubdyClient.GetProfile(Globals.User.Token);
+                Globals.User.Balance = balance;
+                ControlHelper.SetLabelTextSafe(Globals.CoinLable, ((int)balance).ToMoneyString() + " xu");
             }
             if (_platform == PlatformModel.Facebook)
             {
                 switch (_jobService)
                 {
-                    case JobServices.TuongTacCheo:
+                    case "https://tuongtaccheo.com/":
                         {
                             var client = new TuongTacCheoClient();
                             var coin = await client.GetCoin(_account.TokenJob);
@@ -444,7 +471,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             }
                             break;
                         }
-                    case JobServices.GoLike:
+                    case "https://app.golike.net/":
                         {
                             var client = new GoLikeClient();
                             var coin = client.GetCoin(_account.TokenJob);
@@ -533,6 +560,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
         }
         private async Task InitSettings()
         {
+            _sate = "Cấu hình dịch vụ";
+            SetStatus("Đang khởi tạo cài đặt...", 2);
             if (_settingScriptAction.GetBooleanValue("ckbTimeoutScript"))
             {
                 _stopwatchScriptAction.Restart();
@@ -587,7 +616,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
 
                 switch (_jobService)
                 {
-                    case JobServices.TuongTacCheo:
+                    case "https://tuongtaccheo.com/":
                         {
                             if (string.IsNullOrEmpty(_account.TokenJob))
                             {
@@ -609,7 +638,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                     string message = string.Empty;
                                     try
                                     {
-                                        _sate = $"[{i + 1}/{refail}] Cấu hình tài khoản";
+                                        _sate = $"Cấu hình tài khoản TuongTacCheo lần {i + 1}/{refail}";
                                         string siteKey = await tuongtaccheoclient.GetSiteKey(_tokenJobService);
                                         if (string.IsNullOrEmpty(siteKey))
                                         {
@@ -646,14 +675,14 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             }
                             break;
                         }
-                    case JobServices.GoLike:
+                    case "https://app.golike.net/":
                         {
                             _tokenJobService = _account.TokenJob;
                             break;
                         }
                 }
             }
-            else if (_platform == PlatformModel.Instagram)
+            else if (_platform == "Instagram")
             {
                 _jobService = _config.JobService;
 
@@ -663,7 +692,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 }
                 switch (_jobService)
                 {
-                    case JobServices.GoLike:
+                    case "https://app.golike.net/":
                         {
                             var client = new GoLikeClient();
                             if (string.IsNullOrEmpty(_account.FullName) || string.IsNullOrEmpty(_account.Bio))
@@ -724,7 +753,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             }
                             break;
                         }
-                    case JobServices.VipIG:
+                    case "https://vipig.net/":
                         {
                             VipIGClient vipigClient = new VipIGClient();
                             var accVipIG = await vipigClient.LoginByToken(_account.TokenJob);
@@ -733,8 +762,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             _cookieService = accVipIG.Split('|')[2];
                             _account.Result = accVipIG.Split('|')[1];
 
-                            _sate = "Cấu hình tài khoản";
-                            SetStatus("Đang cấu hình tài khoản.", 2);
+                            _sate = "Cấu hình tài khoản VipIG";
+                            SetStatus("Đang cấu hình tài khoản VipIG...", 2);
                             bool configured;
                             if (!_settingScriptAction.GetBooleanValue("check_AddAccount", false))
                             {
@@ -755,8 +784,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             }
                             else
                             {
-                                _sate = "Cấu hình tài khoản nhanh";
-                                SetStatus("Đang cấu hình tài khoản.", 2);
+                                _sate = "Cấu hình tài khoản VipIG nhanh";
+                                SetStatus("Đang cấu hình tài khoản VipIG nhanh...", 2);
                                 bool check = false;
                                 string id = await vipigClient.GetIdByUsername(_account.Uid);
                                 if (!string.IsNullOrEmpty(id))
@@ -858,6 +887,34 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             }
             return token;
         }
+        private void SwipeUp(int repeat = 1, int duration = 800)
+        {
+            var screen = _client.GetScreenResolution();
+            var rnd = new Random();
+            for (int i = 0; i < repeat; i++)
+            {
+                int x = (int)(screen.X * (0.30 + rnd.NextDouble() * 0.40));          // 30–70% ngang
+                int startY = (int)(screen.Y * (0.60 + rnd.NextDouble() * 0.25));     // 60–85% dọc
+                int endY = (int)(screen.Y * (0.15 + rnd.NextDouble() * 0.20));       // 15–35% dọc
+                _client.Swipe(x, startY, x, endY, duration);
+                if (i < repeat - 1) Thread.Sleep(SubdyHelper.RandomValue(300, 800));
+            }
+        }
+
+        private void SwipeDown(int repeat = 1, int duration = 800)
+        {
+            var screen = _client.GetScreenResolution();
+            var rnd = new Random();
+            for (int i = 0; i < repeat; i++)
+            {
+                int x = (int)(screen.X * (0.30 + rnd.NextDouble() * 0.40));          // 30–70% ngang
+                int startY = (int)(screen.Y * (0.15 + rnd.NextDouble() * 0.20));     // 15–35% dọc
+                int endY = (int)(screen.Y * (0.60 + rnd.NextDouble() * 0.25));       // 60–85% dọc
+                _client.Swipe(x, startY, x, endY, duration);
+                if (i < repeat - 1) Thread.Sleep(SubdyHelper.RandomValue(300, 800));
+            }
+        }
+
         private async Task ScrollNewFeed()
         {
             while (!_isStop)
@@ -870,15 +927,15 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         _client.Shell($"am start -n com.facebook.katana/.IntentUriHandler \"fb://feed\"");
                     }
-                    else if (_platform == PlatformModel.Instagram)
+                    else if (_platform == "Instagram")
                     {
                         _client.AppStart(FacebookHander.Package(_platform));
                     }
                     continue;
                 }
                 _client.ElementWithAttributes("//*[@content-desc=\"Close\"]", timeoutInSeconds: 1);
-
-                _client.SwipeByPercent(52, 92, 52, 45, 1000, SubdyHelper.RandomValue(1, 5));
+                _client.SwipeUp(SubdyHelper.RandomValue(1, 5), SubdyHelper.RandomValue(500, 1000), SubdyHelper.RandomValue(200, 1000));
+                // _client.SwipeByPercent(52, 92, 52, 45, 1000, SubdyHelper.RandomValue(1, 5));
                 int second = SubdyHelper.RandomValue(1, 15);
                 for (int i = 0; i < second; i++)
                 {
@@ -938,21 +995,25 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         if (_platform == PlatformModel.Facebook)
                         {
-                            for (int i = 0; i < 10; i++)
+                            if (!_client.ElementWithAttributes("//*[@content-desc=\"Navigate to your Reels profile\"]", 5, click: false))
                             {
-                                string dump = _client.GetXMLSource();
-                                if (string.IsNullOrEmpty(dump))
+                                for (int i = 0; i < 10; i++)
                                 {
-                                    continue;
+                                    string dump = _client.GetXMLSource();
+                                    if (string.IsNullOrEmpty(dump))
+                                    {
+                                        continue;
+                                    }
+                                    dump = dump.ToLower();
+                                    if (!_client.ElementWithAttributes(new List<string> { "//*[contains(@text,\"Share\")]", "//*[contains(@content-desc,\"Share\")]" }, 5, dump, false) || !dump.Contains("share", StringComparison.OrdinalIgnoreCase) && !dump.Contains("like", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        _client.SwipeUp(1, SubdyHelper.RandomValue(500, 2000), SubdyHelper.RandomValue(500, 2000));
+                                        continue;
+                                    }
+                                    break;
                                 }
-                                dump = dump.ToLower();
-                                if (!_client.ElementWithAttributes("//*[@text=\"Share\"]", 1, dump, false) || !dump.Contains("share") && !dump.Contains("like"))
-                                {
-                                    _client.SwipeByPercent(56, 82, 56, 16, 1000);
-                                    continue;
-                                }
-                                break;
                             }
+                           
                         }
 
                     }
@@ -993,20 +1054,24 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                       type == JobTypes.Wow || type == JobTypes.Angry ||
                       type == JobTypes.Care || type == JobTypes.LikeComment)
                     {
-                        if (_platform == PlatformModel.Facebook && !xml.Contains(", pressed. double tap and hold"))
+                        if (!_client.ElementWithAttributes("//*[@content-desc=\"Navigate to your Reels profile\"]", 5, click: false))
                         {
-                            subdy.SubdyEnum = SubdyEnum.Block;
-                            subdy.Message = $"Chặn tương tác {job.Type}";
+                            if (_platform == PlatformModel.Facebook && !xml.Contains(", pressed. double tap and hold"))
+                            {
+                                subdy.SubdyEnum = SubdyEnum.Block;
+                                subdy.Message = $"Chặn tương tác {job.Type}";
+                            }
+                            else if (_platform == "Instagram" && !xml.Contains("liked"))
+                            {
+                                subdy.SubdyEnum = SubdyEnum.Block;
+                                subdy.Message = $"Chặn tương tác {job.Type}";
+                            }
                         }
-                        else if (_platform == PlatformModel.Instagram && !xml.Contains("liked"))
-                        {
-                            subdy.SubdyEnum = SubdyEnum.Block;
-                            subdy.Message = $"Chặn tương tác {job.Type}";
-                        }
+                       
                     }
                     if (type == JobTypes.Follow)
                     {
-                        if (_platform == PlatformModel.Instagram)
+                        if (_platform == "Instagram")
                         {
                             bool check = xml.Contains("requested");
                             if (!check)
@@ -1042,17 +1107,17 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 {
                     if (_platform == PlatformModel.Facebook)
                     {
-                        if (_config.JobService == JobServices.SeedingVip)
+                        if (_config.JobService == "Subdy")
                         {
-                            var message = await LamToolClient.DeleteTaskById(job.JobId);
+                            var message = SubdyClient.ClaimJob(_tokenJobService, Convert.ToInt32(job.JobId), _account.Uid);
                             return subdy;
                         }
 
                         subdy.Message = await JobClient.ReportFacebookJob(_jobService, _account.Uid, _account.FullName, _tokenJobService, job, _jobPrefix);
                     }
-                    else if (_platform == PlatformModel.Instagram)
+                    else if (_platform == "Instagram")
                     {
-                        if (_jobService == JobServices.GoLike)
+                        if (_jobService == "https://app.golike.net/")
                         {
                             var message = await new GoLikeClient().ReportInstagramJob(job.JobId, _infoAccountService["id"], _account.TokenJob);
                             if (message.ContainsKey("error"))
@@ -1061,13 +1126,13 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             }
                             subdy.Message = message["success"];
                         }
-                        else if (_jobService == JobServices.VipIG && job.Type == JobTypes.Like)
+                        else if (_jobService == "https://vipig.net/" && job.Type == JobTypes.Like)
                         {
                             var reward = await new VipIGClient(_cookieService).ClaimLikeReward(job.ObjectId);
                             string message = (reward["mess"] ?? reward["error"])?.ToString();
                             subdy.Message = message;
                         }
-                        else if (_jobService == JobServices.VipIG && job.Type == JobTypes.Follow)
+                        else if (_jobService == "https://vipig.net/" && job.Type == JobTypes.Follow)
                         {
                             string idList = string.Join(",", idJobs);
                             idJobs.Clear();
@@ -1133,7 +1198,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 string url = "";
                 bool isLink = false;
                 List<string> urls = new List<string>();
-                //if (_config.JobService == JobServices.SeedingVip)
+                //if (_config.JobService == "Subdy")
                 //{
                 //    urls.Add(job.Link);
                 //}
@@ -1156,7 +1221,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 //        urls.Add(url);
                 //    }
                 //}
-                urls.Add($"fb://faceweb/f?href=https://www.facebook.com/{SubdyHelper.RandomString("0123456789", SubdyHelper.RandomValue(6, 20))}/posts/{job.ObjectId}");
+                urls.Add(job.ObjectId);
+                //   urls.Add($"fb://faceweb/f?href=https://www.facebook.com/{SubdyHelper.RandomString("0123456789", SubdyHelper.RandomValue(6, 20))}/posts/{job.ObjectId}");
                 foreach (string link in urls)
                 {
                     isLink = await GotoUrl(link);
@@ -1180,10 +1246,10 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         continue;
                     }
-                    dump = dump.ToLower();
-                    if (!_client.ElementWithAttributes("//*[@text=\"Share\"]", 1, dump, false) || !dump.Contains("share") && !dump.Contains("like"))
+                    if (!_client.ElementWithAttributes(new List<string> { "//*[contains(@text,\"Share\")]", "//*[contains(@content-desc,\"Share\")]" }, 5, dump, false) || !dump.Contains("share", StringComparison.OrdinalIgnoreCase) && !dump.Contains("like", StringComparison.OrdinalIgnoreCase))
                     {
-                        _client.SwipeByPercent(56, 82, 56, 16, 1000);
+                        _client.SwipeUp(1, SubdyHelper.RandomValue(500, 2000), SubdyHelper.RandomValue(500, 2000));
+                        //  _client.SwipeByPercent(56, 82, 56, 16, 1000);
                         continue;
                     }
                     if (dump.Contains(", pressed. double tap and hold"))
@@ -1200,31 +1266,53 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 job.Link = url;
                 int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
                 await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
-                var element = _client.FindElement("", new List<string> { "//*[@content-desc=\"Tap to open more options\"]", "//*[contains(@content-desc, 'Like button')]", "//*[contains(@content-desc, 'Like. Double')]" }, 5);
-                if (element == "//*[@content-desc=\"Tap to open more options\"]")
+                if (_client.ElementWithAttributes("//*[@content-desc=\"Navigate to your Reels profile\"]", 5, click: false))
                 {
-                    _client.ElementWithAttributes(element, 5);
-                    _client.ElementWithAttributes("//*[@content-desc=\"Hide\"]", 5);
-                    goto ReFail;
-                }
-                var elementLike = _client.FindPoint(element, 15);
-                string type = job.Type.ToLower();
-                if (elementLike != null && elementLike != System.Drawing.Point.Empty)
-                {
-                    string num = job.Type.ToLower();
+                    var elementLike = _client.FindPoint("//*[contains(@text, \"reactions\")]", 15);
+                    string type = job.Type.ToLower();
+                    if (elementLike != null && elementLike != System.Drawing.Point.Empty)
+                    {
+                        string num = job.Type.ToLower();
 
-                    _client.LongClick(elementLike.X, elementLike.Y, 1000);
-                    if (!type.Contains("like"))
-                    {
-                        num = char.ToUpper(type[0]) + type.Substring(1);
+                        _client.LongClick(elementLike.X, elementLike.Y, 1000);
+                        if (!type.Contains("like"))
+                        {
+                            num = char.ToUpper(type[0]) + type.Substring(1);
+                        }
+                        if (_client.ElementWithAttributes($"//*[@content-desc='{num}']", 3))
+                        {
+                            return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                        }
                     }
-                    if (_client.ElementWithAttributes($"//*[@content-desc='{num}']", 3))
+                }
+                else
+                {
+                    var element = _client.FindElement("", new List<string> { "//*[@content-desc=\"Tap to open more options\"]", "//*[contains(@content-desc, 'Like button')]", "//*[contains(@content-desc, 'Like. Double')]" }, 5);
+                    if (element == "//*[@content-desc=\"Tap to open more options\"]")
                     {
-                        return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                        _client.ElementWithAttributes(element, 5);
+                        _client.ElementWithAttributes("//*[@content-desc=\"Hide\"]", 5);
+                        goto ReFail;
+                    }
+                    var elementLike = _client.FindPoint(element, 15);
+                    string type = job.Type.ToLower();
+                    if (elementLike != null && elementLike != System.Drawing.Point.Empty)
+                    {
+                        string num = job.Type.ToLower();
+
+                        _client.LongClick(elementLike.X, elementLike.Y, 1000);
+                        if (!type.Contains("like"))
+                        {
+                            num = char.ToUpper(type[0]) + type.Substring(1);
+                        }
+                        if (_client.ElementWithAttributes($"//*[@content-desc='{num}']", 3))
+                        {
+                            return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                        }
                     }
                 }
             }
-            else if (_platform == PlatformModel.Instagram)
+            else if (_platform == "Instagram")
             {
                 string link = $"instagram://media?id={job.ObjectId}";
                 if (!await GotoUrl(link))
@@ -1277,13 +1365,15 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 "//*[@content-desc=\"Go to profile\"]",
                 "//*[@text=\"Sorry, this page isn't available.\"]",
                 "//*[@text=\"The link you followed may be broken, or the page may have been removed. \"]",
+                "//*[@content-desc=\"Navigate to your Reels profile\"]"
             };
             if (url.Contains("posts"))
             {
                 xpaths.AddRange(new string[]{
                 "//*[@text=\"From your messages.\"]",
                 "//*[@content-desc=\"Close\"]",
-                "//*[@content-desc=\"Search\"]"});
+                "//*[@content-desc=\"Search\"]",
+                });
             }
             else if (url.Contains("photo"))
             {
@@ -1322,7 +1412,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             {
                 _client.ADB.Shell($"am start -n com.facebook.katana/com.facebook.katana.IntentUriHandler -d \"{url}\"");
             }
-            else if (_platform == PlatformModel.Instagram)
+            else if (_platform == "Instagram")
             {
                 _client.ADB.Shell($"am start -a android.intent.action.VIEW -d \"{url}\" -p com.instagram.android");
             }
@@ -1348,6 +1438,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                         return false;
                     }
+                case "//*[@content-desc=\"Navigate to your Reels profile\"]":
                 case "//*[@text=\"From your messages.\"]":
                     {
                         return true;
@@ -1414,7 +1505,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
                 }
             }
-            else if (_platform == PlatformModel.Instagram)
+            else if (_platform == "Instagram")
             {
                 string link = $"instagram://user?username={job.ObjectId}";
                 if (!await GotoUrl(link))

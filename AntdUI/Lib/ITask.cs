@@ -298,6 +298,12 @@ namespace AntdUI
 #endif
         }
 
+        public static Task Run(Func<Task> action, Action? end = null)
+        {
+            if (end == null) return Task.Run(action);
+            return Task.Run(action).ContinueWith(_ => { end(); });
+        }
+
         public static T? Invoke<T>(Control control, Func<T> method)
         {
             if (control.IsDisposed || control.Disposing) return default;

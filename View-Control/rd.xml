@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+	<Application>
+
+		<!-- ResourceManager support -->
+		<Assembly Name="System.Resources.Extensions">
+			<Type Name="System.Resources.Extensions.RuntimeResourceSet" Dynamic="Required All" />
+			<Type Name="System.Resources.Extensions.DeserializingResourceReader" Dynamic="Required All" />
+		</Assembly>
+
+		<!-- Core reflection -->
+		<Assembly Name="System.Private.CoreLib" Dynamic="Required All">
+			<Type Name="System.Delegate" Dynamic="Required All" />
+			<Type Name="System.MulticastDelegate" Dynamic="Required All" />
+			<Type Name="System.Action" Dynamic="Required All" />
+			<Type Name="System.Func`1" Dynamic="Required All" />
+			<Type Name="System.Func`2" Dynamic="Required All" />
+		</Assembly>
+		<Assembly Name="mscorlib" Dynamic="Required All" />
+		<Assembly Name="System.Reflection" Dynamic="Required All"/>
+		<Assembly Name="System.Runtime" Dynamic="Required All"/>
+		<Assembly Name="System.ComponentModel" Dynamic="Required All" />
+		<Assembly Name="System.ComponentModel.TypeConverter" Dynamic="Required All">
+			<Type Name="System.ComponentModel.TypeDescriptor" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.ReflectTypeDescriptionProvider" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.PropertyDescriptorCollection" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.PropertyDescriptor" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.ITypedList" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.IBindingList" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.IBindingListView" Dynamic="Required All" />
+			<Type Name="System.ComponentModel.BindingList`1" Dynamic="Required All" />
+		</Assembly>
+		<Assembly Name="System.Globalization">
+			<Type Name="System.Globalization.CultureInfo" Dynamic="Required All"/>
+		</Assembly>
+		<Assembly Name="System.Drawing" Dynamic="Required All" />
+
+		<!-- WinForms binding + runtime -->
+		<Assembly Name="System.Windows.Forms" Dynamic="Required All">
+			<Type Name="System.Windows.Forms.Form" Dynamic="Required All" Preserve="All" />
+			<Type Name="System.Windows.Forms.UserControl" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Control" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Application" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.BindingContext" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.BindingSource" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Binding" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.BindingManagerBase" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.CurrencyManager" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.PropertyManager" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.ContainerControl" Dynamic="Required All" />
+		</Assembly>
+
+		<!-- Project assemblies -->
+		<Assembly Name="AntdUI" Dynamic="Required All" />
+		<Assembly Name="AutoAndroid" Dynamic="Required All" />
+		<Assembly Name="Sunny.Subdy.Common" Dynamic="Required All" />
+		<Assembly Name="Sunny.Subdy.Data" Dynamic="Required All" />
+
+		<!-- Models -->
+		<Assembly Name="Sunny.Subdy.Data">
+			<Type Name="Sunny.Subdy.Data.Models.DeviceModel" Dynamic="Required All" />
+		</Assembly>
+
+		<!-- ViewControl forms -->
+		<Assembly Name="ViewControl">
+			<Type Name="ViewControl.fSingleView" Dynamic="Required All" Preserve="All" />
+			<Type Name="ViewControl.fMultiView" Dynamic="Required All" Preserve="All" />
+			<Type Name="LamToolAutoPhonePrime.ucDeviceView" Dynamic="Required All" Preserve="All" />
+			<Type Name="LamToolAutoPhonePrime.ScrcpyManager" Dynamic="Required All" Preserve="All" />
+		</Assembly>
+
+	</Application>
+</Directives>

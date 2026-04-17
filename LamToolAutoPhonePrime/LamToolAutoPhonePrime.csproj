@@ -17,7 +17,6 @@
 	  <Optimize>false</Optimize>
 
 	  <!-- Native AOT -->
-	  <!--<PublishTrimmed>false</PublishTrimmed>-->
 	  <PublishAot>true</PublishAot>
 	  <InvariantGlobalization>false</InvariantGlobalization>
 	  <_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>
@@ -27,21 +26,20 @@
 	  <WindowsSupportedOSPlatformVersion>5.1</WindowsSupportedOSPlatformVersion>
 	  <TargetPlatformMinVersion>5.1</TargetPlatformMinVersion>
 	  <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-	  <PublishTrimmed>false</PublishTrimmed>
-	  <OptimizationPreference>Size</OptimizationPreference>
+		  <OptimizationPreference>Size</OptimizationPreference>
 	  <PublishLzmaCompressed>true</PublishLzmaCompressed>
 	  <!-- Auto Versioning -->
 	  <CurrentTime>$([System.DateTime]::Now.ToString("HH.dd.MM.yyyy"))</CurrentTime>
 	  <Version>$(CurrentTime)</Version>
 	  <AssemblyVersion>$(CurrentTime)</AssemblyVersion>
 	  <FileVersion>$(CurrentTime)</FileVersion>
-	  <AssemblyName>LamToolAutoPhoneFarm$(CurrentTime)</AssemblyName>
-	  <Product>LamToolAutoPhoneFarm</Product>
-	  <Company>LamToolAutoPhoneFarm</Company>
-	  <Copyright>LamToolAutoPhoneFarm</Copyright>
-	  <PackageId>LamToolAutoPhoneFarm</PackageId>
-	  <Title>LamToolAutoPhoneFarm</Title>
-	  <PackageProjectUrl>https://lamtool.net/</PackageProjectUrl>
+	  <AssemblyName>SubdyPhoneFarm</AssemblyName>
+	  <Product>SubdyPhoneFarm</Product>
+	  <Company>Subdy</Company>
+	  <Copyright>Subdy</Copyright>
+	  <PackageId>SubdyPhoneFarm</PackageId>
+	  <Title>SubdyPhoneFarm</Title>
+	  <PackageProjectUrl>https://subdy.net/</PackageProjectUrl>
 	  <ApplicationIcon>Resources\logo_lamtool_v3_dark_16.ico</ApplicationIcon>
 	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -101,30 +99,24 @@
     <PackageReference Include="WinFormsComInterop" Version="0.5.0" />
     <PackageReference Include="YY-Thunks" Version="1.1.7" />
   </ItemGroup>
-	<!-- COM Interop -->
-	<ItemGroup>
-		<COMReference Include="IWshRuntimeLibrary">
-			<WrapperTool>tlbimp</WrapperTool>
-			<VersionMajor>1</VersionMajor>
-			<VersionMinor>0</VersionMinor>
-			<Lcid>0</Lcid>
-			<Isolated>false</Isolated>
-			<EmbedInteropTypes>true</EmbedInteropTypes>
-			<Guid>f935dc20-1cf0-11d0-adb9-00c04fd58a0b</Guid>
-		</COMReference>
-	</ItemGroup>
 	<!-- Trimming Rules -->
 	<ItemGroup>
 		<TrimmerRootAssembly Include="System.Drawing.Common" />
 		<TrimmerRootAssembly Include="System.Resources.Extensions" />
+		<TrimmerRootAssembly Include="System.ComponentModel.TypeConverter" />
+		<TrimmerRootAssembly Include="System.ComponentModel" />
+		<TrimmerRootAssembly Include="System.Windows.Forms" />
 		<TrimmerRootAssembly Include="mscorlib" />
-		<TrimmableAssembly Include="System.Windows.Forms" />
 	</ItemGroup>
 	<!-- AOT Reflection Config -->
 	<ItemGroup>
 		<RdXmlFile Include="rd.xml" />
 		<RdXmlFile Include="Forms.xml" />
 	</ItemGroup>
+	<!-- Force WinForms binding support = true (overrides SDK default of false for trimmed builds) -->
+	<PropertyGroup>
+		<_WinFormsBindingSupport>true</_WinFormsBindingSupport>
+	</PropertyGroup>
 
 	<Target Name="PreserveReflectionForAutoAndroid" BeforeTargets="PrepareForILLink">
 		<ItemGroup>
@@ -150,6 +142,111 @@
 	    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 	  </Resource>
 	</ItemGroup>
+
+	<PropertyGroup>
+		<HttpRequestLibProjectPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\HttpRequestLib\HttpRequestLib\HttpRequestLib.vcxproj'))</HttpRequestLibProjectPath>
+		<HttpRequestLibSolutionDir>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))))</HttpRequestLibSolutionDir>
+		<HttpRequestLibNativePlatform Condition="'$(Platform)' == 'x86'">Win32</HttpRequestLibNativePlatform>
+		<HttpRequestLibNativePlatform Condition="'$(Platform)' == 'x64'">x64</HttpRequestLibNativePlatform>
+		<HttpRequestLibNativePlatform Condition="'$(HttpRequestLibNativePlatform)' == ''">x64</HttpRequestLibNativePlatform>
+		<HttpRequestLibX64DllPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\x64\$(Configuration)\HttpRequestLib.dll'))</HttpRequestLibX64DllPath>
+		<HttpRequestLibWin32DllPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Win32\$(Configuration)\HttpRequestLib.dll'))</HttpRequestLibWin32DllPath>
+		<HttpRequestLibWin32LegacyDllPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\$(Configuration)\HttpRequestLib.dll'))</HttpRequestLibWin32LegacyDllPath>
+		<VsWherePath>$([System.IO.Path]::Combine($([System.Environment]::GetFolderPath(SpecialFolder.ProgramFilesX86)), 'Microsoft Visual Studio', 'Installer', 'vswhere.exe'))</VsWherePath>
+		<HttpRequestLibMsBuildLookupFile>$(BaseIntermediateOutputPath)HttpRequestLib.$(Configuration).$(Platform).msbuild.path.txt</HttpRequestLibMsBuildLookupFile>
+	</PropertyGroup>
+
+	<Target Name="ResolveHttpRequestLibMsBuildPath" Condition="'$(HttpRequestLibMsBuildPath)' == ''">
+		<MakeDir Directories="$(BaseIntermediateOutputPath)" />
+		<Exec Command="&quot;$(VsWherePath)&quot; -latest -requires Microsoft.Component.MSBuild -find &quot;MSBuild\**\Bin\MSBuild.exe&quot; &gt; &quot;$(HttpRequestLibMsBuildLookupFile)&quot;" Condition="Exists('$(VsWherePath)')" />
+		<ReadLinesFromFile File="$(HttpRequestLibMsBuildLookupFile)" Condition="Exists('$(HttpRequestLibMsBuildLookupFile)')">
+			<Output TaskParameter="Lines" ItemName="HttpRequestLibMsBuildPathCandidate" />
+		</ReadLinesFromFile>
+		<PropertyGroup>
+			<HttpRequestLibMsBuildPath>@(HttpRequestLibMsBuildPathCandidate->'%(Identity)', '')</HttpRequestLibMsBuildPath>
+		</PropertyGroup>
+		<Error Condition="'$(HttpRequestLibMsBuildPath)' == ''" Text="Could not locate Visual Studio MSBuild.exe to build HttpRequestLib. Expected vswhere at '$(VsWherePath)'." />
+	</Target>
+
+	<Target Name="BuildHttpRequestLibIfMissing" DependsOnTargets="ResolveHttpRequestLibMsBuildPath" Condition="('$(HttpRequestLibNativePlatform)' == 'x64' and !Exists('$(HttpRequestLibX64DllPath)')) or ('$(HttpRequestLibNativePlatform)' == 'Win32' and !Exists('$(HttpRequestLibWin32LegacyDllPath)') and !Exists('$(HttpRequestLibWin32DllPath)'))">
+		<Message Text="Building HttpRequestLib ($(Configuration)|$(HttpRequestLibNativePlatform)) before LamToolAutoPhonePrime..." Importance="high" />
+		<Exec Command="&quot;$(HttpRequestLibMsBuildPath)&quot; &quot;$(HttpRequestLibProjectPath)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(HttpRequestLibNativePlatform) /p:SolutionDir=$(HttpRequestLibSolutionDir) /nologo" />
+		<Error Condition="('$(HttpRequestLibNativePlatform)' == 'x64' and !Exists('$(HttpRequestLibX64DllPath)')) or ('$(HttpRequestLibNativePlatform)' == 'Win32' and !Exists('$(HttpRequestLibWin32LegacyDllPath)') and !Exists('$(HttpRequestLibWin32DllPath)'))" Text="HttpRequestLib.dll was not found after the native build. Checked: $(HttpRequestLibX64DllPath), $(HttpRequestLibWin32LegacyDllPath), $(HttpRequestLibWin32DllPath)." />
+	</Target>
+
+	<Target Name="BuildAndCopyHttpRequestLib" BeforeTargets="Build" DependsOnTargets="BuildHttpRequestLibIfMissing">
+		<ItemGroup>
+			<HttpRequestLibCandidate Include="$(HttpRequestLibX64DllPath)" Condition="'$(HttpRequestLibNativePlatform)' == 'x64'" />
+			<HttpRequestLibCandidate Include="$(HttpRequestLibWin32LegacyDllPath)" Condition="'$(HttpRequestLibNativePlatform)' == 'Win32'" />
+			<HttpRequestLibCandidate Include="$(HttpRequestLibWin32DllPath)" Condition="'$(HttpRequestLibNativePlatform)' == 'Win32'" />
+			<ResolvedHttpRequestLibCandidate Include="@(HttpRequestLibCandidate)" Condition="Exists('%(Identity)')" />
+		</ItemGroup>
+		<Error Condition="'@(ResolvedHttpRequestLibCandidate)' == ''" Text="HttpRequestLib.dll was not found after the native build. Checked: @(HttpRequestLibCandidate, ', ')." />
+		<Copy SourceFiles="@(ResolvedHttpRequestLibCandidate)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+		<Message Text="Copied HttpRequestLib.dll to $(OutDir)." Importance="high" />
+	</Target>
+
+	<!-- Copy ScrcpyNet native DLLs (FFmpeg, SDL2, adb, scrcpy-server) vào output -->
+	<Target Name="CopyScrcpyNativeDeps" AfterTargets="Build">
+		<ItemGroup>
+			<ScrcpyNativeDep Include="$(MSBuildProjectDirectory)\..\ScrcpyNet\bin\$(Configuration)\netstandard2.1\ScrcpyNet\*.*" />
+		</ItemGroup>
+		<MakeDir Directories="$(OutDir)ScrcpyNet" />
+		<Copy SourceFiles="@(ScrcpyNativeDep)" DestinationFolder="$(OutDir)ScrcpyNet" SkipUnchangedFiles="true" Condition="'@(ScrcpyNativeDep)' != ''" />
+		<Message Text="Copied ScrcpyNet native DLLs to $(OutDir)ScrcpyNet." Importance="high" Condition="'@(ScrcpyNativeDep)' != ''" />
+		<Warning Text="ScrcpyNet native DLLs not found. Build ScrcpyNet project first." Condition="'@(ScrcpyNativeDep)' == ''" />
+	</Target>
+
+	<!-- Build LTPhoneHelper (Python PyInstaller) và copy vào output -->
+	<PropertyGroup>
+		<LTPhoneHelperDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\LTPhoneHelper'))</LTPhoneHelperDir>
+		<LTPhoneHelperExe>$(LTPhoneHelperDir)\dist\LTPhoneHelper.exe</LTPhoneHelperExe>
+	</PropertyGroup>
+
+	<Target Name="BuildLTPhoneHelper" BeforeTargets="Build">
+		<Message Text="Building LTPhoneHelper..." Importance="high" />
+		<Exec Command="python build.py" WorkingDirectory="$(LTPhoneHelperDir)" IgnoreExitCode="true" Condition="Exists('$(LTPhoneHelperDir)\build.py')" />
+		<Warning Text="LTPhoneHelper.exe not found after build. Skipping copy." Condition="!Exists('$(LTPhoneHelperExe)')" />
+	</Target>
+
+	<Target Name="CopyLTPhoneHelper" AfterTargets="BuildLTPhoneHelper" BeforeTargets="Build" Condition="Exists('$(LTPhoneHelperExe)')">
+		<Copy SourceFiles="$(LTPhoneHelperExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+		<Message Text="Copied LTPhoneHelper.exe to $(OutDir)." Importance="high" />
+	</Target>
+
+	<!-- Build ORC-Helper-Python (PyInstaller onefile) và copy vào output -->
+	<PropertyGroup>
+		<OrcHelperDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\ORC-Helper-Python'))</OrcHelperDir>
+		<OrcHelperExe>$(OrcHelperDir)\dist\ocr_helper.exe</OrcHelperExe>
+	</PropertyGroup>
+
+	<Target Name="BuildOrcHelper" BeforeTargets="Build">
+		<Message Text="Building ORC-Helper-Python (onefile)..." Importance="high" />
+		<Exec Command="pyinstaller build/ocr_helper.spec --clean --distpath dist/" WorkingDirectory="$(OrcHelperDir)" IgnoreExitCode="true" Condition="Exists('$(OrcHelperDir)\build\ocr_helper.spec')" />
+		<Warning Text="ocr_helper.exe not found after build. Skipping copy." Condition="!Exists('$(OrcHelperExe)')" />
+	</Target>
+
+	<Target Name="CopyOrcHelper" AfterTargets="BuildOrcHelper" BeforeTargets="Build" Condition="Exists('$(OrcHelperExe)')">
+		<Copy SourceFiles="$(OrcHelperExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+		<Message Text="Copied ocr_helper.exe to $(OutDir)." Importance="high" />
+	</Target>
+
+	<!-- Build ViewControl (AOT standalone .exe) và copy vào output -->
+	<PropertyGroup>
+		<ViewControlProjectPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\ViewControl.csproj'))</ViewControlProjectPath>
+		<ViewControlExe>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish\ViewControl.exe'))</ViewControlExe>
+	</PropertyGroup>
+
+	<Target Name="BuildViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlProjectPath)')">
+		<Message Text="Building ViewControl..." Importance="high" />
+		<Exec Command="dotnet publish &quot;$(ViewControlProjectPath)&quot; -r win-x64 -c Release --output &quot;$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish'))&quot; /p:PublishAot=false /p:PublishSingleFile=true /p:SelfContained=true /p:IncludeNativeLibrariesForSelfExtract=true /nologo" IgnoreExitCode="true" />
+		<Warning Text="ViewControl.exe not found after build. Skipping copy." Condition="!Exists('$(ViewControlExe)')" />
+	</Target>
+
+	<Target Name="CopyViewControl" AfterTargets="BuildViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlExe)')">
+		<Copy SourceFiles="$(ViewControlExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+		<Message Text="Copied ViewControl.exe to $(OutDir)." Importance="high" />
+	</Target>
 
 	<Target Name="CleanObjWhenRun" AfterTargets="Build" Condition="'$(RunConfiguration)' != ''">
 		<Message Text="🧹 Dọn thư mục obj sau khi chạy build..." Importance="high" />

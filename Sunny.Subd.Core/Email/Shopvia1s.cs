@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System.Text.Json.Nodes;
 
 namespace Sunny.Subd.Core.Email
 {
@@ -22,13 +22,13 @@ namespace Sunny.Subd.Core.Email
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 string json = await response.Content.ReadAsStringAsync();
-                var obj = JObject.Parse(json);
-                if ((string)obj["status"] == "success")
+                var obj = JsonNode.Parse(json)!.AsObject();
+                if (obj["status"]?.GetValue<string>() == "success")
                 {
-                    var dataArray = obj["data"] as JArray;
+                    var dataArray = obj["data"]?.AsArray();
                     foreach (var item in dataArray)
                     {
-                        return item.ToString();
+                        return item?.ToJsonString();
                     }
                 }
             }
@@ -49,10 +49,10 @@ namespace Sunny.Subd.Core.Email
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 string json = await response.Content.ReadAsStringAsync();
-                var obj = JObject.Parse(json);
-                if (Convert.ToBoolean(obj["status"]))
+                var obj = JsonNode.Parse(json)!.AsObject();
+                if (obj["status"]?.GetValue<bool>() == true)
                 {
-                    return (string)obj["code"];
+                    return obj["code"]?.GetValue<string>();
                 }
             }
             catch

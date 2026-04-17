@@ -80,11 +80,15 @@ namespace Sunny.Subd.Core.Facebook
                 await Task.Delay(1000);
             }
         }
-        public void SetStatus(string status, int color)
+        public void SetStatus(string status, int color, string logDetail = null)
         {
             if (!string.IsNullOrEmpty(_sate) && !status.Contains(_sate))
             {
                 status = $"[{_sate}] - ({status})";
+            }
+            if (!string.IsNullOrEmpty(logDetail))
+            {
+                LogManager.Info($"[DEBUG] {logDetail}");
             }
             if (_account != null)
             {
@@ -137,7 +141,7 @@ namespace Sunny.Subd.Core.Facebook
             }
             if (_settingGeneral.GetBooleanValue("checkBox3", true))
             {
-                string profileDir = _settingGeneral.GetValuesFromInputString("textBox3", Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup", "Profile", _platform));
+                string profileDir = _settingGeneral.GetValuesFromInputString("textBox3", Path.Combine(AppContext.BaseDirectory, "Backup", "Profile", _platform));
                 Directory.CreateDirectory(profileDir);
                 string fileProfile = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
                 switch (_platform)
@@ -147,7 +151,7 @@ namespace Sunny.Subd.Core.Facebook
                             _backupRestoreHelper.BackupFacebook(fileProfile);
                             break;
                         }
-                    case PlatformModel.Instagram:
+                    case "Instagram":
                         {
                             _backupRestoreHelper.BackupInstagram(fileProfile);
                             break;
@@ -156,7 +160,7 @@ namespace Sunny.Subd.Core.Facebook
             }
             if (_settingGeneral.GetBooleanValue("checkBox2", true))
             {
-                string profileDir = _settingGeneral.GetValuesFromInputString("textBox2", Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup", "Device", _platform));
+                string profileDir = _settingGeneral.GetValuesFromInputString("textBox2", Path.Combine(AppContext.BaseDirectory, "Backup", "Device", _platform));
                 Directory.CreateDirectory(profileDir);
                 string fileProfile = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
                 await _client.BackupDevice(fileProfile);
@@ -169,16 +173,16 @@ namespace Sunny.Subd.Core.Facebook
         private async Task ChangeInfoAsync()
         {
             if (!_settingGeneral.GetBooleanValue("checkBox1", true)) return;
-            _sate = "Thay đổi thiết bị";
+            _sate = "Thay đổi thông tin thiết bị";
             try
             {
-                SetStatus("Đang làm", 2);
+                SetStatus("Đang thay đổi thông tin thiết bị...", 2);
                 string filezip = string.Empty;
                 List<string> brands = _settingGeneral.GetValuesFromInputString("textBox1", DeviceServices.Brands).Split('|').ToList();
                 bool backup = _settingGeneral.GetBooleanValue("checkBox2", true);
                 if (backup)
                 {
-                    string profileDir = _settingGeneral.GetValuesFromInputString("textBox2", Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup", "Device", _platform));
+                    string profileDir = _settingGeneral.GetValuesFromInputString("textBox2", Path.Combine(AppContext.BaseDirectory, "Backup", "Device", _platform));
                     profileDir = Path.Combine(profileDir);
                     Directory.CreateDirectory(profileDir);
                     filezip = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
@@ -202,8 +206,8 @@ namespace Sunny.Subd.Core.Facebook
         // Thay đổi proxy
         private async Task ChangeProxyAsync()
         {
-            _sate = "Thay đổi IP";
-            SetStatus("Đang làm", 2);
+            _sate = "Thay đổi IP/Proxy";
+            SetStatus("Đang thay đổi IP/Proxy...", 2);
             _client.Shell("settings put global http_proxy :0");
             _client.Shell("am broadcast -a com.vat.proxyconnector.STOP_PROXY -n com.vat.proxyconnector/.ProxyReceiver");
             string proxy = string.Empty;
@@ -291,7 +295,7 @@ namespace Sunny.Subd.Core.Facebook
         // Kiểm tra kết nối internet
         private async Task<bool> IsInternetAsync()
         {
-            _sate = "Kiểm tra tín hiệu internet";
+            _sate = "Kiểm tra kết nối internet";
             int attempts = _settingGeneral.GetIntType("nud_IndexFailProxy", 5);
             for (int i = 1; i <= attempts; i++)
             {
@@ -299,6 +303,10 @@ namespace Sunny.Subd.Core.Facebook
                 if (string.IsNullOrEmpty(ip))
                 {
                     SetStatus($"[{i}/{attempts}] Không có internet.", 1);
+                        await _client.DisableWifi();
+                        await Task.Delay(5000);
+                        await _client.EnableWifi();
+                         await Task.Delay(15000);
                     continue;
                 }
                 SetStatus($"[{i}/{attempts}] IP:[{ip}].", 2);
@@ -315,7 +323,7 @@ namespace Sunny.Subd.Core.Facebook
         // Mở ứng dụng Facebook
         private async Task<bool> OpenFacebookAsync()
         {
-            _sate = $"Mở ứng dụng {_platform.ToLower()}";
+            _sate = $"Mở ứng dụng {_platform}";
             string fileAPK = string.Empty;
             if (_settingGeneral.GetBooleanValue("checkBox8", true))
             {
@@ -323,7 +331,7 @@ namespace Sunny.Subd.Core.Facebook
             }
             for (int i = 1; i <= 10; i++)
             {
-                SetStatus($"[{i}/{10}] Đang làm", 2);
+                SetStatus($"[{i}/10] Đang khởi động ứng dụng...", 2);
                 _client.AppStart(FacebookHander.Package(_platform), true, true, true);
                 if (_client.ElementWithAttributes($"//*[@text=\"{_platform} keeps stopping\"]", 5, click: false))
                 {
@@ -376,12 +384,14 @@ namespace Sunny.Subd.Core.Facebook
         // Kết nối thiết bị
         private async Task<bool> ConnectDeviceAsync()
         {
+            _sate = "Kết nối thiết bị";
             return _client.Connect();
         }
 
         // Chuẩn bị thiết bị
         private async Task PrepareDeviceAsync()
         {
+            _sate = "Chuẩn bị ứng dụng";
             var check = _settingGeneral.GetBooleanValue("checkBox12", false);
             if (!check)
             {
@@ -402,19 +412,20 @@ namespace Sunny.Subd.Core.Facebook
                 };
                             break;
                         }
-                    case PlatformModel.Instagram:
+                    case "Instagram":
                         {
                             packages.Add(FacebookHander.Package(_platform));
                             break;
                         }
                 }
 
+                SetStatus("Đang xóa cache ứng dụng cũ...", 2);
                 foreach (var package in packages)
                 {
                     _client.AppClear(package);
                 }
 
-
+                SetStatus("Đang cấp quyền ứng dụng...", 2);
                 _client.GrantAppPermissions(FacebookHander.Package(_platform));
             }
             if (!await OpenFacebookAsync()) throw new Exception($"Không thể mở {_platform}.");
@@ -424,6 +435,7 @@ namespace Sunny.Subd.Core.Facebook
         // Kiểm tra trạng thái tài khoản
         private async Task<bool> HandleInitialLogin()
         {
+            _sate = "Đăng nhập Gmail";
             switch (_typeRegister)
             {
                 case RegistrationType.Gmail_BaitPhoneNumber:
@@ -469,7 +481,9 @@ namespace Sunny.Subd.Core.Facebook
             switch (subdyExtension.SubdyEnum)
             {
                 case SubdyEnum.Stop:
-                    _account.Status = "Đã dừng lại.";
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Đã dừng lại."
+                        : "Đã dừng: " + subdyExtension.Message;
                     break;
                 case SubdyEnum.Error:
                     _account.Status = "Lỗi: " + subdyExtension.Message;
@@ -532,8 +546,10 @@ namespace Sunny.Subd.Core.Facebook
 
                 if (IsReboot()) continue;
 
+                _sate = "Kết nối thiết bị";
                 if (!await ConnectAndPrepareDeviceAsync(false)) continue;
 
+                _sate = "Tạo tài khoản mới";
                 _account = GetAccount();
 
                 if (_account == null) continue;
@@ -542,11 +558,13 @@ namespace Sunny.Subd.Core.Facebook
                 try
                 {
 
+                    _sate = "Chuẩn bị thiết bị và proxy";
                     if (!await ConnectAndPrepareDeviceAsync(true)) continue;
 
+                    _sate = "Đăng nhập Gmail";
                     if (!await HandleInitialLogin()) continue;
 
-                    _sate = "Đăng kí tài khoản facebook.";
+                    _sate = "Đăng ký tài khoản Facebook mới";
                     var message = await ImportInfo();
                     if (message.SubdyEnum == SubdyEnum.Success)
                     {
@@ -558,6 +576,7 @@ namespace Sunny.Subd.Core.Facebook
                         }
                         
                     }
+                    _sate = "Lấy thông tin xác thực";
                     await ExtractAndUpdateAuthenticationInfoAsync();
 
                 }
@@ -921,7 +940,7 @@ namespace Sunny.Subd.Core.Facebook
                     await DelayMessageAsync(15, _account.Status, 2);
                     continue;
                 }
-                SetStatus($"Đang xử lý case [{currentCase}]...", 2);
+                SetStatus("Đang xử lý...", 2, logDetail: currentCase);
                 if (IsConfirmationCase(currentCase))
                 {
                     if (currentCase == $"//*[contains(@text, \"confirm your account\") and contains(@text, \"{_account.Phone?.Split("|")[0]}\")]")
@@ -1081,6 +1100,7 @@ namespace Sunny.Subd.Core.Facebook
         }
         private async Task<SubdyExtension> ImportInfo()
         {
+            _sate = "Nhập thông tin đăng ký";
             string currentCase = string.Empty;
             List<string> caseFacebooks = FacebookHander.Regsiner_Facebook();
             caseFacebooks.Remove("//*[@content-desc=\"I already have an account\"]");
@@ -1096,7 +1116,7 @@ namespace Sunny.Subd.Core.Facebook
                     continue;
                 }
 
-                SetStatus($"Đang xử lý case [{currentCase}]...", 2);
+                SetStatus("Đang xử lý...", 2, logDetail: currentCase);
 
                 if (IsConfirmationCase(currentCase))
                 {
@@ -1117,10 +1137,12 @@ namespace Sunny.Subd.Core.Facebook
                         return new SubdyExtension(SubdyEnum.EmailExist, "Đã có tài khoản thêm mail này rồi.");
                     case "//*[@text=\"Sign up with mobile number\"]":
                     case "//*[@text=\"What's your email?\"]":
+                        _sate = "Nhập email";
                         await HandleEmailInput();
                         break;
                     case "//*[@text=\"What is your mobile number?\"]":
                     case "//*[@text=\"Sign up with email\"]":
+                        _sate = "Nhập số điện thoại";
                         await HandlePhoneInput();
                         break;
                     case "//*[@text=\"Select your name\"]":
@@ -1130,6 +1152,7 @@ namespace Sunny.Subd.Core.Facebook
                     case var c when XpathManagerFacebook.Get(XpathType.Success).Contains(c):
                         return new SubdyExtension(SubdyEnum.Success, "Đăng ký thành công!");
                     case "//*[@text=\"I agree\"]":
+                        _sate = "Chờ xác nhận từ Facebook";
                         _client.ElementWithAttributes(currentCase, 5);
                         return await Agreement();
                     case var c when XpathManagerFacebook.Get(XpathType.NavigationButton).Contains(c):
@@ -1137,25 +1160,31 @@ namespace Sunny.Subd.Core.Facebook
                         _client.ElementWithAttributes(currentCase, 5);
                         break;
                     case "//*[@text=\"Enter the confirmation code\"]":
+                        _sate = "Nhập mã xác nhận";
                         await HandleConfirmationCode();
                         break;
                     case "//*[@text=\"First name\"]":
                     case "//*[@text=\"What's your name?\"]":
+                        _sate = "Nhập họ tên";
                         await HandleNameInput();
                         break;
                     case "//*[@text=\"When is your date of birth?\"]":
+                        _sate = "Chọn ngày sinh";
                         HandleDateOfBirth();
                         break;
                     case "//*[@text=\"SET\"]":
                     case "//*[@text=\"Set date\"]":
+                        _sate = "Chọn ngày sinh";
                         await HandleDatePicker();
                         break;
                     case "//*[@text=\"Male\"]":
                     case "//*[@text=\"Female\"]":
                     case "//*[@text=\"What is your gender?\"]":
+                        _sate = "Chọn giới tính";
                         HandleGenderSelection();
                         break;
                     case "//*[@text=\"Create a password\"]":
+                        _sate = "Tạo mật khẩu";
                         await HandlePasswordInput();
                         break;
                 }

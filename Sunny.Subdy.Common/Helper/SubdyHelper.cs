@@ -1,5 +1,6 @@
 ﻿using Sunny.Subdy.Common.API;
 using Sunny.Subdy.Common.Models;
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -115,7 +116,7 @@ namespace Sunny.Subdy.Common.Helper
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"UpdateItemCount error: {ex.Message}");
+                Debug.WriteLine($"UpdateItemCount error: {ex.Message}");
             }
         }
         public static string DecodeBase64(string base64String)
@@ -530,27 +531,7 @@ namespace Sunny.Subdy.Common.Helper
         }
         public static List<string> JobServiceByPlatform(string platform)
         {
-            var items = new List<string>();
-            switch (platform)
-            {
-                case PlatformModel.Instagram:
-                    items.AddRange(JobServices.TypesInstagram);
-                    break;
-                case PlatformModel.Facebook:
-                    {
-                        if (Globals.User.Role != "admin")
-                        {
-                            JobServices.TypesFacebook.Remove(JobServices.GoLike);
-                        }
-                        items.AddRange(JobServices.TypesFacebook);
-                        break;
-                    }
-
-                case PlatformModel.TikTok:
-                    items.AddRange(JobServices.TypesTikTok);
-                    break;
-            }
-            return items;
+            return JobServices.GetTypeJobByPlatformt(platform);
         }
         public static string ExtractFacebookPostIdFromUrl(string url)
         {

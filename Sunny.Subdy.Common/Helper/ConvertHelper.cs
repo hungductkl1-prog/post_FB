@@ -53,7 +53,7 @@ namespace Sunny.Subdy.Common.Helper
 
                         if (column != null)
                         {
-                            cellValue = Convert.ToString(row.Cells[column.Index].Value);
+                            cellValue = Convert.ToString(row.Cells[column.Index].Value) ?? "";
                         }
 
                         fields.Add(cellValue);
@@ -63,6 +63,7 @@ namespace Sunny.Subdy.Common.Helper
                 }
 
                 string result = string.Join("\n", lines);
+                if (string.IsNullOrEmpty(result)) { CommonMethod.ShowMessageWarning("Không có dữ liệu để copy."); return; }
                 Clipboard.SetText(result);
                 CommonMethod.ShowMessageSuccess($"Copy thành công {lines.Count} tài khoản.");
             }

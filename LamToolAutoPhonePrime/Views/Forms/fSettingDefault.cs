@@ -16,6 +16,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private string _platform = "";
         private System.Windows.Forms.Timer _txtLinesDebounceTimer;
         private string _label9BaseRaw = "";
+        private Sunny.Subdy.Common.Json.ConfigHelper _configHelper;
 
         public fSettingDefault(string platform)
         {
@@ -67,7 +68,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             cbb_ListTypeProxy.SelectedIndexChanged += cbb_ListTypeProxy_SelectedIndexChanged;
 
             // Defer heavier configuration load until form is shown to avoid blocking constructor/UI thread
-            new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fSettingDefault)}_{_platform}", onLoad: new System.Action(() =>
+            _configHelper = new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fSettingDefault)}_{_platform}", onLoad: new System.Action(() =>
             {
                 LoadForm();
                 cbb_ListTypeProxy_SelectedIndexChanged(null, null);
@@ -93,11 +94,11 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             if (string.IsNullOrEmpty(textBox2.Text.Trim()))
             {
-                textBox2.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup", "Device", _platform);
+                textBox2.Text = Path.Combine(AppContext.BaseDirectory, "Backup", "Device", _platform);
             }
             if (string.IsNullOrEmpty(textBox3.Text.Trim()))
             {
-                textBox3.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup", "Profile", _platform);
+                textBox3.Text = Path.Combine(AppContext.BaseDirectory, "Backup", "Profile", _platform);
             }
             if (string.IsNullOrEmpty(textBox4.Text.Trim()))
             {
@@ -246,6 +247,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
         private void button9_Click(object sender, EventArgs e)
         {
+            _configHelper.ControlClosing(null, EventArgs.Empty);
             this.Close();
         }
 

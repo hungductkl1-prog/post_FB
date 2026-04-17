@@ -25,14 +25,12 @@ namespace Sunny.Subdy.Common.Helper
 
             if (ptr == IntPtr.Zero)
             {
-                LogManager.Info($"Request failed: {method} {url} (null response)");
                 return null;
             }
 
             try
             {
                 string response = Marshal.PtrToStringUni(ptr);
-                LogManager.Info($"Response from {url}:\n{response}");
                 return response;
             }
             catch (Exception ex)

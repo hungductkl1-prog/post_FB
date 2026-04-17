@@ -15,6 +15,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private bool _add = true;
         private string _platform = string.Empty;
         string FormatFile = string.Empty;
+        private Sunny.Subdy.Common.Json.ConfigHelper _configHelper;
         public fAddAccount(string platform, bool add)
         {
             InitializeComponent();
@@ -23,7 +24,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             _folderContext = new FolderContext();
             LoadFormats();
             LoadCombobox();
-            new Sunny.Subdy.Common.Json.ConfigHelper(this, this.Name, onLoad: new System.Action(() =>
+            _configHelper = new Sunny.Subdy.Common.Json.ConfigHelper(this, this.Name, onLoad: new System.Action(() =>
             {
                 txtLines.Text = "";
 
@@ -52,21 +53,24 @@ namespace LamToolAutoPhonePrime.Views.Forms
         }
         private void LoadCombobox()
         {
+            const int SLOT_COUNT = 10;
             List<string> listField = Globals.GetFieldsToImportExport();
-            for (int i = 0; i < listField.Count - 1; i++)
+
+            cbxs.Clear();
+            flowLayoutPanel1.Controls.Clear();
+
+            for (int i = 0; i < SLOT_COUNT; i++)
             {
                 ComboBox cbx = new ComboBox();
                 cbx.DropDownStyle = ComboBoxStyle.DropDownList;
-                cbx.Width = 100;
+                cbx.Width = 108;
                 cbx.Items.AddRange(listField.ToArray());
-                if (i < listField.Count - 1)
-                {
-                    cbx.SelectedIndex = i + 1;
-                }
+                cbx.SelectedIndex = 0; // mặc định rỗng
                 cbx.SelectedValueChanged += cbx_SelectedIndexChanged;
                 cbxs.Add(cbx);
             }
 
+            // Slot đầu luôn là UID, không thể đổi
             cbxs[0].Items.Clear();
             cbxs[0].Items.Add(Fields.Uid);
             cbxs[0].SelectedIndex = 0;
@@ -86,38 +90,27 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     CommonMethod.ShowMessageWarning("Danh sách tài khoản không được để trống.");
                     return;
                 }
-                this.Invoke(new Action(async () =>
-                {
-                    txtLines.ReadOnly = true;
-                    button1.Enabled = false;
-                    button2.Enabled = false;
-                    button9.Enabled = false;
-                    select8.Enabled = false;
-                }));
-               
-                List<string> lines = new List<string>();
-                lines = txtLines.Lines.Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
+                txtLines.ReadOnly = true;
+                button1.Enabled = false;
+                button2.Enabled = false;
+                button9.Enabled = false;
+                select8.Enabled = false;
+
+                List<string> lines = txtLines.Lines.Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
                 if (_add)
                 {
-                    this.Invoke(new Action(async () =>
-                    {
-                        await AddAccounts(lines);
-                    }));
-
+                    await AddAccounts(lines);
                 }
                 else
                 {
                     await UpdateAccounts(lines);
-
                 }
-                this.Invoke(new Action(async () =>
-                {
-                    txtLines.ReadOnly = false;
-                    button1.Enabled = true;
-                    button2.Enabled = true;
-                    button9.Enabled = true;
-                    select8.Enabled = true;
-                }));
+
+                txtLines.ReadOnly = false;
+                button1.Enabled = true;
+                button2.Enabled = true;
+                button9.Enabled = true;
+                select8.Enabled = true;
               
             }
             catch (Exception ex)
@@ -192,6 +185,12 @@ namespace LamToolAutoPhonePrime.Views.Forms
                         case Fields.Username:
                             account.UserName = value;
                             break;
+                        case Fields.UserAgent:
+                            account.UserAgent = value;
+                            break;
+                        case Fields.PassMailRecover:
+                            account.PassPrivateEmailAddress = value;
+                            break;
                     }
                 }
                 if (!string.IsNullOrEmpty(account.Uid))
@@ -209,6 +208,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
                         if (!string.IsNullOrEmpty(account.PassMail)) accountNew.PassMail = account.PassMail;
                         if (!string.IsNullOrEmpty(account.UserAgent)) accountNew.UserAgent = account.UserAgent;
                         if (!string.IsNullOrEmpty(account.UserName)) accountNew.UserName = account.UserName;
+                        if (!string.IsNullOrEmpty(account.PassPrivateEmailAddress)) accountNew.PassPrivateEmailAddress = account.PassPrivateEmailAddress;
                         accounts.Add(accountNew);
                     }
                 }
@@ -294,6 +294,12 @@ namespace LamToolAutoPhonePrime.Views.Forms
                         case Fields.Username:
                             account.UserName = value;
                             break;
+                        case Fields.UserAgent:
+                            account.UserAgent = value;
+                            break;
+                        case Fields.PassMailRecover:
+                            account.PassPrivateEmailAddress = value;
+                            break;
                     }
                 }
                 if (!string.IsNullOrEmpty(account.Uid) || !string.IsNullOrEmpty(account.Email))
@@ -352,7 +358,98 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void txtLines_TextChanged_1(object sender, EventArgs e)
         {
             label3.Text = $"Danh sách tài khoản ({txtLines.Lines.Count()}):";
+            AutoDetectFields();
+        }
 
+        private void AutoDetectFields()
+        {
+            var firstLine = txtLines.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
+            if (string.IsNullOrEmpty(firstLine)) return;
+
+            string[] parts = firstLine.Split('|');
+            if (parts.Length < 2) return;
+
+            var detected = new string[parts.Length];
+            var used = new HashSet<string>();
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string val = parts[i].Trim();
+                detected[i] = DetectField(val, i, detected);
+                used.Add(detected[i]);
+            }
+
+            // Sau Email thì PassMail (nếu Email đã detect và cột kế chưa detect rõ)
+            for (int i = 0; i < detected.Length - 1; i++)
+            {
+                if (detected[i] == Fields.Email && string.IsNullOrEmpty(detected[i + 1]))
+                {
+                    detected[i + 1] = Fields.PassMail;
+                }
+                if (detected[i] == Fields.Uid && string.IsNullOrEmpty(detected[i + 1]))
+                {
+                    detected[i + 1] = Fields.Password;
+                }
+            }
+
+            // Cột cuối cùng chưa detect: nếu có dạng proxy thì gán Proxy
+            for (int i = 0; i < detected.Length; i++)
+            {
+                if (string.IsNullOrEmpty(detected[i]))
+                {
+                    string val = parts[i].Trim();
+                    if (IsProxy(val)) detected[i] = Fields.Proxy;
+                }
+            }
+
+            // Áp dụng lên combobox (bỏ qua cbxs[0] vì luôn là UID)
+            for (int i = 1; i < cbxs.Count && i < detected.Length; i++)
+            {
+                if (!string.IsNullOrEmpty(detected[i]))
+                {
+                    var item = cbxs[i].Items.Cast<string>().FirstOrDefault(x => x == detected[i]);
+                    if (item != null)
+                        cbxs[i].SelectedItem = item;
+                }
+            }
+        }
+
+        private string DetectField(string val, int index, string[] alreadyDetected)
+        {
+            if (index == 0) return Fields.Uid;
+
+            if (val.StartsWith("EAA", StringComparison.OrdinalIgnoreCase))
+                return Fields.Token;
+
+            if (val.Contains("@") && val.Contains("."))
+                return Fields.Email;
+
+            if (val.Length > 20 && val.Contains("=") && val.Contains(";"))
+                return Fields.Cookie;
+
+            if (IsProxy(val))
+                return Fields.Proxy;
+
+            // Chuỗi toàn số dài >= 6: UID
+            if (val.All(char.IsDigit) && val.Length >= 6)
+                return Fields.Uid;
+
+            // Mozilla user agent
+            if (val.StartsWith("Mozilla/", StringComparison.OrdinalIgnoreCase))
+                return Fields.UserAgent;
+
+            return string.Empty;
+        }
+
+        private bool IsProxy(string val)
+        {
+            // Dạng: ip:port hoặc ip:port:user:pass hoặc http://...
+            if (val.StartsWith("http://") || val.StartsWith("socks5://") || val.StartsWith("socks4://"))
+                return true;
+            var proxyParts = val.Split(':');
+            if (proxyParts.Length >= 2 && int.TryParse(proxyParts[1].Split('@').Last(), out _))
+                return true;
+            return false;
         }
         private void uiSymbolButton2_Click(object sender, EventArgs e)
         {

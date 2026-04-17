@@ -14,6 +14,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
     public partial class fSettingRegsiner : AntdUI.Window
     {
         private string _platform = "";
+        private Sunny.Subdy.Common.Json.ConfigHelper _configHelper;
         public fSettingRegsiner(string platform)
         {
             InitializeComponent();
@@ -53,7 +54,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             checkBox6.CheckedChanged += checkBox9_CheckedChanged;
             checkBox8.CheckedChanged += checkBox9_CheckedChanged;
 
-            new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fSettingRegsiner)}_{_platform}", onLoad: new System.Action(() =>
+            _configHelper = new Sunny.Subdy.Common.Json.ConfigHelper(this, $"{nameof(fSettingRegsiner)}_{_platform}", onLoad: new System.Action(() =>
             {
                 LoadForm();
                 cbb_ListTypeProxy_SelectedIndexChanged(null, null);
@@ -72,11 +73,11 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             if (string.IsNullOrEmpty(textBox2.Text.Trim()))
             {
-                textBox2.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup", "Device", _platform);
+                textBox2.Text = Path.Combine(AppContext.BaseDirectory, "Backup", "Device", _platform);
             }
             if (string.IsNullOrEmpty(textBox3.Text.Trim()))
             {
-                textBox3.Text = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Backup", "Profile", _platform);
+                textBox3.Text = Path.Combine(AppContext.BaseDirectory, "Backup", "Profile", _platform);
             }
             if (string.IsNullOrEmpty(textBox4.Text.Trim()))
             {

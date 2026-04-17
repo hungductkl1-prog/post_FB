@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System.Text.Json.Nodes;
 
 namespace Sunny.Subd.Core.Phone
 {
@@ -19,9 +19,9 @@ namespace Sunny.Subd.Core.Phone
                 error = json.Trim();
                 try
                 {
-                    JObject jObject = JObject.Parse(json);
-                    phoneNumber = jObject["data"]?["phone_number"]?.ToString();
-                    session = jObject["data"]?["session"]?.ToString();
+                    JsonObject jObject = JsonNode.Parse(json)!.AsObject();
+                    phoneNumber = jObject["data"]?["phone_number"]?.GetValue<string>();
+                    session = jObject["data"]?["session"]?.GetValue<string>();
                 }
                 catch
                 {
@@ -53,8 +53,8 @@ namespace Sunny.Subd.Core.Phone
                 error = json.Trim();
                 try
                 {
-                    JObject jObject = JObject.Parse(json);
-                    otp = jObject["data"]?["messages"]?[0]?["otp"]?.ToString();
+                    JsonObject jObject = JsonNode.Parse(json)!.AsObject();
+                    otp = jObject["data"]?["messages"]?[0]?["otp"]?.GetValue<string>();
 
                 }
                 catch

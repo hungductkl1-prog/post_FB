@@ -1,6 +1,8 @@
-﻿using System.Drawing;
+using System.Diagnostics.CodeAnalysis;
+using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
+using LamToolAutoPhonePrime.Utils;
 
 namespace Sunny.Subdy.UI.View.Pages
 {
@@ -31,54 +33,44 @@ namespace Sunny.Subdy.UI.View.Pages
         /// <summary>
         /// Required method for Designer support - do not modify
         /// the contents of this method with the code editor.
-        /// Improved visual style and smoothness for DataGridView and panels.
         /// </summary>
         private void InitializeComponent()
         {
             DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
-            button3 = new AntdUI.Button();
             button2 = new AntdUI.Button();
             button53 = new AntdUI.Button();
             panel6 = new AntdUI.Panel();
+            cboFilter = new AntdUI.Select();
             button1 = new AntdUI.Button();
             input1 = new AntdUI.Input();
             panel1 = new AntdUI.Panel();
-            dataGridView1 = new DataGridView();
+            dataGridView1 = new DoubleBufferedDataGridView();
+            dataGridViewCheckBoxColumn1 = new DataGridViewCheckBoxColumn();
+            dataGridViewTextBoxColumn1 = new DataGridViewTextBoxColumn();
             panel5 = new AntdUI.Panel();
             toolStrip2 = new ToolStrip();
             toolStripLabel7 = new ToolStripLabel();
             toolStripLabel8 = new ToolStripLabel();
+            toolStripLabelOnline = new ToolStripLabel();
+            toolStripLabelOnlineCount = new ToolStripLabel();
             toolStripLabel9 = new ToolStripLabel();
             toolStripLabel10 = new ToolStripLabel();
             toolStripLabel11 = new ToolStripLabel();
             toolStripLabel12 = new ToolStripLabel();
-            dataGridViewCheckBoxColumn1 = new DataGridViewCheckBoxColumn();
-            dataGridViewTextBoxColumn1 = new DataGridViewTextBoxColumn();
+            panelRight = new AntdUI.Panel();
+            splitContainer1 = new SplitContainer();
             panel6.SuspendLayout();
             panel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
             panel5.SuspendLayout();
             toolStrip2.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
+            splitContainer1.Panel1.SuspendLayout();
+            splitContainer1.Panel2.SuspendLayout();
+            splitContainer1.SuspendLayout();
             SuspendLayout();
-            // 
-            // button3
-            // 
-            button3.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            button3.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            button3.IconRatio = 0.8F;
-            button3.IconSvg = "XFilled";
-            button3.Location = new System.Drawing.Point(915, 23);
-            button3.Name = "button3";
-            button3.Shape = AntdUI.TShape.Round;
-            button3.Size = new Size(137, 39);
-            button3.TabIndex = 13;
-            button3.Text = "Đóng";
-            button3.Type = AntdUI.TTypeMini.Error;
-            button3.Visible = false;
             // 
             // button2
             // 
@@ -87,7 +79,7 @@ namespace Sunny.Subdy.UI.View.Pages
             button2.IconRatio = 1.2F;
             button2.IconSvg = "CaretRightFilled";
             button2.IconToggleAnimation = 400;
-            button2.Location = new System.Drawing.Point(772, 23);
+            button2.Location = new Point(914, 22);
             button2.Name = "button2";
             button2.Shape = AntdUI.TShape.Round;
             button2.Size = new Size(137, 39);
@@ -100,24 +92,24 @@ namespace Sunny.Subdy.UI.View.Pages
             // 
             button53.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button53.IconSvg = "ReloadOutlined";
-            button53.Location = new System.Drawing.Point(267, 22);
+            button53.Location = new Point(267, 22);
             button53.Name = "button53";
             button53.Shape = AntdUI.TShape.Round;
             button53.Size = new Size(137, 39);
             button53.TabIndex = 11;
-            button53.Text = "Load Devices";
+            button53.Text = "Tải thiết bị";
             button53.Type = AntdUI.TTypeMini.Success;
             // 
             // panel6
             // 
             panel6.BackColor = Color.Transparent;
             panel6.Controls.Add(button2);
-            panel6.Controls.Add(button3);
+            panel6.Controls.Add(cboFilter);
             panel6.Controls.Add(button1);
             panel6.Controls.Add(input1);
             panel6.Controls.Add(button53);
             panel6.Dock = DockStyle.Top;
-            panel6.Location = new System.Drawing.Point(24, 24);
+            panel6.Location = new Point(24, 24);
             panel6.Margin = new Padding(10, 3, 3, 3);
             panel6.Name = "panel6";
             panel6.padding = new Padding(10);
@@ -127,23 +119,32 @@ namespace Sunny.Subdy.UI.View.Pages
             panel6.TabIndex = 9;
             panel6.Text = "panel6";
             // 
+            // cboFilter
+            // 
+            cboFilter.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            cboFilter.Location = new Point(560, 22);
+            cboFilter.Name = "cboFilter";
+            cboFilter.PlaceholderText = "Lọc thiết bị";
+            cboFilter.Size = new Size(180, 40);
+            cboFilter.TabIndex = 14;
+            // 
             // button1
             // 
             button1.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             button1.IconSvg = "StopOutlined";
-            button1.Location = new System.Drawing.Point(410, 23);
+            button1.Location = new Point(410, 23);
             button1.Name = "button1";
             button1.Shape = AntdUI.TShape.Round;
             button1.Size = new Size(137, 39);
             button1.TabIndex = 13;
-            button1.Text = "Kill ADB";
+            button1.Text = "Dừng ADB";
             button1.Type = AntdUI.TTypeMini.Error;
             // 
             // input1
             // 
             input1.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
             input1.LocalizationPlaceholderText = "Overview.{id}";
-            input1.Location = new System.Drawing.Point(20, 22);
+            input1.Location = new Point(20, 22);
             input1.Name = "input1";
             input1.Padding = new Padding(0, 2, 0, 2);
             input1.PlaceholderText = "Tìm kiếm";
@@ -156,13 +157,13 @@ namespace Sunny.Subdy.UI.View.Pages
             panel1.Controls.Add(dataGridView1);
             panel1.Controls.Add(panel5);
             panel1.Dock = DockStyle.Fill;
-            panel1.Location = new System.Drawing.Point(24, 112);
+            panel1.Location = new Point(0, 0);
             panel1.Margin = new Padding(10, 3, 3, 3);
             panel1.Name = "panel1";
             panel1.padding = new Padding(10);
             panel1.Padding = new Padding(20, 30, 20, 10);
             panel1.Radius = 12;
-            panel1.Size = new Size(1082, 519);
+            panel1.Size = new Size(978, 519);
             panel1.TabIndex = 10;
             panel1.Text = "panel1";
             // 
@@ -193,89 +194,23 @@ namespace Sunny.Subdy.UI.View.Pages
             dataGridView1.EditMode = DataGridViewEditMode.EditOnEnter;
             dataGridView1.EnableHeadersVisualStyles = false;
             dataGridView1.GridColor = Color.FromArgb(230, 230, 230);
-            dataGridView1.Location = new System.Drawing.Point(14, 86);
+            dataGridView1.Location = new Point(20, 30);
             dataGridView1.Name = "dataGridView1";
             dataGridView1.RightToLeft = RightToLeft.No;
-            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle5.BackColor = Color.White;
-            dataGridViewCellStyle5.Font = new Font("Segoe UI", 9F);
-            dataGridViewCellStyle5.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle5.SelectionBackColor = Color.FromArgb(0, 120, 215);
-            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.True;
-            dataGridView1.RowHeadersDefaultCellStyle = dataGridViewCellStyle5;
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle3.BackColor = Color.White;
+            dataGridViewCellStyle3.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle3.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle3.SelectionBackColor = Color.FromArgb(0, 120, 215);
+            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.True;
+            dataGridView1.RowHeadersDefaultCellStyle = dataGridViewCellStyle3;
             dataGridView1.RowHeadersVisible = false;
             dataGridView1.RowTemplate.DefaultCellStyle.Padding = new Padding(8, 6, 8, 6);
             dataGridView1.RowTemplate.Height = 36;
             dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dataGridView1.Size = new Size(800, 215);
+            dataGridView1.Size = new Size(938, 442);
             dataGridView1.TabIndex = 12;
-            // 
-            // panel5
-            // 
-            panel5.BackColor = Color.Transparent;
-            panel5.Controls.Add(toolStrip2);
-            panel5.Dock = DockStyle.Bottom;
-            panel5.Location = new System.Drawing.Point(20, 467);
-            panel5.Margin = new Padding(10, 3, 3, 3);
-            panel5.Name = "panel5";
-            panel5.padding = new Padding(10);
-            panel5.Padding = new Padding(10);
-            panel5.Radius = 12;
-            panel5.Size = new Size(1042, 42);
-            panel5.TabIndex = 9;
-            panel5.Text = "panel5";
-            // 
-            // toolStrip2
-            // 
-            toolStrip2.BackColor = Color.White;
-            toolStrip2.Dock = DockStyle.Bottom;
-            toolStrip2.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip2.Items.AddRange(new ToolStripItem[] { toolStripLabel7, toolStripLabel8, toolStripLabel9, toolStripLabel10, toolStripLabel11, toolStripLabel12 });
-            toolStrip2.Location = new System.Drawing.Point(10, 7);
-            toolStrip2.Name = "toolStrip2";
-            toolStrip2.Size = new Size(1022, 25);
-            toolStrip2.TabIndex = 9;
-            toolStrip2.Text = "toolStrip2";
-            // 
-            // toolStripLabel7
-            // 
-            toolStripLabel7.Name = "toolStripLabel7";
-            toolStripLabel7.Size = new Size(41, 22);
-            toolStripLabel7.Text = "Tất cả:";
-            // 
-            // toolStripLabel8
-            // 
-            toolStripLabel8.ForeColor = Color.Blue;
-            toolStripLabel8.Name = "toolStripLabel8";
-            toolStripLabel8.Size = new Size(19, 22);
-            toolStripLabel8.Text = "32";
-            // 
-            // toolStripLabel9
-            // 
-            toolStripLabel9.Name = "toolStripLabel9";
-            toolStripLabel9.Size = new Size(54, 22);
-            toolStripLabel9.Text = "Đã chọn:";
-            // 
-            // toolStripLabel10
-            // 
-            toolStripLabel10.ForeColor = Color.Green;
-            toolStripLabel10.Name = "toolStripLabel10";
-            toolStripLabel10.Size = new Size(19, 22);
-            toolStripLabel10.Text = "10";
-            // 
-            // toolStripLabel11
-            // 
-            toolStripLabel11.Name = "toolStripLabel11";
-            toolStripLabel11.Size = new Size(50, 22);
-            toolStripLabel11.Text = "Bôi đen:";
-            // 
-            // toolStripLabel12
-            // 
-            toolStripLabel12.ForeColor = Color.Green;
-            toolStripLabel12.Name = "toolStripLabel12";
-            toolStripLabel12.Size = new Size(19, 22);
-            toolStripLabel12.Text = "10";
             // 
             // dataGridViewCheckBoxColumn1
             // 
@@ -294,10 +229,121 @@ namespace Sunny.Subdy.UI.View.Pages
             dataGridViewTextBoxColumn1.ReadOnly = true;
             dataGridViewTextBoxColumn1.Width = 60;
             // 
+            // panel5
+            // 
+            panel5.BackColor = Color.Transparent;
+            panel5.Controls.Add(toolStrip2);
+            panel5.Dock = DockStyle.Bottom;
+            panel5.Location = new Point(20, 472);
+            panel5.Margin = new Padding(10, 3, 3, 3);
+            panel5.Name = "panel5";
+            panel5.padding = new Padding(10);
+            panel5.Padding = new Padding(10);
+            panel5.Radius = 12;
+            panel5.Size = new Size(938, 37);
+            panel5.TabIndex = 9;
+            panel5.Text = "panel5";
+            // 
+            // toolStrip2
+            // 
+            toolStrip2.BackColor = Color.White;
+            toolStrip2.Dock = DockStyle.Bottom;
+            toolStrip2.GripStyle = ToolStripGripStyle.Hidden;
+            toolStrip2.Items.AddRange(new ToolStripItem[] { toolStripLabel7, toolStripLabel8, toolStripLabelOnline, toolStripLabelOnlineCount, toolStripLabel9, toolStripLabel10, toolStripLabel11, toolStripLabel12 });
+            toolStrip2.Location = new Point(10, 2);
+            toolStrip2.Name = "toolStrip2";
+            toolStrip2.Size = new Size(918, 25);
+            toolStrip2.TabIndex = 9;
+            toolStrip2.Text = "toolStrip2";
+            // 
+            // toolStripLabel7
+            // 
+            toolStripLabel7.Name = "toolStripLabel7";
+            toolStripLabel7.Size = new Size(41, 22);
+            toolStripLabel7.Text = "Tất cả:";
+            // 
+            // toolStripLabel8
+            // 
+            toolStripLabel8.ForeColor = Color.Blue;
+            toolStripLabel8.Name = "toolStripLabel8";
+            toolStripLabel8.Size = new Size(13, 22);
+            toolStripLabel8.Text = "0";
+            // 
+            // toolStripLabelOnline
+            // 
+            toolStripLabelOnline.Name = "toolStripLabelOnline";
+            toolStripLabelOnline.Size = new Size(47, 22);
+            toolStripLabelOnline.Text = "Kết nối:";
+            // 
+            // toolStripLabelOnlineCount
+            // 
+            toolStripLabelOnlineCount.ForeColor = Color.Green;
+            toolStripLabelOnlineCount.Name = "toolStripLabelOnlineCount";
+            toolStripLabelOnlineCount.Size = new Size(13, 22);
+            toolStripLabelOnlineCount.Text = "0";
+            // 
+            // toolStripLabel9
+            // 
+            toolStripLabel9.Name = "toolStripLabel9";
+            toolStripLabel9.Size = new Size(54, 22);
+            toolStripLabel9.Text = "Đã chọn:";
+            // 
+            // toolStripLabel10
+            // 
+            toolStripLabel10.ForeColor = Color.Green;
+            toolStripLabel10.Name = "toolStripLabel10";
+            toolStripLabel10.Size = new Size(13, 22);
+            toolStripLabel10.Text = "0";
+            // 
+            // toolStripLabel11
+            // 
+            toolStripLabel11.Name = "toolStripLabel11";
+            toolStripLabel11.Size = new Size(50, 22);
+            toolStripLabel11.Text = "Bôi đen:";
+            // 
+            // toolStripLabel12
+            // 
+            toolStripLabel12.ForeColor = Color.Green;
+            toolStripLabel12.Name = "toolStripLabel12";
+            toolStripLabel12.Size = new Size(13, 22);
+            toolStripLabel12.Text = "0";
+            // 
+            // panelRight
+            // 
+            panelRight.BackColor = Color.Transparent;
+            panelRight.Dock = DockStyle.Fill;
+            panelRight.Location = new Point(0, 0);
+            panelRight.Name = "panelRight";
+            panelRight.padding = new Padding(10);
+            panelRight.Padding = new Padding(10);
+            panelRight.Radius = 12;
+            panelRight.Size = new Size(98, 519);
+            panelRight.TabIndex = 16;
+            panelRight.Text = "panelRight";
+            // 
+            // splitContainer1
+            // 
+            splitContainer1.Dock = DockStyle.Fill;
+            splitContainer1.FixedPanel = FixedPanel.Panel2;
+            splitContainer1.Location = new Point(24, 112);
+            splitContainer1.Name = "splitContainer1";
+            // 
+            // splitContainer1.Panel1
+            // 
+            splitContainer1.Panel1.Controls.Add(panel1);
+            // 
+            // splitContainer1.Panel2
+            // 
+            splitContainer1.Panel2.Controls.Add(panelRight);
+            splitContainer1.Size = new Size(1082, 519);
+            splitContainer1.SplitterDistance = 978;
+            splitContainer1.SplitterWidth = 6;
+            splitContainer1.TabIndex = 15;
+            // 
             // ucManagerDevices
             // 
             BackColor = Color.FromArgb(236, 240, 241);
-            Controls.Add(panel1);
+            Controls.Add(splitContainer1);
             Controls.Add(panel6);
             Margin = new Padding(5, 3, 3, 3);
             Name = "ucManagerDevices";
@@ -310,6 +356,10 @@ namespace Sunny.Subdy.UI.View.Pages
             panel5.PerformLayout();
             toolStrip2.ResumeLayout(false);
             toolStrip2.PerformLayout();
+            splitContainer1.Panel1.ResumeLayout(false);
+            splitContainer1.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
+            splitContainer1.ResumeLayout(false);
             ResumeLayout(false);
         }
 
@@ -318,41 +368,44 @@ namespace Sunny.Subdy.UI.View.Pages
         /// Uses reflection to set the protected DoubleBuffered property.
         /// </summary>
         /// <param name="dgv">Target DataGridView</param>
-        private void MakeDoubleBuffered(DataGridView dgv)
+        // MakeDoubleBuffered không còn cần thiết — DoubleBufferedDataGridView đã bật sẵn qua subclass
+        [DynamicDependency("DoubleBuffered", typeof(DataGridView))]
+        private static void MakeDoubleBuffered(DataGridView dgv)
         {
+            // DoubleBufferedDataGridView tự bật DoubleBuffered trong constructor.
+            // Method này giữ lại cho tương thích nếu có nơi nào khác gọi.
+            if (dgv is DoubleBufferedDataGridView) return;
             try
             {
                 var prop = typeof(DataGridView).GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (prop != null)
-                {
-                    prop.SetValue(dgv, true, null);
-                }
+                prop?.SetValue(dgv, true, null);
             }
-            catch
-            {
-                // If reflection fails, ignore — it's an optimization only.
-            }
+            catch { }
         }
 
         #endregion
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn7;
-        private AntdUI.Button button53;
         private AntdUI.Panel panel6;
         private AntdUI.Button button1;
         private AntdUI.Input input1;
         private AntdUI.Panel panel1;
-        public DataGridView dataGridView1;
+        public DoubleBufferedDataGridView dataGridView1;
         private AntdUI.Panel panel5;
         private ToolStrip toolStrip2;
         private ToolStripLabel toolStripLabel7;
         private ToolStripLabel toolStripLabel8;
+        private ToolStripLabel toolStripLabelOnline;
+        private ToolStripLabel toolStripLabelOnlineCount;
         private ToolStripLabel toolStripLabel9;
         private ToolStripLabel toolStripLabel10;
         private ToolStripLabel toolStripLabel11;
         private ToolStripLabel toolStripLabel12;
-        public AntdUI.Button button3;
         public AntdUI.Button button2;
         private DataGridViewCheckBoxColumn dataGridViewCheckBoxColumn1;
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn1;
+        private AntdUI.Button button53;
+        private AntdUI.Select cboFilter;
+        private AntdUI.Panel panelRight;
+        public SplitContainer splitContainer1;
     }
 }

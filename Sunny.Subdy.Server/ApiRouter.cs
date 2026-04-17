@@ -8,7 +8,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Sunny.Subdy.Common.Logs;
 
 namespace Sunny.Subdy.Server

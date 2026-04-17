@@ -1,4 +1,6 @@
-﻿using DeviceId;
+﻿using AntdUI;
+using AutoAndroid;
+using DeviceId;
 using LamToolAutoPhonePrime.Utils;
 using LamToolAutoPhonePrime.Views;
 using LamToolAutoPhonePrime.Views.Forms;
@@ -27,36 +29,112 @@ namespace LamToolAutoPhonePrime
         [STAThread]
         static void Main()
         {
-            FontUtil.LoadCustomFonts();
+            // MUST be first: re-enable WinForms data binding before any WinForms type is loaded
+            // Binding.cctor reads this switch once; if set after first access it's too late.
+            AppContext.SetSwitch("System.Windows.Forms.Binding.IsSupported", true);
 
-            // Perform VCpp check/install on startup but keep Main synchronous.
-            // The helper will run download/install synchronously (streaming) and restart if needed.
+            // Kiểm tra môi trường trước khi khởi động
             try
             {
-                CheckAndInstallVCpp();
+                if (!IsEnvironmentReady())
+                {
+                    RunLTPhoneHelper();
+                    RestartApp();
+                    return;
+                }
             }
             catch (Exception ex)
             {
-                // Non-fatal: log and continue. If install fails, user can run manually.
-                Trace.TraceError("VCpp check/install failed: " + ex);
+                Trace.TraceError("Environment check failed: " + ex);
             }
+
+            // Kiểm tra VCpp trước khi load font (chỉ mất thời gian nếu cần cài)
+          
+
+            Localization.Provider = new VietnameseLocalization();
 
             ComWrappers.RegisterForMarshalling(WinFormsComInterop.WinFormsComWrappers.Instance);
             ApplicationConfiguration.Initialize();
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+
+            // Wire up SortableBindingList to auto-unregister items from ThrottledPropertyNotifier
+            // on removal, preventing stale PropertyChanged events from crashing DataGridView.
+            SortableBindingList<DeviceModel>.OnBeforeRemove = ThrottledPropertyNotifier.Unregister;
+            SortableBindingList<Account>.OnBeforeRemove = ThrottledPropertyNotifier.Unregister;
+            SortableBindingList<JobHistory>.OnBeforeRemove = ThrottledPropertyNotifier.Unregister;
+
+            // Load font sau khi init WinForms để tránh lỗi GDI+
+            FontUtil.LoadCustomFonts();
             Globals.DeviceId = new DeviceIdBuilder()
                    .OnWindows(windows => windows.AddWindowsDeviceId())
                    .ToString();
-
-            using (var login = new fLogin())
+            using (var frm = new fLogin())
             {
-                if (login.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+               frm.ShowDialog(); 
+            }
+            Application.Run(new fMain());
+        }
+
+        public static bool IsEnvironmentReady()
+        {
+          
+            // Kiểm tra ADB tồn tại ở đường dẫn cố định
+            if (!File.Exists(Path.Combine(ProcessHelper.ADBPath, "adb.exe")))
+                return false;
+            // Kiểm tra Node
+            if (!IsCommandAvailable("node --version"))
+                return false;
+            return true;
+        }
+
+        private static bool IsCommandAvailable(string command)
+        {
+            try
+            {
+                string[] parts = command.Split(' ', 2);
+                var psi = new ProcessStartInfo
                 {
-                    Environment.Exit(0);
-                }
+                    FileName = parts[0],
+                    Arguments = parts.Length > 1 ? parts[1] : "",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                };
+                using var p = Process.Start(psi);
+                if (p == null) return false;
+                p.WaitForExit(5000);
+                return p.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static void RunLTPhoneHelper()
+        {
+            string helperPath = Path.Combine(
+                AppContext.BaseDirectory, "LTPhoneHelper.exe");
+
+            if (!File.Exists(helperPath))
+            {
+                MessageBox.Show(
+                    "Môi trường chưa được cài đặt.\nVui lòng chạy LTPhoneHelper.exe để thiết lập.",
+                    "Thiếu môi trường",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
             }
 
-            Application.Run(new fMain());
+            var psi = new ProcessStartInfo
+            {
+                FileName = helperPath,
+                UseShellExecute = true,
+                Verb = "runas",
+            };
+            using var p = Process.Start(psi);
+            p?.WaitForExit(10 * 60 * 1000); // tối đa 10 phút
         }
 
         public static bool IsVCppInstalled(string arch)
@@ -202,6 +280,46 @@ namespace LamToolAutoPhonePrime
             }
             catch
             {
+            }
+        }
+
+        private const string StartupRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+        private static string StartupAppName => Application.ProductName ?? "LamToolAutoPhonePrime";
+
+        public static bool IsStartupEnabled()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, false);
+                return key?.GetValue(StartupAppName) != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static void SetStartup(bool enable)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryKey, true);
+                if (key == null) return;
+
+                if (enable)
+                {
+                    string exePath = Process.GetCurrentProcess().MainModule?.FileName
+                        ?? Environment.GetCommandLineArgs()[0];
+                    key.SetValue(StartupAppName, $"\"{exePath}\"");
+                }
+                else
+                {
+                    key.DeleteValue(StartupAppName, throwOnMissingValue: false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("SetStartup failed: " + ex);
             }
         }
     }

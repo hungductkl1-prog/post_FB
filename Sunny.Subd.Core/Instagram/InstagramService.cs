@@ -1,4 +1,4 @@
-﻿using AutoAndroid;
+using AutoAndroid;
 using Sunny.Subd.Core.Facebook;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Services;
@@ -30,7 +30,7 @@ namespace Sunny.Subd.Core.Instagram
                 throw new SubdyExtension(SubdyEnum.Stop, "Bạn đã dừng thực hiện việc thao tác.");
             }
         }
-        private void SetStatus(string status, int color)
+        private void SetStatus(string status, int color, string logDetail = null)
         {
             if (!string.IsNullOrEmpty(_sate))
             {
@@ -46,6 +46,10 @@ namespace Sunny.Subd.Core.Instagram
             {
                 _client.Device.Status = status;
                 _client.Device.TypeColor = color;
+            }
+            if (!string.IsNullOrEmpty(logDetail) && _client != null)
+            {
+                _client.LogHelper.SUCCESS(logDetail);
             }
         }
         public async Task<SubdyExtension> Login(ADBClient client, Account account, CancellationToken ct, int timeout, MainService main)
@@ -64,14 +68,14 @@ namespace Sunny.Subd.Core.Instagram
                 while (true)
                 {
                     CheckStop(timeout);
-                    SetStatus($"Đang đăng nhập.", 2);
+                    SetStatus("Đang tìm cửa sổ đăng nhập...", 2);
                     _case = client.FindElement("", FacebookHander.GetActiAccountInstagram(), 120);
                     if (string.IsNullOrEmpty(_case))
                     {
                         client.AppStart(FacebookHander.Package(PlatformModel.Facebook), true, true, true);
                         continue;
                     }
-                    SetStatus($"Xử lý case [{_case}]...", 2);
+                    SetStatus("Đang xử lý...", 2, logDetail: $"[InstagramService.Login] case={_case}");
                     switch (_case)
                     {
                         case var c when XpathManagerInstagram.Get(XpathType.Loading).Contains(c): continue;
@@ -127,20 +131,22 @@ namespace Sunny.Subd.Core.Instagram
         }
         private async Task ImportUid()
         {
+            _sate = "Nhập tài khoản";
             _client.ElementWithAttributes(new List<string> { "//*[@class='android.widget.EditText']", "//*[@content-desc=\"Log into another account\"]" });
             string uid = _account.Uid_Email;
             var elements = _client.FindElements(10, "", "//*[@class='android.widget.EditText']");
             if (!elements.Any() || elements.Count != 2) return;
-            SetStatus($"Đang nhập {uid}...", 2);
+            SetStatus("Đang nhập tên đăng nhập...", 2);
             _client.SendTextADB("//*[@class='android.widget.EditText']", uid, xml: elements[0].OuterXml);
-            SetStatus($"Đang nhập {_account.Password}...", 2);
+            SetStatus("Đang nhập mật khẩu...", 2);
             _client.SendTextADB("//*[@class='android.widget.EditText']", _account.Password, xml: elements[1].OuterXml);
             _client.ElementWithAttributes("//*[@content-desc=\"Log in\"]", 10);
             return;
         }
         private async Task ImportPassword()
         {
-            SetStatus($"Đang nhập {_account.Password}...", 2);
+            _sate = "Nhập mật khẩu";
+            SetStatus("Đang nhập mật khẩu...", 2);
             _client.SendTextSlow("//*[@class='android.widget.EditText']", _account.Password);
             _client.ElementWithAttributes(XpathManagerFacebook.Get(XpathType.NavigationButton));
             return;
@@ -152,7 +158,8 @@ namespace Sunny.Subd.Core.Instagram
                 SetStatus("Không có mã 2FA để nhập.", 2);
                 throw new SubdyExtension(SubdyEnum.LogOut, "Tài khoản không có 2fa...");
             }
-            SetStatus($"Đang nhập 2FA {_account.TowFA}...", 2);
+            _sate = "Xác thực 2 bước";
+            SetStatus("Đang nhập mã xác thực...", 2);
 
             string element = _client.FindElement("", new List<string> { "//*[contains(@text, \"Check your notifications on another device\")]", "//*[@content-desc=\"Go to your authentication app\"]" }, 10);
             if (element == "//*[contains(@text, \"Check your notifications on another device\")]")
@@ -185,7 +192,7 @@ namespace Sunny.Subd.Core.Instagram
                     message = $"Không tìm thấy case phù hợp...";
                     return new SubdyExtension(subyEnum, message);
                 }
-                SetStatus($"Xử lý case [{_case}]...", 2);
+                SetStatus("Đang kiểm tra...", 2, logDetail: $"[InstagramService.HanderAccount] case={_case}");
                 switch (_case)
                 {
                     case var c when XpathManagerInstagram.Get(XpathType.Loading).Contains(c): continue;
@@ -250,20 +257,21 @@ namespace Sunny.Subd.Core.Instagram
                 "//*[@resource-id=\"com.instagram.android:id/full_name\"]",
             };
                 xpaths.AddRange(XpathManagerInstagram.Combine(XpathType.CP956, XpathType.CP282, XpathType.Loading, XpathType.NavigationButton));
-                client.AppStart(FacebookHander.Package(PlatformModel.Instagram));
+                SetStatus("Đang khởi động Instagram...", 2);
+                client.AppStart(FacebookHander.Package("Instagram"));
                 client.Delay(5);
                 Stopwatch.Restart();
                 string _case = string.Empty;
                 while (Stopwatch.ElapsedMilliseconds < 120000)
                 {
-                    _sate = $"{_account.Uid} - get info";
+                    _sate = $"Lấy thông tin tài khoản {_account.Uid}";
                     _case = client.FindElement("", xpaths, 120);
                     if (string.IsNullOrEmpty(_case))
                     {
                         client.AppStart(FacebookHander.Package(PlatformModel.Facebook), true, true, true);
                         continue;
                     }
-                    SetStatus($"Xử lý case [{_case}]...", 2);
+                    SetStatus("Đang đọc thông tin...", 2, logDetail: $"[InstagramService.GetInfo] case={_case}");
                     switch (_case)
                     {
                         case "//*[@resource-id=\"com.instagram.android:id/profile_tab\"]":
@@ -339,13 +347,13 @@ namespace Sunny.Subd.Core.Instagram
                                             var match = Regex.Match(nodesFullname[i].OuterXml, "text=\"(.*?)\"");
                                             if (match.Success)
                                             {
-                                                Console.WriteLine("Text là: " + match.Groups[1].Value);
+                                                Debug.WriteLine("Text là: " + match.Groups[1].Value);
                                             }
                                             XmlDocument doc = new XmlDocument();
                                             doc.LoadXml(nodesFullname[i].InnerXml);
                                             XmlNode node = doc.DocumentElement;
                                             string text = node.Attributes["text"]?.Value;
-                                            Console.WriteLine("Text là: " + text);
+                                            Debug.WriteLine("Text là: " + text);
                                         }
                                         catch
                                         {
@@ -398,30 +406,32 @@ namespace Sunny.Subd.Core.Instagram
                 "//*[@content-desc=\"Profile\"]",
             };
             xpaths.AddRange(XpathManagerInstagram.Combine(XpathType.CP956, XpathType.CP282, XpathType.Loading, XpathType.NavigationButton));
-            client.AppStart(FacebookHander.Package(PlatformModel.Instagram));
+            client.AppStart(FacebookHander.Package("Instagram"));
             client.Delay(5);
             Stopwatch.Restart();
             string _case = string.Empty;
             while (Stopwatch.ElapsedMilliseconds < 60000)
             {
-                _sate = $"{_account.Uid} - update info";
+                _sate = $"Cập nhật thông tin tài khoản {_account.Uid}";
                 _case = client.FindElement("", FacebookHander.GetActiAccountFacebook(), 120);
                 if (string.IsNullOrEmpty(_case))
                 {
                     client.AppStart(FacebookHander.Package(PlatformModel.Facebook), true, true, true);
                     continue;
                 }
-                SetStatus($"Xử lý case [{_case}]...", 2);
+                SetStatus("Đang xử lý...", 2, logDetail: $"[InstagramService.UpateInfo] case={_case}");
                 switch (_case)
                 {
                     case "//*[@resource-id=\"com.instagram.android:id/profile_tab\"]":
                     case "//*[@content-desc=\"Profile\"]":
                         {
                             client.ElementWithAttributes(_case);
+                            SetStatus("Đang mở trang chỉnh sửa...", 2);
                             client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"Edit profile\"]", "//*[@text=\"Edit profile\"]" }, 15);
                             if (!string.IsNullOrEmpty(fullename))
                             {
-                                _sate = $"{_account.Uid} - tên ";
+                                _sate = $"Đổi tên hiển thị cho {_account.Uid}";
+                                SetStatus("Đang cập nhật tên hiển thị...", 2);
                                 client.ElementWithAttributes("//*[@resource-id=\"com.instagram.android:id/full_name\"]");
                                 client.Delay(2);
                                 client.SendTextSlow("//*[@class=\"android.widget.EditText\"]", fullename, timeout: 15);
@@ -432,7 +442,8 @@ namespace Sunny.Subd.Core.Instagram
                             }
                             if (!string.IsNullOrEmpty(username))
                             {
-                                _sate = $"{_account.Uid} - username ";
+                                _sate = $"Đổi username cho {_account.Uid}";
+                                SetStatus("Đang cập nhật username...", 2);
                                 client.ElementWithAttributes("//*[@resource-id=\"com.instagram.android:id/username\"]");
                                 client.Delay(2);
                                 client.SendTextSlow("//*[@class=\"android.widget.EditText\"]", username, timeout: 15);
@@ -443,7 +454,8 @@ namespace Sunny.Subd.Core.Instagram
                             }
                             if (!string.IsNullOrEmpty(bio))
                             {
-                                _sate = $"{_account.Uid} - bio ";
+                                _sate = $"Cập nhật bio cho {_account.Uid}";
+                                SetStatus("Đang cập nhật bio...", 2);
                                 client.ElementWithAttributes("//*[@resource-id=\"com.instagram.android:id/bio\"]");
                                 client.Delay(2);
                                 client.SendTextSlow("//*[@class=\"android.widget.EditText\"]", bio, timeout: 15);

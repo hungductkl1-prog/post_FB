@@ -1,5 +1,5 @@
-﻿using System.Text.RegularExpressions;
-using Newtonsoft.Json.Linq;
+﻿using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Sunny.Subdy.Common.Logs;
 
 namespace Sunny.Subd.Core.Email
@@ -17,9 +17,9 @@ namespace Sunny.Subd.Core.Email
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
                 var contentData = await response.Content.ReadAsStringAsync();
-                var data = JObject.Parse(contentData);
-                string token = Convert.ToString(data["token"]);
-                string mail = Convert.ToString(data["email"]);
+                var data = JsonNode.Parse(contentData)!.AsObject();
+                string token = data["token"]?.GetValue<string>();
+                string mail = data["email"]?.GetValue<string>();
                 if (data != null && !string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(mail))
                 {
                     return mail;
@@ -43,16 +43,16 @@ namespace Sunny.Subd.Core.Email
                 response.EnsureSuccessStatusCode();
                 string content = await response.Content.ReadAsStringAsync();
 
-                var dataV2 = JArray.Parse(content); // Sử dụng JArray thay vì JObject
-                string firstId = dataV2.Last?["id"]?.ToString(); // Lấy id của phần tử đầu tiên
+                var dataV2 = JsonNode.Parse(content)!.AsArray(); // Sử dụng JsonArray thay vì JObject
+                string firstId = dataV2.LastOrDefault()?["id"]?.GetValue<string>(); // Lấy id của phần tử đầu tiên
                 if (dataV2 != null && !string.IsNullOrEmpty(firstId))
                 {
                     request = new HttpRequestMessage(HttpMethod.Get, $"https://api.internal.temp-mail.io/api/v3/message/{firstId}");
                     response = await client.SendAsync(request);
                     response.EnsureSuccessStatusCode();
                     content = await response.Content.ReadAsStringAsync();
-                    var data = JObject.Parse(content);
-                    string textContent = data["body_text"]?.ToString();
+                    var data = JsonNode.Parse(content)!.AsObject();
+                    string textContent = data["body_text"]?.GetValue<string>();
                     string cleanedText = Regex.Replace(textContent, @"[^\d\s]", "");
                     string pattern = @"\b\d{4,8}(?!\S)";
                     MatchCollection matches = Regex.Matches(cleanedText, pattern);

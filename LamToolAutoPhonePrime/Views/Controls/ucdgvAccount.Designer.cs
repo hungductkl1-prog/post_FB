@@ -2,6 +2,7 @@
 using LamToolAutoPhonePrime.Utils;
 using System.Reflection;
 using System.Windows.Forms;
+using LamToolAutoPhonePrime.Utils;
 
 namespace LamToolAutoPhonePrime.Views.Controls
 {
@@ -18,9 +19,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
         /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing)
             {
-                components.Dispose();
+                _countsTimer?.Stop();
+                _countsTimer?.Dispose();
+                _countsTimer = null;
+                components?.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -33,25 +37,23 @@ namespace LamToolAutoPhonePrime.Views.Controls
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             tableLayoutPanel1 = new TableLayoutPanel();
-            panel3 = new AntdUI.Panel();
-            button6 = new System.Windows.Forms.Button();
-            button5 = new System.Windows.Forms.Button();
             panel2 = new AntdUI.Panel();
             select1 = new Select();
             button3 = new System.Windows.Forms.Button();
             button2 = new System.Windows.Forms.Button();
             button1 = new System.Windows.Forms.Button();
             label2 = new System.Windows.Forms.Label();
-            panel1 = new AntdUI.Panel();
-            select4 = new Select();
-            button4 = new System.Windows.Forms.Button();
-            label1 = new System.Windows.Forms.Label();
+            panel3 = new AntdUI.Panel();
+            cboFilterAccount = new AntdUI.SelectMultiple();
+            button4 = new AntdUI.Button();
+            button6 = new AntdUI.Button();
+            button5 = new AntdUI.Button();
             panel4 = new AntdUI.Panel();
             input6 = new Input();
             button16 = new AntdUI.Button();
@@ -59,7 +61,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button8 = new AntdUI.Button();
             button7 = new AntdUI.Button();
             panel5 = new AntdUI.Panel();
-            dataGridView1 = new DataGridView();
+            dataGridView1 = new DoubleBufferedDataGridView();
             dataGridViewCheckBoxColumn1 = new DataGridViewCheckBoxColumn();
             dataGridViewTextBoxColumn1 = new DataGridViewTextBoxColumn();
             toolStrip1 = new ToolStrip();
@@ -105,9 +107,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button11 = new AntdUI.Button();
             button12 = new AntdUI.Button();
             tableLayoutPanel1.SuspendLayout();
-            panel3.SuspendLayout();
             panel2.SuspendLayout();
-            panel1.SuspendLayout();
+            panel3.SuspendLayout();
             panel4.SuspendLayout();
             panel5.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
@@ -119,13 +120,11 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // 
             // tableLayoutPanel1
             // 
-            tableLayoutPanel1.ColumnCount = 3;
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33333F));
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3333321F));
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33334F));
-            tableLayoutPanel1.Controls.Add(panel3, 2, 0);
-            tableLayoutPanel1.Controls.Add(panel2, 1, 0);
-            tableLayoutPanel1.Controls.Add(panel1, 0, 0);
+            tableLayoutPanel1.ColumnCount = 2;
+            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 55F));
+            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45F));
+            tableLayoutPanel1.Controls.Add(panel2, 0, 0);
+            tableLayoutPanel1.Controls.Add(panel3, 1, 0);
             tableLayoutPanel1.Dock = DockStyle.Top;
             tableLayoutPanel1.Location = new Point(24, 24);
             tableLayoutPanel1.Name = "tableLayoutPanel1";
@@ -133,62 +132,6 @@ namespace LamToolAutoPhonePrime.Views.Controls
             tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             tableLayoutPanel1.Size = new Size(828, 100);
             tableLayoutPanel1.TabIndex = 1;
-            // 
-            // panel3
-            // 
-            panel3.Back = Color.White;
-            panel3.BackColor = Color.Transparent;
-            panel3.Controls.Add(button6);
-            panel3.Controls.Add(button5);
-            panel3.Dock = DockStyle.Fill;
-            panel3.Location = new Point(553, 3);
-            panel3.Name = "panel3";
-            panel3.padding = new Padding(5);
-            panel3.Radius = 16;
-            panel3.Size = new Size(272, 94);
-            panel3.TabIndex = 2;
-            panel3.Text = "panel3";
-            // 
-            // button6
-            // 
-            button6.Anchor = AnchorStyles.Left;
-            button6.AutoSize = true;
-            button6.BackColor = Color.White;
-            button6.Cursor = Cursors.Hand;
-            button6.FlatAppearance.BorderSize = 0;
-            button6.FlatStyle = FlatStyle.Flat;
-            button6.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
-            button6.Image = Properties.Resources.icons8_requirements_16;
-            button6.ImageAlign = ContentAlignment.MiddleLeft;
-            button6.Location = new Point(23, 47);
-            button6.Name = "button6";
-            button6.Size = new Size(182, 28);
-            button6.TabIndex = 11;
-            button6.Text = "Cấu hình tương tác";
-            button6.TextAlign = ContentAlignment.MiddleLeft;
-            button6.TextImageRelation = TextImageRelation.ImageBeforeText;
-            button6.UseVisualStyleBackColor = false;
-            button6.Click += button6_Click;
-            // 
-            // button5
-            // 
-            button5.Anchor = AnchorStyles.Left;
-            button5.AutoSize = true;
-            button5.BackColor = Color.White;
-            button5.Cursor = Cursors.Hand;
-            button5.FlatAppearance.BorderSize = 0;
-            button5.FlatStyle = FlatStyle.Flat;
-            button5.Font = new Font("Segoe UI", 9F, FontStyle.Italic, GraphicsUnit.Point, 0);
-            button5.Image = Properties.Resources.icons8_setting_16_Defeault;
-            button5.ImageAlign = ContentAlignment.MiddleLeft;
-            button5.Location = new Point(23, 13);
-            button5.Name = "button5";
-            button5.Size = new Size(182, 28);
-            button5.TabIndex = 10;
-            button5.Text = "Cài đặt chung";
-            button5.TextImageRelation = TextImageRelation.ImageBeforeText;
-            button5.UseVisualStyleBackColor = false;
-            button5.Click += button5_Click;
             // 
             // panel2
             // 
@@ -200,11 +143,11 @@ namespace LamToolAutoPhonePrime.Views.Controls
             panel2.Controls.Add(button1);
             panel2.Controls.Add(label2);
             panel2.Dock = DockStyle.Fill;
-            panel2.Location = new Point(278, 3);
+            panel2.Location = new Point(3, 3);
             panel2.Name = "panel2";
             panel2.padding = new Padding(5);
             panel2.Radius = 16;
-            panel2.Size = new Size(269, 94);
+            panel2.Size = new Size(449, 94);
             panel2.TabIndex = 1;
             panel2.Text = "panel2";
             // 
@@ -218,7 +161,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             select1.Location = new Point(15, 37);
             select1.Name = "select1";
             select1.PlaceholderText = "";
-            select1.Size = new Size(168, 30);
+            select1.Size = new Size(348, 30);
             select1.TabIndex = 12;
             select1.SelectedIndexChanged += select1_SelectedIndexChanged;
             // 
@@ -231,7 +174,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button3.FlatAppearance.BorderSize = 0;
             button3.FlatStyle = FlatStyle.Flat;
             button3.Image = Properties.Resources.icons8_add_16;
-            button3.Location = new Point(183, 41);
+            button3.Location = new Point(363, 41);
             button3.Name = "button3";
             button3.Size = new Size(22, 23);
             button3.TabIndex = 9;
@@ -247,7 +190,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button2.FlatAppearance.BorderSize = 0;
             button2.FlatStyle = FlatStyle.Flat;
             button2.Image = Properties.Resources.icons8_rename_16;
-            button2.Location = new Point(210, 41);
+            button2.Location = new Point(390, 41);
             button2.Name = "button2";
             button2.Size = new Size(22, 23);
             button2.TabIndex = 8;
@@ -263,7 +206,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button1.FlatAppearance.BorderSize = 0;
             button1.FlatStyle = FlatStyle.Flat;
             button1.Image = Properties.Resources.icons8_remove_16;
-            button1.Location = new Point(235, 41);
+            button1.Location = new Point(415, 41);
             button1.Name = "button1";
             button1.Size = new Size(22, 23);
             button1.TabIndex = 7;
@@ -281,70 +224,79 @@ namespace LamToolAutoPhonePrime.Views.Controls
             label2.TabIndex = 1;
             label2.Text = "Quản lý nhóm";
             // 
-            // panel1
+            // panel3
             // 
-            panel1.Back = Color.White;
-            panel1.BackColor = Color.Transparent;
-            panel1.Controls.Add(select4);
-            panel1.Controls.Add(button4);
-            panel1.Controls.Add(label1);
-            panel1.Dock = DockStyle.Fill;
-            panel1.Location = new Point(3, 3);
-            panel1.Name = "panel1";
-            panel1.padding = new Padding(5);
-            panel1.Radius = 16;
-            panel1.Size = new Size(269, 94);
-            panel1.TabIndex = 0;
-            panel1.Text = "panel1";
-            // 
-            // select4
-            // 
-            select4.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-            select4.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            select4.ForeColor = Color.Black;
-            select4.List = true;
-            select4.LocalizationPlaceholderText = "Select.{id}";
-            select4.Location = new Point(20, 39);
-            select4.Name = "select4";
-            select4.PlaceholderText = "";
-            select4.Size = new Size(202, 30);
-            select4.TabIndex = 11;
-            select4.SelectedIndexChanged += select4_SelectedIndexChanged;
+            panel3.Back = Color.White;
+            panel3.BackColor = Color.Transparent;
+            panel3.Controls.Add(button4);
+            panel3.Controls.Add(button6);
+            panel3.Controls.Add(button5);
+            panel3.Dock = DockStyle.Fill;
+            panel3.Location = new Point(458, 3);
+            panel3.Name = "panel3";
+            panel3.padding = new Padding(15, 10, 15, 10);
+            panel3.Radius = 16;
+            panel3.Size = new Size(367, 94);
+            panel3.TabIndex = 2;
+            panel3.Text = "panel3";
             // 
             // button4
             // 
-            button4.Anchor = AnchorStyles.Right;
-            button4.AutoSize = true;
-            button4.BackColor = Color.White;
-            button4.Cursor = Cursors.Hand;
-            button4.FlatAppearance.BorderSize = 0;
-            button4.FlatStyle = FlatStyle.Flat;
-            button4.Image = Properties.Resources.icons8_Setting_16;
-            button4.Location = new Point(228, 41);
+            button4.Anchor = AnchorStyles.Left;
+            button4.BorderWidth = 1F;
+            button4.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            button4.ForeColor = Color.FromArgb(80, 80, 80);
+            button4.Ghost = true;
+            button4.IconRatio = 0.85F;
+            button4.IconSvg = "ToolOutlined";
+            button4.Location = new Point(15, 12);
             button4.Name = "button4";
-            button4.Size = new Size(22, 23);
-            button4.TabIndex = 5;
-            button4.UseVisualStyleBackColor = false;
+            button4.Radius = 8;
+            button4.Size = new Size(230, 34);
+            button4.TabIndex = 9;
+            button4.Text = "Cài đặt jobs";
             button4.Click += button4_Click;
             // 
-            // label1
+            // button6
             // 
-            label1.AutoSize = true;
-            label1.Font = new Font("Segoe UI", 8.25F, FontStyle.Italic, GraphicsUnit.Point, 0);
-            label1.ForeColor = Color.DarkGray;
-            label1.Location = new Point(20, 23);
-            label1.Name = "label1";
-            label1.Size = new Size(35, 13);
-            label1.TabIndex = 0;
-            label1.Text = "Server";
+            button6.Anchor = AnchorStyles.Left;
+            button6.BorderWidth = 1F;
+            button6.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            button6.ForeColor = Color.FromArgb(80, 80, 80);
+            button6.Ghost = true;
+            button6.IconRatio = 0.85F;
+            button6.IconSvg = "UnorderedListOutlined";
+            button6.Location = new Point(132, 52);
+            button6.Name = "button6";
+            button6.Radius = 8;
+            button6.Size = new Size(130, 34);
+            button6.TabIndex = 11;
+            button6.Text = "Tương tác";
+            button6.Click += button6_Click;
+            // 
+            // button5
+            // 
+            button5.Anchor = AnchorStyles.Left;
+            button5.BorderWidth = 1F;
+            button5.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            button5.ForeColor = Color.FromArgb(80, 80, 80);
+            button5.Ghost = true;
+            button5.IconRatio = 0.85F;
+            button5.IconSvg = "SettingOutlined";
+            button5.Location = new Point(15, 52);
+            button5.Name = "button5";
+            button5.Radius = 8;
+            button5.Size = new Size(115, 34);
+            button5.TabIndex = 10;
+            button5.Text = "Cài đặt chung";
+            button5.Click += button5_Click;
             // 
             // panel4
-            // 
+            //
             panel4.Back = Color.White;
             panel4.BackColor = Color.Transparent;
             panel4.Controls.Add(input6);
             panel4.Controls.Add(button16);
-            panel4.Controls.Add(button9);
             panel4.Controls.Add(button8);
             panel4.Controls.Add(button7);
             panel4.Dock = DockStyle.Top;
@@ -361,11 +313,11 @@ namespace LamToolAutoPhonePrime.Views.Controls
             input6.AllowClear = true;
             input6.Anchor = AnchorStyles.Right;
             input6.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            input6.Location = new Point(416, 20);
+            input6.Location = new Point(429, 20);
             input6.Name = "input6";
             input6.PlaceholderText = "Tìm kiếm...";
             input6.PrefixSvg = "SearchOutlined";
-            input6.Size = new Size(241, 40);
+            input6.Size = new Size(200, 40);
             input6.TabIndex = 2;
             input6.TextChanged += input6_TextChanged;
             // 
@@ -378,11 +330,11 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button16.IconHoverSvg = "";
             button16.IconRatio = 0.9F;
             button16.IconSvg = "PlusOutlined";
-            button16.Location = new Point(663, 20);
+            button16.Location = new Point(635, 20);
             button16.Name = "button16";
             button16.Radius = 10;
             button16.Shape = TShape.Round;
-            button16.Size = new Size(146, 40);
+            button16.Size = new Size(158, 40);
             button16.TabIndex = 6;
             button16.Text = "Thêm tài khoản";
             button16.Type = TTypeMini.Info;
@@ -390,57 +342,58 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // 
             // button9
             // 
-            button9.Anchor = AnchorStyles.Left;
+            button9.Anchor = AnchorStyles.Right;
             button9.DefaultBack = Color.DodgerBlue;
-            button9.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
+            button9.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             button9.ForeColor = Color.White;
             button9.IconHoverSvg = "";
             button9.IconRatio = 0.9F;
-            button9.IconSvg = "RedoOutlined";
-            button9.Location = new Point(239, 20);
+            button9.IconSvg = "ReloadOutlined";
+            button9.Location = new Point(222, 38);
             button9.Name = "button9";
             button9.Radius = 10;
             button9.Shape = TShape.Round;
-            button9.Size = new Size(102, 40);
+            button9.Size = new Size(90, 30);
             button9.TabIndex = 5;
-            button9.Text = "Reload";
+            button9.Text = "Tải lại";
             button9.Type = TTypeMini.Primary;
             button9.Click += button9_Click;
             // 
             // button8
             // 
             button8.Anchor = AnchorStyles.Left;
-            button8.DefaultBack = Color.Red;
+            button8.DefaultBack = Color.FromArgb(220, 53, 69);
             button8.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
             button8.ForeColor = Color.White;
             button8.IconHoverSvg = "";
-            button8.IconSvg = "XFilled";
-            button8.Location = new Point(131, 20);
+            button8.IconSvg = "PauseCircleOutlined";
+            button8.Location = new Point(15, 20);
             button8.Name = "button8";
             button8.Radius = 10;
             button8.Shape = TShape.Round;
-            button8.Size = new Size(102, 40);
+            button8.Size = new Size(110, 40);
             button8.TabIndex = 4;
-            button8.Text = "Stop";
+            button8.Text = "Dừng";
             button8.Type = TTypeMini.Error;
+            button8.Visible = false;
             button8.Click += button8_Click;
             // 
             // button7
             // 
             button7.Anchor = AnchorStyles.Left;
-            button7.DefaultBack = Color.Green;
+            button7.DefaultBack = Color.FromArgb(40, 167, 69);
             button7.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button7.ForeColor = Color.White;
             button7.IconHoverSvg = "";
-            button7.IconRatio = 1.1F;
-            button7.IconSvg = "CaretRightFilled";
-            button7.Location = new Point(23, 20);
+            button7.IconRatio = 1F;
+            button7.IconSvg = "PlayCircleOutlined";
+            button7.Location = new Point(15, 20);
             button7.Name = "button7";
             button7.Radius = 10;
             button7.Shape = TShape.Round;
-            button7.Size = new Size(102, 40);
+            button7.Size = new Size(110, 40);
             button7.TabIndex = 3;
-            button7.Text = "Start";
+            button7.Text = "Chạy";
             button7.Type = TTypeMini.Success;
             button7.Click += button7_Click;
             // 
@@ -469,22 +422,22 @@ namespace LamToolAutoPhonePrime.Views.Controls
             dataGridView1.AllowUserToAddRows = false;
             dataGridView1.AllowUserToDeleteRows = false;
             dataGridView1.AllowUserToResizeRows = false;
-            dataGridViewCellStyle6.BackColor = Color.FromArgb(250, 250, 250);
-            dataGridView1.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle6;
+            dataGridViewCellStyle1.BackColor = Color.FromArgb(250, 250, 250);
+            dataGridView1.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             dataGridView1.BackgroundColor = Color.White;
             dataGridView1.BorderStyle = BorderStyle.None;
             dataGridView1.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
             dataGridView1.ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText;
             dataGridView1.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
-            dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle7.BackColor = Color.WhiteSmoke;
-            dataGridViewCellStyle7.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            dataGridViewCellStyle7.ForeColor = Color.DimGray;
-            dataGridViewCellStyle7.SelectionBackColor = Color.WhiteSmoke;
-            dataGridViewCellStyle7.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle7.WrapMode = DataGridViewTriState.True;
-            dataGridView1.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle7;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle2.BackColor = Color.WhiteSmoke;
+            dataGridViewCellStyle2.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            dataGridViewCellStyle2.ForeColor = Color.DimGray;
+            dataGridViewCellStyle2.SelectionBackColor = Color.WhiteSmoke;
+            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.True;
+            dataGridView1.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
             dataGridView1.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dataGridView1.Columns.AddRange(new DataGridViewColumn[] { dataGridViewCheckBoxColumn1, dataGridViewTextBoxColumn1 });
             dataGridView1.Dock = DockStyle.Fill;
@@ -494,14 +447,14 @@ namespace LamToolAutoPhonePrime.Views.Controls
             dataGridView1.Location = new Point(14, 86);
             dataGridView1.Name = "dataGridView1";
             dataGridView1.RightToLeft = RightToLeft.No;
-            dataGridViewCellStyle10.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle10.BackColor = Color.White;
-            dataGridViewCellStyle10.Font = new Font("Segoe UI", 9F);
-            dataGridViewCellStyle10.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle10.SelectionBackColor = Color.FromArgb(0, 120, 215);
-            dataGridViewCellStyle10.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle10.WrapMode = DataGridViewTriState.True;
-            dataGridView1.RowHeadersDefaultCellStyle = dataGridViewCellStyle10;
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle5.BackColor = Color.White;
+            dataGridViewCellStyle5.Font = new Font("Segoe UI", 9F);
+            dataGridViewCellStyle5.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle5.SelectionBackColor = Color.FromArgb(0, 120, 215);
+            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.True;
+            dataGridView1.RowHeadersDefaultCellStyle = dataGridViewCellStyle5;
             dataGridView1.RowHeadersVisible = false;
             dataGridView1.RowTemplate.DefaultCellStyle.Padding = new Padding(8, 6, 8, 6);
             dataGridView1.RowTemplate.Height = 36;
@@ -514,10 +467,10 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // 
             dataGridViewCheckBoxColumn1.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             dataGridViewCheckBoxColumn1.DataPropertyName = "Checked";
-            dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle8.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
-            dataGridViewCellStyle8.NullValue = false;
-            dataGridViewCheckBoxColumn1.DefaultCellStyle = dataGridViewCellStyle8;
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle3.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
+            dataGridViewCellStyle3.NullValue = false;
+            dataGridViewCheckBoxColumn1.DefaultCellStyle = dataGridViewCellStyle3;
             dataGridViewCheckBoxColumn1.FillWeight = 43.8844223F;
             dataGridViewCheckBoxColumn1.FlatStyle = FlatStyle.System;
             dataGridViewCheckBoxColumn1.HeaderText = "Chọn";
@@ -529,8 +482,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // dataGridViewTextBoxColumn1
             // 
             dataGridViewTextBoxColumn1.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            dataGridViewCellStyle9.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
-            dataGridViewTextBoxColumn1.DefaultCellStyle = dataGridViewCellStyle9;
+            dataGridViewCellStyle4.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
+            dataGridViewTextBoxColumn1.DefaultCellStyle = dataGridViewCellStyle4;
             dataGridViewTextBoxColumn1.FillWeight = 60F;
             dataGridViewTextBoxColumn1.HeaderText = "#";
             dataGridViewTextBoxColumn1.MinimumWidth = 60;
@@ -828,7 +781,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // 
             // panel7
             // 
-            panel7.Controls.Add(select2);
+            panel7.Controls.Add(cboFilterAccount);
+            panel7.Controls.Add(button9);
             panel7.Controls.Add(button17);
             panel7.Dock = DockStyle.Right;
             panel7.Location = new Point(449, 0);
@@ -837,23 +791,26 @@ namespace LamToolAutoPhonePrime.Views.Controls
             panel7.Size = new Size(341, 76);
             panel7.TabIndex = 7;
             panel7.Text = "panel7";
-            // 
-            // select2
-            // 
-            select2.Anchor = AnchorStyles.Right;
-            select2.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            select2.ForeColor = Color.Black;
-            select2.List = true;
-            select2.LocalizationPlaceholderText = "Select.{id}";
-            select2.Location = new Point(92, 38);
-            select2.Name = "select2";
-            select2.PlaceholderText = "";
-            select2.Size = new Size(223, 30);
-            select2.TabIndex = 13;
-            select2.SelectedIndexChanged += select2_SelectedIndexChanged;
-            // 
-            // button17
-            // 
+            //
+            // cboFilterAccount
+            //
+            cboFilterAccount.Anchor = AnchorStyles.Right;
+            cboFilterAccount.CheckMode = true;
+            cboFilterAccount.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            cboFilterAccount.Location = new Point(10, 38);
+            cboFilterAccount.Name = "cboFilterAccount";
+            cboFilterAccount.PlaceholderText = "Lọc tài khoản";
+            cboFilterAccount.Size = new Size(150, 30);
+            cboFilterAccount.TabIndex = 13;
+            //
+            // button9 (Tải lại)
+            //
+            button9.Anchor = AnchorStyles.Right;
+            button9.Location = new Point(166, 38);
+            button9.Size = new Size(100, 30);
+            //
+            // button17 (Hiển thị)
+            //
             button17.Anchor = AnchorStyles.Right;
             button17.AutoSize = true;
             button17.BackColor = Color.White;
@@ -985,12 +942,9 @@ namespace LamToolAutoPhonePrime.Views.Controls
             Size = new Size(876, 560);
             Load += ucdgvAccount_Load;
             tableLayoutPanel1.ResumeLayout(false);
-            panel3.ResumeLayout(false);
-            panel3.PerformLayout();
             panel2.ResumeLayout(false);
             panel2.PerformLayout();
-            panel1.ResumeLayout(false);
-            panel1.PerformLayout();
+            panel3.ResumeLayout(false);
             panel4.ResumeLayout(false);
             panel5.ResumeLayout(false);
             panel5.PerformLayout();
@@ -1008,17 +962,15 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         #endregion
         private TableLayoutPanel tableLayoutPanel1;
-        private AntdUI.Panel panel1;
         private AntdUI.Panel panel3;
         private AntdUI.Panel panel2;
-        private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.Button button4;
         private System.Windows.Forms.Button button3;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Button button1;
         private System.Windows.Forms.Label label2;
-        private System.Windows.Forms.Button button5;
-        private System.Windows.Forms.Button button6;
+        private AntdUI.Button button4;
+        private AntdUI.Button button5;
+        private AntdUI.Button button6;
         private AntdUI.Panel panel4;
         private AntdUI.Button button7;
         private AntdUI.Button button8;
@@ -1047,13 +999,13 @@ namespace LamToolAutoPhonePrime.Views.Controls
         private ToolStripLabel toolStripLabel4;
         private ToolStripLabel toolStripLabel5;
         private ToolStripLabel toolStripLabel6;
-        public DataGridView dataGridView1;
+        public DoubleBufferedDataGridView dataGridView1;
         private ToolStripLabel toolStripLabel13;
         private ToolStripLabel toolStripLabel14;
         private System.Windows.Forms.Button button17;
         private AntdUI.Select select1;
-        private AntdUI.Select select4;
         private AntdUI.Select select2;
+        private AntdUI.SelectMultiple cboFilterAccount;
         private ToolStripLabel toolStripLabel1;
         private ToolStripLabel toolStripLabel2;
         private ToolStripLabel toolStripLabel15;

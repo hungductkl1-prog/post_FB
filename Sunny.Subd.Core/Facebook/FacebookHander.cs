@@ -1,8 +1,9 @@
-﻿using System.Net;
+﻿using System.Diagnostics;
+using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AutoAndroid;
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 using OtpNet;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Utils;
@@ -12,6 +13,7 @@ namespace Sunny.Subd.Core.Facebook
 {
     public class FacebookHander
     {
+        public const string DOWNLOAD_FACEBOOK = "https://www.facebook.com/download/direct/fb4a/";
         public static List<string> TypeLogin = new List<string>
         {
             "Uid|Password",
@@ -19,7 +21,7 @@ namespace Sunny.Subd.Core.Facebook
         };
         public static string FilePath(string platform)
         {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "App", $"{platform}.apk");
+            return Path.Combine(AppContext.BaseDirectory, "App", $"{platform}.apk");
         }
         public static string Package(string platform)
         {
@@ -29,7 +31,7 @@ namespace Sunny.Subd.Core.Facebook
                     return "com.facebook.katana";
                 case "messenger":
                     return "com.facebook.orca";
-                case PlatformModel.Instagram:
+                case "Instagram":
                     return "com.instagram.android";
                 default:
                     throw new ArgumentException("Unsupported platform: " + platform);
@@ -150,7 +152,7 @@ namespace Sunny.Subd.Core.Facebook
                             string jsonCookies = Regex.Match(catData, @"session_cookies_string.*?(\[.*?\])").Groups[1].Value;
 
                             // Parse JSON
-                            JArray cookies = JArray.Parse(jsonCookies);
+                            JsonArray cookies = JsonNode.Parse(jsonCookies)!.AsArray();
 
                             // Duyệt qua cookies và chọn các trường cần thiết
                             string cookieString = "";
@@ -247,12 +249,12 @@ namespace Sunny.Subd.Core.Facebook
         {
             var s = client.Shell("content delete --uri content://media/external/images/media");
             client.Shell(" mkdir -p /sdcard/LT");
-             client.Delay(2);
+            client.Delay(2);
 
             string fileName = System.IO.Path.GetFileName(imagePath);
             var p = client.Push(imagePath, $"/sdcard/LT/{fileName}");
 
-             client.Delay(1);
+            client.Delay(1);
             client.Shell($"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/LT/{fileName}");
         }
         public static void DeleteImage(ADBClient client, string imagePath)
@@ -262,10 +264,10 @@ namespace Sunny.Subd.Core.Facebook
             string remotePath = $"/sdcard/LT/{fileName}";
 
             // Xóa tệp từ đường dẫn
-             client.Shell($" rm {remotePath}");
+            client.Shell($" rm {remotePath}");
 
             // Gửi broadcast để cập nhật thư viện phương tiện
-             client.Shell($" am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://{remotePath}");
+            client.Shell($" am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://{remotePath}");
         }
         public static async Task<string> GetUrlByObjectId(string object_id)
         {
@@ -302,7 +304,7 @@ namespace Sunny.Subd.Core.Facebook
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Lỗi: {ex.Message}");
+                Debug.WriteLine($"Lỗi: {ex.Message}");
             }
             return "";
         }

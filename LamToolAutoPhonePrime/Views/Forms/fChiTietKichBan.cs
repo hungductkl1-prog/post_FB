@@ -29,6 +29,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             _scriptContext = new ScriptContext();
             _scriptActionContext = new ScriptActionContext();
             _script = _scriptContext.GetById(idScript);
+            if (_script == null) { this.Load += (s, e) => this.Close(); return; }
             textBox1.Text = _script.Name;
             bindingList = new SortableBindingList<ScriptAction>(_scriptAction);
             dataGridView1.MultiSelect = false;
@@ -45,9 +46,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             dataGridView1.DragOver += dataGridView1_DragOver;
             dataGridView1.DragDrop += dataGridView1_DragDrop;
             dataGridView1.KeyDown += dataGridView1_KeyDown;
-            typeof(DataGridView).InvokeMember("DoubleBuffered",
-    BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.SetProperty,
-    null, dataGridView1, new object[] { true });
+
             menulist = null;
             CreateMenuStrip();
             LoadColumnsDataGridView();
@@ -56,6 +55,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             FontUtil.ApplyFontToAllControls(this);
             LoadData();
         }
+
         private void CreateMenuStrip()
         {
             var items = new List<AntdUI.IContextMenuStripItem>
@@ -95,8 +95,17 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
         private void button5_Click(object sender, EventArgs e)
         {
-            fActions fActions = new fActions(_idScript.ToString());
-            fActions.ShowDialog();
+            this.Cursor = Cursors.WaitCursor;
+            try
+            {
+                fActions fActions = new fActions(_idScript.ToString());
+                this.Cursor = Cursors.Default;
+                fActions.ShowDialog();
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
             LoadData();
         }
 

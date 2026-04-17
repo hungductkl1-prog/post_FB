@@ -1,11 +1,12 @@
 ﻿using System.Drawing;
 using System.Drawing.Text;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace Sunny.Subdy.Common.Helper
 {
-    public class FontUtil
+    public partial class FontUtil
     {
         private static PrivateFontCollection _pfc = new PrivateFontCollection();
         private static FontFamily _fontRegular;
@@ -13,12 +14,12 @@ namespace Sunny.Subdy.Common.Helper
         private static FontFamily _fontLight;
         private static FontFamily _fontMedium;
         public static FontFamily _fontSemiBold;
-        [DllImport("gdi32.dll")]
-        private static extern IntPtr AddFontMemResourceEx(
+        [LibraryImport("gdi32")]
+        private static partial IntPtr AddFontMemResourceEx(
     IntPtr pbFont,
     uint cbFont,
     IntPtr pdv,
-    [In] ref uint pcFonts);
+    ref uint pcFonts);
         private static void AddFontFromResource(byte[] fontData)
         {
             IntPtr fontPtr = Marshal.AllocCoTaskMem(fontData.Length);
@@ -54,7 +55,26 @@ namespace Sunny.Subdy.Common.Helper
             }
 
         }
+        private static readonly PropertyInfo _doubleBufferedProp =
+            typeof(Control).GetProperty("DoubleBuffered", BindingFlags.NonPublic | BindingFlags.Instance);
+
         public static void ApplyFontToAllControls(Control parent)
+        {
+            parent.SuspendLayout();
+            try
+            {
+                // Bật double-buffering cho form cha để giảm nhấp nháy
+                _doubleBufferedProp?.SetValue(parent, true, null);
+                ApplyFontRecursive(parent);
+            }
+            finally
+            {
+                parent.ResumeLayout(false);
+                parent.PerformLayout();
+            }
+        }
+
+        private static void ApplyFontRecursive(Control parent)
         {
             foreach (Control ctrl in parent.Controls)
             {
@@ -68,8 +88,6 @@ namespace Sunny.Subdy.Common.Helper
                 }
                 ctrl.Font = new Font(newFamily, oldFont.Size, style);
 
-
-                // Nếu là MenuStrip hoặc ContextMenuStrip
                 if (ctrl is MenuStrip menuStrip)
                 {
                     foreach (ToolStripMenuItem item in menuStrip.Items)
@@ -81,7 +99,6 @@ namespace Sunny.Subdy.Common.Helper
                         ApplyFontToToolStripItem(item, newFamily);
                 }
 
-                // Nếu là DataGridView
                 if (ctrl is DataGridView dgv)
                 {
                     dgv.ColumnHeadersDefaultCellStyle.Font = new Font(newFamily, oldFont.Size, oldFont.Style);
@@ -89,9 +106,12 @@ namespace Sunny.Subdy.Common.Helper
                     dgv.RowHeadersDefaultCellStyle.Font = new Font(newFamily, oldFont.Size, oldFont.Style);
                 }
 
-                // Đệ quy xuống control con
                 if (ctrl.HasChildren)
-                    ApplyFontToAllControls(ctrl);
+                {
+                    ctrl.SuspendLayout();
+                    ApplyFontRecursive(ctrl);
+                    ctrl.ResumeLayout(false);
+                }
             }
         }
 

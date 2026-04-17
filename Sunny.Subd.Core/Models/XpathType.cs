@@ -4,6 +4,7 @@
     {
         Loading,
         Captcha,
+        No_Internet,
         CP282,
         CP956,
         Logout,

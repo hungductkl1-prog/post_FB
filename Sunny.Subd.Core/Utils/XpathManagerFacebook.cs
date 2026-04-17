@@ -1,5 +1,6 @@
 ﻿using Sunny.Subd.Core.Models;
 using System.Collections.Concurrent;
+using System.Text.Json.Nodes;
 
 namespace Sunny.Subd.Core.Utils
 {
@@ -12,8 +13,17 @@ namespace Sunny.Subd.Core.Utils
       {
           $"//*[contains(@text, \"Enter the characters you see\")]",
       });
+            _xpathGroups.TryAdd(XpathType.No_Internet, new List<string>
+      {
+          $"//*[@text=\"Page isn't available right now\"]",
+          $"//*[@text=\"Refresh\"]",
+      });
             _xpathGroups.TryAdd(XpathType.CP282, new List<string>
           {
+              "//*[@content-desc=\"Start security steps\"]",
+              "//*[@text=\"Start video selfie\"]",
+             "//*[@text=\"Your selfie will only be used to confirm your identity and to keep our community safe.\"]",
+              "//*[@text=\"It will be deleted within 30 days.\"]",
              "//*[@text=\"Type the text\"]",
              "//*[contains(@content-desc, \"confirm you're human to use your account\")]",
              $"//*[contains(@text, \"Record a video of yourself\")]",
@@ -77,6 +87,8 @@ namespace Sunny.Subd.Core.Utils
       });
             _xpathGroups.TryAdd(XpathType.NavigationButton, new List<string>
       {
+          "//*[@text=\"Dismiss\"]",
+         "//*[@text=\"I already have a profile\"]",
          "//*[@text=\"Use another profile\"]",
           "//*[@content-desc=\"I already have an account\"]",
           "//*[@text=\"Continue using English (US)\"]",
@@ -101,6 +113,7 @@ namespace Sunny.Subd.Core.Utils
           "//*[@content-desc=\"Continue in English (US)\"]",
           "//*[@content-desc=\"Continue\"]",
           "//*[@text=\"Continue\"]",
+          "//*[@text=\"Close app\"]",
       });
             _xpathGroups.TryAdd(XpathType.TowFA, new List<string>
       {
@@ -113,6 +126,7 @@ namespace Sunny.Subd.Core.Utils
             _xpathGroups.TryAdd(XpathType.CashApp, new List<string>
       {
           $"//*[contains(@text, \"Session Expired\")]",
+          "//*[@text=\"Facebook keeps stopping\"]",
       });
             _xpathGroups.TryAdd(XpathType.InputUserName, new List<string>
       {
@@ -223,6 +237,48 @@ namespace Sunny.Subd.Core.Utils
         public static void AddCustomGroup(XpathType key, List<string> xpaths)
         {
             _xpathGroups[key] = xpaths;
+        }
+
+        public static async Task LoadFromApiAsync(string apiUrl = "https://dev.subdy.net/api/case")
+        {
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                var json = await client.GetStringAsync(apiUrl);
+                var root = JsonNode.Parse(json);
+
+                if (root?["success"]?.GetValue<bool>() != true) return;
+
+                var dataArray = root["data"]?.AsArray();
+                if (dataArray == null) return;
+
+                foreach (var item in dataArray)
+                {
+                    var casename = item?["casename"]?.GetValue<string>();
+                    var listcase = item?["listcase"]?.AsArray();
+
+                    if (casename == null || listcase == null) continue;
+                    if (!Enum.TryParse<XpathType>(casename, true, out var xpathType)) continue;
+
+                    var incoming = listcase
+                        .Select(x => x?.GetValue<string>())
+                        .Where(x => x != null)
+                        .Select(x => x!)
+                        .ToList();
+
+                    if (_xpathGroups.TryGetValue(xpathType, out var existing))
+                    {
+                        foreach (var xpath in incoming)
+                            if (!existing.Contains(xpath))
+                                existing.Add(xpath);
+                    }
+                    else
+                    {
+                        _xpathGroups.TryAdd(xpathType, incoming);
+                    }
+                }
+            }
+            catch { }
         }
     }
 }

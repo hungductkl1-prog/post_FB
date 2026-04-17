@@ -1,6 +1,6 @@
-﻿using Sunny.Subdy.Data.Models;
+﻿using Microsoft.Data.Sqlite;
+using Sunny.Subdy.Data.Models;
 using System;
-using System.Data.SQLite;
 
 namespace Sunny.Subdy.Data.Context
 {
@@ -17,13 +17,23 @@ namespace Sunny.Subdy.Data.Context
             _jobHistoryContext = new JobHistoryContext();
         }
 
-        private Account MapToAccount(SQLiteDataReader reader)
+        private static bool HasColumn(SqliteDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        private Account MapToAccount(SqliteDataReader reader)
         {
             Guid.TryParse(reader["Id"]?.ToString(), out var id);
 
             var account = new Account
             {
-                Checked = false,
+                Checked = HasColumn(reader, "Checked") && reader["Checked"] != DBNull.Value && Convert.ToBoolean(reader["Checked"]),
                 Running = false,
                 ColorType = 0,
                 Uid_Email = "",

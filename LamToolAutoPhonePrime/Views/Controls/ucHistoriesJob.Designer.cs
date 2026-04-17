@@ -1,4 +1,6 @@
-﻿namespace LamToolAutoPhonePrime.Views.Controls
+﻿using LamToolAutoPhonePrime.Utils;
+
+namespace LamToolAutoPhonePrime.Views.Controls
 {
     partial class ucHistoriesJob
     {
@@ -13,9 +15,9 @@
         /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
-            if (disposing && (components != null))
+            if (disposing)
             {
-                components.Dispose();
+                components?.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -60,6 +62,36 @@
             label3 = new Label();
             shield1 = new AntdUI.Shield();
             label1 = new Label();
+            // Summary cards
+            panelSummaryCards = new TableLayoutPanel();
+            panelCardTotal = new AntdUI.Panel();
+            lblCardTotalIcon = new Label();
+            lblCardTotalTitle = new Label();
+            lblCardTotalValue = new Label();
+            panelCardSuccess = new AntdUI.Panel();
+            lblCardSuccessIcon = new Label();
+            lblCardSuccessTitle = new Label();
+            lblCardSuccessValue = new Label();
+            panelCardFail = new AntdUI.Panel();
+            lblCardFailIcon = new Label();
+            lblCardFailTitle = new Label();
+            lblCardFailValue = new Label();
+            panelCardCoin = new AntdUI.Panel();
+            lblCardCoinIcon = new Label();
+            lblCardCoinTitle = new Label();
+            lblCardCoinValue = new Label();
+            panelCardTime = new AntdUI.Panel();
+            lblCardTimeIcon = new Label();
+            lblCardTimeTitle = new Label();
+            lblCardTimeValue = new Label();
+            // Chart
+            panelChart = new AntdUI.Panel();
+            lblChartTitle = new Label();
+            panelChartArea = new Panel();
+            // Method stats
+            panelMethodStats = new AntdUI.Panel();
+            lblMethodTitle = new Label();
+            flowMethodStats = new FlowLayoutPanel();
             panel10 = new AntdUI.Panel();
             dateTimePicker2 = new DateTimePicker();
             dateTimePicker1 = new DateTimePicker();
@@ -70,12 +102,13 @@
             button7 = new AntdUI.Button();
             button16 = new AntdUI.Button();
             select1 = new AntdUI.Select();
+            selectDateRange = new AntdUI.Select();
             label17 = new Label();
             label18 = new Label();
             label16 = new Label();
             select4 = new AntdUI.Select();
             panel11 = new AntdUI.Panel();
-            dataGridView1 = new DataGridView();
+            dataGridView1 = new DoubleBufferedDataGridView();
             dataGridViewTextBoxColumn1 = new DataGridViewTextBoxColumn();
             panel12 = new AntdUI.Panel();
             toolStrip2 = new ToolStrip();
@@ -85,6 +118,8 @@
             toolStripLabel10 = new ToolStripLabel();
             toolStripLabel11 = new ToolStripLabel();
             toolStripLabel12 = new ToolStripLabel();
+            toolStripLabel13 = new ToolStripLabel();
+            toolStripLabel14 = new ToolStripLabel();
             label20 = new Label();
             button13 = new AntdUI.Button();
             button14 = new AntdUI.Button();
@@ -102,6 +137,14 @@
             panel1.SuspendLayout();
             panel5.SuspendLayout();
             panel4.SuspendLayout();
+            panelSummaryCards.SuspendLayout();
+            panelCardTotal.SuspendLayout();
+            panelCardSuccess.SuspendLayout();
+            panelCardFail.SuspendLayout();
+            panelCardCoin.SuspendLayout();
+            panelCardTime.SuspendLayout();
+            panelChart.SuspendLayout();
+            panelMethodStats.SuspendLayout();
             panel10.SuspendLayout();
             panel11.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
@@ -111,12 +154,8 @@
             // 
             // tableLayoutPanel1
             // 
-            tableLayoutPanel1.ColumnCount = 3;
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33333F));
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3333321F));
-            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33334F));
-            tableLayoutPanel1.Controls.Add(panel3, 2, 0);
-            tableLayoutPanel1.Controls.Add(panel2, 1, 0);
+            tableLayoutPanel1.ColumnCount = 1;
+            tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             tableLayoutPanel1.Controls.Add(panel1, 0, 0);
             tableLayoutPanel1.Dock = DockStyle.Top;
             tableLayoutPanel1.Location = new Point(24, 24);
@@ -164,7 +203,7 @@
             label11.Name = "label11";
             label11.Size = new Size(60, 21);
             label11.TabIndex = 15;
-            label11.Text = "Jobs:";
+            label11.Text = "Tác vụ:";
             label11.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // label12
@@ -200,7 +239,7 @@
             label13.Name = "label13";
             label13.Size = new Size(60, 21);
             label13.TabIndex = 15;
-            label13.Text = "Accounts:";
+            label13.Text = "Tài khoản:";
             label13.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // label14
@@ -278,7 +317,7 @@
             label4.Name = "label4";
             label4.Size = new Size(60, 21);
             label4.TabIndex = 15;
-            label4.Text = "Jobs:";
+            label4.Text = "Tác vụ:";
             label4.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // label5
@@ -314,7 +353,7 @@
             label8.Name = "label8";
             label8.Size = new Size(60, 21);
             label8.TabIndex = 15;
-            label8.Text = "Accounts:";
+            label8.Text = "Tài khoản:";
             label8.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // label9
@@ -392,7 +431,7 @@
             label2.Name = "label2";
             label2.Size = new Size(60, 21);
             label2.TabIndex = 15;
-            label2.Text = "Jobs:";
+            label2.Text = "Tác vụ:";
             label2.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // label7
@@ -428,7 +467,7 @@
             label6.Name = "label6";
             label6.Size = new Size(60, 21);
             label6.TabIndex = 15;
-            label6.Text = "Accounts:";
+            label6.Text = "Tài khoản:";
             label6.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // label3
@@ -467,21 +506,357 @@
             label1.Name = "label1";
             label1.Size = new Size(0, 13);
             label1.TabIndex = 1;
-            // 
+            //
+            // panelSummaryCards
+            //
+            panelSummaryCards.ColumnCount = 5;
+            panelSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            panelSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            panelSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            panelSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            panelSummaryCards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
+            panelSummaryCards.Controls.Add(panelCardTotal, 0, 0);
+            panelSummaryCards.Controls.Add(panelCardSuccess, 1, 0);
+            panelSummaryCards.Controls.Add(panelCardFail, 2, 0);
+            panelSummaryCards.Controls.Add(panelCardCoin, 3, 0);
+            panelSummaryCards.Controls.Add(panelCardTime, 4, 0);
+            panelSummaryCards.Dock = DockStyle.Top;
+            panelSummaryCards.Location = new Point(24, 175);
+            panelSummaryCards.Name = "panelSummaryCards";
+            panelSummaryCards.RowCount = 1;
+            panelSummaryCards.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            panelSummaryCards.Size = new Size(904, 76);
+            panelSummaryCards.TabIndex = 10;
+            panelSummaryCards.BackColor = Color.Transparent;
+            panelSummaryCards.Padding = new Padding(0, 8, 0, 0);
+            //
+            // panelCardTotal
+            //
+            panelCardTotal.Back = Color.FromArgb(240, 248, 255);
+            panelCardTotal.BackColor = Color.Transparent;
+            panelCardTotal.Controls.Add(lblCardTotalValue);
+            panelCardTotal.Controls.Add(lblCardTotalTitle);
+            panelCardTotal.Controls.Add(lblCardTotalIcon);
+            panelCardTotal.Dock = DockStyle.Fill;
+            panelCardTotal.Margin = new Padding(0, 0, 6, 0);
+            panelCardTotal.Name = "panelCardTotal";
+            panelCardTotal.Radius = 12;
+            panelCardTotal.Padding = new Padding(12, 8, 12, 8);
+            panelCardTotal.TabIndex = 0;
+            //
+            // lblCardTotalIcon
+            //
+            lblCardTotalIcon.AutoSize = false;
+            lblCardTotalIcon.Dock = DockStyle.Left;
+            lblCardTotalIcon.Font = new Font("Segoe UI", 18F);
+            lblCardTotalIcon.ForeColor = Color.FromArgb(0, 120, 215);
+            lblCardTotalIcon.Name = "lblCardTotalIcon";
+            lblCardTotalIcon.Size = new Size(40, 52);
+            lblCardTotalIcon.TabIndex = 0;
+            lblCardTotalIcon.Text = "📊";
+            lblCardTotalIcon.TextAlign = ContentAlignment.MiddleCenter;
+            //
+            // lblCardTotalTitle
+            //
+            lblCardTotalTitle.AutoSize = false;
+            lblCardTotalTitle.Dock = DockStyle.Top;
+            lblCardTotalTitle.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+            lblCardTotalTitle.ForeColor = Color.DarkGray;
+            lblCardTotalTitle.Name = "lblCardTotalTitle";
+            lblCardTotalTitle.Size = new Size(150, 18);
+            lblCardTotalTitle.TabIndex = 1;
+            lblCardTotalTitle.Text = "Tổng Job";
+            //
+            // lblCardTotalValue
+            //
+            lblCardTotalValue.AutoSize = false;
+            lblCardTotalValue.Dock = DockStyle.Fill;
+            lblCardTotalValue.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            lblCardTotalValue.ForeColor = Color.FromArgb(0, 120, 215);
+            lblCardTotalValue.Name = "lblCardTotalValue";
+            lblCardTotalValue.Size = new Size(150, 30);
+            lblCardTotalValue.TabIndex = 2;
+            lblCardTotalValue.Text = "0";
+            lblCardTotalValue.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // panelCardSuccess
+            //
+            panelCardSuccess.Back = Color.FromArgb(240, 255, 240);
+            panelCardSuccess.BackColor = Color.Transparent;
+            panelCardSuccess.Controls.Add(lblCardSuccessValue);
+            panelCardSuccess.Controls.Add(lblCardSuccessTitle);
+            panelCardSuccess.Controls.Add(lblCardSuccessIcon);
+            panelCardSuccess.Dock = DockStyle.Fill;
+            panelCardSuccess.Margin = new Padding(3, 0, 3, 0);
+            panelCardSuccess.Name = "panelCardSuccess";
+            panelCardSuccess.Radius = 12;
+            panelCardSuccess.Padding = new Padding(12, 8, 12, 8);
+            panelCardSuccess.TabIndex = 1;
+            //
+            // lblCardSuccessIcon
+            //
+            lblCardSuccessIcon.AutoSize = false;
+            lblCardSuccessIcon.Dock = DockStyle.Left;
+            lblCardSuccessIcon.Font = new Font("Segoe UI", 18F);
+            lblCardSuccessIcon.ForeColor = Color.Green;
+            lblCardSuccessIcon.Name = "lblCardSuccessIcon";
+            lblCardSuccessIcon.Size = new Size(40, 52);
+            lblCardSuccessIcon.TabIndex = 0;
+            lblCardSuccessIcon.Text = "✅";
+            lblCardSuccessIcon.TextAlign = ContentAlignment.MiddleCenter;
+            //
+            // lblCardSuccessTitle
+            //
+            lblCardSuccessTitle.AutoSize = false;
+            lblCardSuccessTitle.Dock = DockStyle.Top;
+            lblCardSuccessTitle.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+            lblCardSuccessTitle.ForeColor = Color.DarkGray;
+            lblCardSuccessTitle.Name = "lblCardSuccessTitle";
+            lblCardSuccessTitle.Size = new Size(150, 18);
+            lblCardSuccessTitle.TabIndex = 1;
+            lblCardSuccessTitle.Text = "Thành công";
+            //
+            // lblCardSuccessValue
+            //
+            lblCardSuccessValue.AutoSize = false;
+            lblCardSuccessValue.Dock = DockStyle.Fill;
+            lblCardSuccessValue.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            lblCardSuccessValue.ForeColor = Color.Green;
+            lblCardSuccessValue.Name = "lblCardSuccessValue";
+            lblCardSuccessValue.Size = new Size(150, 30);
+            lblCardSuccessValue.TabIndex = 2;
+            lblCardSuccessValue.Text = "0";
+            lblCardSuccessValue.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // panelCardFail
+            //
+            panelCardFail.Back = Color.FromArgb(255, 245, 245);
+            panelCardFail.BackColor = Color.Transparent;
+            panelCardFail.Controls.Add(lblCardFailValue);
+            panelCardFail.Controls.Add(lblCardFailTitle);
+            panelCardFail.Controls.Add(lblCardFailIcon);
+            panelCardFail.Dock = DockStyle.Fill;
+            panelCardFail.Margin = new Padding(3, 0, 3, 0);
+            panelCardFail.Name = "panelCardFail";
+            panelCardFail.Radius = 12;
+            panelCardFail.Padding = new Padding(12, 8, 12, 8);
+            panelCardFail.TabIndex = 2;
+            //
+            // lblCardFailIcon
+            //
+            lblCardFailIcon.AutoSize = false;
+            lblCardFailIcon.Dock = DockStyle.Left;
+            lblCardFailIcon.Font = new Font("Segoe UI", 18F);
+            lblCardFailIcon.ForeColor = Color.Red;
+            lblCardFailIcon.Name = "lblCardFailIcon";
+            lblCardFailIcon.Size = new Size(40, 52);
+            lblCardFailIcon.TabIndex = 0;
+            lblCardFailIcon.Text = "❌";
+            lblCardFailIcon.TextAlign = ContentAlignment.MiddleCenter;
+            //
+            // lblCardFailTitle
+            //
+            lblCardFailTitle.AutoSize = false;
+            lblCardFailTitle.Dock = DockStyle.Top;
+            lblCardFailTitle.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+            lblCardFailTitle.ForeColor = Color.DarkGray;
+            lblCardFailTitle.Name = "lblCardFailTitle";
+            lblCardFailTitle.Size = new Size(150, 18);
+            lblCardFailTitle.TabIndex = 1;
+            lblCardFailTitle.Text = "Thất bại";
+            //
+            // lblCardFailValue
+            //
+            lblCardFailValue.AutoSize = false;
+            lblCardFailValue.Dock = DockStyle.Fill;
+            lblCardFailValue.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            lblCardFailValue.ForeColor = Color.Red;
+            lblCardFailValue.Name = "lblCardFailValue";
+            lblCardFailValue.Size = new Size(150, 30);
+            lblCardFailValue.TabIndex = 2;
+            lblCardFailValue.Text = "0";
+            lblCardFailValue.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // panelCardCoin
+            //
+            panelCardCoin.Back = Color.FromArgb(255, 253, 235);
+            panelCardCoin.BackColor = Color.Transparent;
+            panelCardCoin.Controls.Add(lblCardCoinValue);
+            panelCardCoin.Controls.Add(lblCardCoinTitle);
+            panelCardCoin.Controls.Add(lblCardCoinIcon);
+            panelCardCoin.Dock = DockStyle.Fill;
+            panelCardCoin.Margin = new Padding(6, 0, 0, 0);
+            panelCardCoin.Name = "panelCardCoin";
+            panelCardCoin.Radius = 12;
+            panelCardCoin.Padding = new Padding(12, 8, 12, 8);
+            panelCardCoin.TabIndex = 3;
+            //
+            // lblCardCoinIcon
+            //
+            lblCardCoinIcon.AutoSize = false;
+            lblCardCoinIcon.Dock = DockStyle.Left;
+            lblCardCoinIcon.Font = new Font("Segoe UI", 18F);
+            lblCardCoinIcon.ForeColor = Color.DarkGoldenrod;
+            lblCardCoinIcon.Name = "lblCardCoinIcon";
+            lblCardCoinIcon.Size = new Size(40, 52);
+            lblCardCoinIcon.TabIndex = 0;
+            lblCardCoinIcon.Text = "💰";
+            lblCardCoinIcon.TextAlign = ContentAlignment.MiddleCenter;
+            //
+            // lblCardCoinTitle
+            //
+            lblCardCoinTitle.AutoSize = false;
+            lblCardCoinTitle.Dock = DockStyle.Top;
+            lblCardCoinTitle.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+            lblCardCoinTitle.ForeColor = Color.DarkGray;
+            lblCardCoinTitle.Name = "lblCardCoinTitle";
+            lblCardCoinTitle.Size = new Size(150, 18);
+            lblCardCoinTitle.TabIndex = 1;
+            lblCardCoinTitle.Text = "Tổng Xu";
+            //
+            // lblCardCoinValue
+            //
+            lblCardCoinValue.AutoSize = false;
+            lblCardCoinValue.Dock = DockStyle.Fill;
+            lblCardCoinValue.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            lblCardCoinValue.ForeColor = Color.DarkGoldenrod;
+            lblCardCoinValue.Name = "lblCardCoinValue";
+            lblCardCoinValue.Size = new Size(150, 30);
+            lblCardCoinValue.TabIndex = 2;
+            lblCardCoinValue.Text = "0";
+            lblCardCoinValue.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // panelCardTime
+            //
+            panelCardTime.Back = Color.FromArgb(240, 253, 244);
+            panelCardTime.BackColor = Color.Transparent;
+            panelCardTime.Controls.Add(lblCardTimeValue);
+            panelCardTime.Controls.Add(lblCardTimeTitle);
+            panelCardTime.Controls.Add(lblCardTimeIcon);
+            panelCardTime.Dock = DockStyle.Fill;
+            panelCardTime.Margin = new Padding(6, 0, 0, 0);
+            panelCardTime.Name = "panelCardTime";
+            panelCardTime.Radius = 12;
+            panelCardTime.Padding = new Padding(12, 8, 12, 8);
+            panelCardTime.TabIndex = 4;
+            //
+            // lblCardTimeIcon
+            //
+            lblCardTimeIcon.AutoSize = false;
+            lblCardTimeIcon.Dock = DockStyle.Left;
+            lblCardTimeIcon.Font = new Font("Segoe UI", 18F);
+            lblCardTimeIcon.ForeColor = Color.FromArgb(82, 196, 26);
+            lblCardTimeIcon.Name = "lblCardTimeIcon";
+            lblCardTimeIcon.Size = new Size(40, 52);
+            lblCardTimeIcon.TabIndex = 0;
+            lblCardTimeIcon.Text = "👤";
+            lblCardTimeIcon.TextAlign = ContentAlignment.MiddleCenter;
+            //
+            // lblCardTimeTitle
+            //
+            lblCardTimeTitle.AutoSize = false;
+            lblCardTimeTitle.Dock = DockStyle.Top;
+            lblCardTimeTitle.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+            lblCardTimeTitle.ForeColor = Color.DarkGray;
+            lblCardTimeTitle.Name = "lblCardTimeTitle";
+            lblCardTimeTitle.Size = new Size(150, 18);
+            lblCardTimeTitle.TabIndex = 1;
+            lblCardTimeTitle.Text = "Tài khoản";
+            //
+            // lblCardTimeValue
+            //
+            lblCardTimeValue.AutoSize = false;
+            lblCardTimeValue.Dock = DockStyle.Fill;
+            lblCardTimeValue.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            lblCardTimeValue.ForeColor = Color.FromArgb(82, 196, 26);
+            lblCardTimeValue.Name = "lblCardTimeValue";
+            lblCardTimeValue.Size = new Size(150, 30);
+            lblCardTimeValue.TabIndex = 2;
+            lblCardTimeValue.Text = "0 / Live: 0 / Die: 0";
+            lblCardTimeValue.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // panelChart
+            //
+            panelChart.Back = Color.White;
+            panelChart.BackColor = Color.Transparent;
+            panelChart.Controls.Add(panelChartArea);
+            panelChart.Controls.Add(lblChartTitle);
+            panelChart.Dock = DockStyle.Top;
+            panelChart.Location = new Point(24, 259);
+            panelChart.Name = "panelChart";
+            panelChart.padding = new Padding(5);
+            panelChart.Padding = new Padding(14, 8, 14, 8);
+            panelChart.Radius = 16;
+            panelChart.Size = new Size(904, 170);
+            panelChart.TabIndex = 11;
+            panelChart.Text = "panelChart";
+            //
+            // lblChartTitle
+            //
+            lblChartTitle.AutoSize = false;
+            lblChartTitle.Dock = DockStyle.Top;
+            lblChartTitle.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            lblChartTitle.ForeColor = Color.FromArgb(30, 30, 30);
+            lblChartTitle.Name = "lblChartTitle";
+            lblChartTitle.Size = new Size(876, 22);
+            lblChartTitle.TabIndex = 0;
+            lblChartTitle.Text = "Biểu đồ Xu theo ngày";
+            //
+            // panelChartArea
+            //
+            panelChartArea.BackColor = Color.White;
+            panelChartArea.Dock = DockStyle.Fill;
+            panelChartArea.Name = "panelChartArea";
+            panelChartArea.TabIndex = 1;
+            panelChartArea.Size = new Size(876, 132);
+            //
+            // panelMethodStats
+            //
+            panelMethodStats.Back = Color.White;
+            panelMethodStats.BackColor = Color.Transparent;
+            panelMethodStats.Controls.Add(flowMethodStats);
+            panelMethodStats.Controls.Add(lblMethodTitle);
+            panelMethodStats.Dock = DockStyle.Right;
+            panelMethodStats.Name = "panelMethodStats";
+            panelMethodStats.padding = new Padding(5);
+            panelMethodStats.Padding = new Padding(10, 10, 10, 10);
+            panelMethodStats.Radius = 12;
+            panelMethodStats.Size = new Size(220, 264);
+            panelMethodStats.TabIndex = 13;
+            panelMethodStats.Text = "panelMethodStats";
+            //
+            // lblMethodTitle
+            //
+            lblMethodTitle.AutoSize = false;
+            lblMethodTitle.Dock = DockStyle.Top;
+            lblMethodTitle.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold);
+            lblMethodTitle.ForeColor = Color.FromArgb(30, 30, 30);
+            lblMethodTitle.Name = "lblMethodTitle";
+            lblMethodTitle.Size = new Size(200, 24);
+            lblMethodTitle.TabIndex = 0;
+            lblMethodTitle.Text = "Thống kê theo Method";
+            //
+            // flowMethodStats
+            //
+            flowMethodStats.AutoScroll = true;
+            flowMethodStats.BackColor = Color.White;
+            flowMethodStats.Dock = DockStyle.Fill;
+            flowMethodStats.FlowDirection = FlowDirection.TopDown;
+            flowMethodStats.Name = "flowMethodStats";
+            flowMethodStats.Padding = new Padding(0, 4, 0, 0);
+            flowMethodStats.TabIndex = 1;
+            flowMethodStats.WrapContents = false;
+            //
             // panel10
-            // 
+            //
             panel10.Back = Color.White;
             panel10.BackColor = Color.Transparent;
-            panel10.Controls.Add(dateTimePicker2);
-            panel10.Controls.Add(dateTimePicker1);
             panel10.Controls.Add(input1);
-            panel10.Controls.Add(label19);
             panel10.Controls.Add(button8);
             panel10.Controls.Add(input6);
             panel10.Controls.Add(button7);
             panel10.Controls.Add(button16);
-            panel10.Controls.Add(select1);
-            panel10.Controls.Add(label17);
+            panel10.Controls.Add(selectDateRange);
             panel10.Controls.Add(label18);
             panel10.Controls.Add(label16);
             panel10.Controls.Add(select4);
@@ -622,17 +997,29 @@
             label17.Size = new Size(37, 13);
             label17.TabIndex = 13;
             label17.Text = "Server:";
-            // 
+            //
+            // selectDateRange
+            //
+            selectDateRange.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            selectDateRange.ForeColor = Color.Black;
+            selectDateRange.List = true;
+            selectDateRange.LocalizationPlaceholderText = "Select.{id}";
+            selectDateRange.Location = new Point(284, 18);
+            selectDateRange.Name = "selectDateRange";
+            selectDateRange.PlaceholderText = "";
+            selectDateRange.Size = new Size(160, 30);
+            selectDateRange.TabIndex = 30;
+            //
             // label18
-            // 
+            //
             label18.AutoSize = true;
             label18.Font = new Font("Segoe UI", 8.25F, FontStyle.Italic, GraphicsUnit.Point, 0);
             label18.ForeColor = Color.DarkGray;
-            label18.Location = new Point(558, 25);
+            label18.Location = new Point(241, 26);
             label18.Name = "label18";
-            label18.Size = new Size(34, 13);
+            label18.Size = new Size(40, 13);
             label18.TabIndex = 23;
-            label18.Text = "Ngày:";
+            label18.Text = "Thời gian:";
             // 
             // label16
             // 
@@ -656,13 +1043,13 @@
             select4.PlaceholderText = "";
             select4.Size = new Size(143, 30);
             select4.TabIndex = 12;
-            select4.SelectedIndexChanged += select4_SelectedIndexChanged;
             // 
             // panel11
             // 
             panel11.Back = Color.White;
             panel11.BackColor = Color.Transparent;
             panel11.Controls.Add(dataGridView1);
+            panel11.Controls.Add(panelMethodStats);
             panel11.Controls.Add(panel12);
             panel11.Controls.Add(button10);
             panel11.Controls.Add(button11);
@@ -751,7 +1138,7 @@
             toolStrip2.Dock = DockStyle.Bottom;
             toolStrip2.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
             toolStrip2.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip2.Items.AddRange(new ToolStripItem[] { toolStripLabel7, toolStripLabel8, toolStripLabel9, toolStripLabel10, toolStripLabel11, toolStripLabel12 });
+            toolStrip2.Items.AddRange(new ToolStripItem[] { toolStripLabel7, toolStripLabel8, toolStripLabel9, toolStripLabel10, toolStripLabel11, toolStripLabel12, toolStripLabel13, toolStripLabel14 });
             toolStrip2.Location = new Point(10, 37);
             toolStrip2.Name = "toolStrip2";
             toolStrip2.RenderMode = ToolStripRenderMode.System;
@@ -805,13 +1192,31 @@
             toolStripLabel11.Size = new Size(46, 22);
             toolStripLabel11.Text = "Fail:";
             toolStripLabel11.TextAlign = ContentAlignment.MiddleRight;
-            // 
+            //
             // toolStripLabel12
-            // 
+            //
             toolStripLabel12.ForeColor = Color.Red;
             toolStripLabel12.Name = "toolStripLabel12";
             toolStripLabel12.Size = new Size(13, 22);
             toolStripLabel12.Text = "0";
+            //
+            // toolStripLabel13
+            //
+            toolStripLabel13.ForeColor = Color.DarkGray;
+            toolStripLabel13.Image = Properties.Resources.icons8_circle_7_Blue;
+            toolStripLabel13.ImageScaling = ToolStripItemImageScaling.None;
+            toolStripLabel13.Name = "toolStripLabel13";
+            toolStripLabel13.Padding = new Padding(10, 0, 0, 0);
+            toolStripLabel13.Size = new Size(40, 22);
+            toolStripLabel13.Text = "Xu:";
+            //
+            // toolStripLabel14
+            //
+            toolStripLabel14.ForeColor = Color.DarkGoldenrod;
+            toolStripLabel14.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            toolStripLabel14.Name = "toolStripLabel14";
+            toolStripLabel14.Size = new Size(13, 22);
+            toolStripLabel14.Text = "0";
             // 
             // label20
             // 
@@ -924,7 +1329,8 @@
             BackColor = Color.FromArgb(236, 240, 241);
             Controls.Add(panel11);
             Controls.Add(panel10);
-            Controls.Add(tableLayoutPanel1);
+            Controls.Add(panelChart);
+            Controls.Add(panelSummaryCards);
             Name = "ucHistoriesJob";
             Padding = new Padding(24);
             Size = new Size(952, 586);
@@ -941,6 +1347,14 @@
             panel1.PerformLayout();
             panel5.ResumeLayout(false);
             panel4.ResumeLayout(false);
+            panelSummaryCards.ResumeLayout(false);
+            panelCardTotal.ResumeLayout(false);
+            panelCardSuccess.ResumeLayout(false);
+            panelCardFail.ResumeLayout(false);
+            panelCardCoin.ResumeLayout(false);
+            panelCardTime.ResumeLayout(false);
+            panelChart.ResumeLayout(false);
+            panelMethodStats.ResumeLayout(false);
             panel10.ResumeLayout(false);
             panel10.PerformLayout();
             panel11.ResumeLayout(false);
@@ -991,7 +1405,7 @@
         private AntdUI.Button button7;
         private AntdUI.Input input1;
         private AntdUI.Panel panel11;
-        public DataGridView dataGridView1;
+        public DoubleBufferedDataGridView dataGridView1;
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn1;
         private AntdUI.Panel panel12;
         private ToolStrip toolStrip2;
@@ -1010,11 +1424,45 @@
         private AntdUI.Button button12;
         private DateTimePicker dateTimePicker1;
         private DateTimePicker dateTimePicker2;
+        private AntdUI.Select selectDateRange;
         public Label label3;
         public Label label5;
         public Label label9;
         public Label label7;
         public Label label12;
         public Label label14;
+        // Summary cards
+        private TableLayoutPanel panelSummaryCards;
+        private AntdUI.Panel panelCardTotal;
+        private Label lblCardTotalIcon;
+        private Label lblCardTotalTitle;
+        private Label lblCardTotalValue;
+        private AntdUI.Panel panelCardSuccess;
+        private Label lblCardSuccessIcon;
+        private Label lblCardSuccessTitle;
+        private Label lblCardSuccessValue;
+        private AntdUI.Panel panelCardFail;
+        private Label lblCardFailIcon;
+        private Label lblCardFailTitle;
+        private Label lblCardFailValue;
+        private AntdUI.Panel panelCardCoin;
+        private Label lblCardCoinIcon;
+        private Label lblCardCoinTitle;
+        private Label lblCardCoinValue;
+        private AntdUI.Panel panelCardTime;
+        private Label lblCardTimeIcon;
+        private Label lblCardTimeTitle;
+        public Label lblCardTimeValue;
+        // Chart
+        private AntdUI.Panel panelChart;
+        private Label lblChartTitle;
+        private Panel panelChartArea;
+        // Method stats
+        private AntdUI.Panel panelMethodStats;
+        private Label lblMethodTitle;
+        private FlowLayoutPanel flowMethodStats;
+        // New toolbar items
+        private ToolStripLabel toolStripLabel13;
+        private ToolStripLabel toolStripLabel14;
     }
 }

@@ -1,16 +1,9 @@
-﻿namespace LamToolAutoPhonePrime.Views
+namespace LamToolAutoPhonePrime.Views
 {
     partial class fQuanLyKichBan
     {
-        /// <summary>
-        /// Required designer variable.
-        /// </summary>
         private System.ComponentModel.IContainer components = null;
 
-        /// <summary>
-        /// Clean up any resources being used.
-        /// </summary>
-        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -22,10 +15,6 @@
 
         #region Windows Form Designer generated code
 
-        /// <summary>
-        /// Required method for Designer support - do not modify
-        /// the contents of this method with the code editor.
-        /// </summary>
         private void InitializeComponent()
         {
             windowBar = new AntdUI.PageHeader();
@@ -35,53 +24,59 @@
             btn_global = new AntdUI.Button();
             btn_setting = new AntdUI.Button();
             panel4 = new AntdUI.Panel();
-            label12 = new Label();
-            numericUpDown10 = new NumericUpDown();
-            label13 = new Label();
-            numericUpDown11 = new NumericUpDown();
-            checkBox5 = new CheckBox();
-            label10 = new Label();
-            numericUpDown8 = new NumericUpDown();
-            label11 = new Label();
-            numericUpDown9 = new NumericUpDown();
-            checkBox4 = new CheckBox();
-            label8 = new Label();
-            numericUpDown6 = new NumericUpDown();
-            label9 = new Label();
-            numericUpDown7 = new NumericUpDown();
-            checkBox3 = new CheckBox();
-            label6 = new Label();
-            numericUpDown4 = new NumericUpDown();
-            label7 = new Label();
-            numericUpDown5 = new NumericUpDown();
-            checkBox2 = new CheckBox();
+            // Left column
+            radioButton1 = new RadioButton();
+            radioButton2 = new RadioButton();
+            radioButton3 = new RadioButton();
+            radioButton4 = new RadioButton();
+            lblSoLanLap = new Label();
+            nudSoLanLap = new NumericUpDown();
+            lblLuot = new Label();
+            lblChoLuot = new Label();
+            nudChoLuotFrom = new NumericUpDown();
+            lblDenLuot = new Label();
+            nudChoLuotTo = new NumericUpDown();
+            lblPhutLuot = new Label();
+            // Right column
             checkBox1 = new CheckBox();
+            checkBox2 = new CheckBox();
+            nudTaiKhoanFrom = new NumericUpDown();
+            lblDenTaiKhoan = new Label();
+            nudTaiKhoanTo = new NumericUpDown();
+            lblPhutTaiKhoan = new Label();
+            checkBox3 = new CheckBox();
+            nudKichBanFrom = new NumericUpDown();
+            lblDenKichBan = new Label();
+            nudKichBanTo = new NumericUpDown();
+            lblPhutKichBan = new Label();
+            checkBox4 = new CheckBox();
+            lblThoiGianBatDau = new Label();
+            timepickerFrom = new AntdUI.TimePicker();
+            lblDenNgay = new Label();
+            timepickerTo = new AntdUI.TimePicker();
+            // Info
+            llbHuongDan = new LinkLabel();
+            lblCanhBao1 = new Label();
+            lblCanhBao2 = new Label();
+            // VirtualPanel
+            virtualPanel = new AntdUI.VirtualPanel();
+            // hidden
             input6 = new AntdUI.Input();
             button16 = new AntdUI.Button();
-            virtualPanel = new AntdUI.VirtualPanel();
-            label1 = new Label();
-            label2 = new Label();
-            numericUpDown1 = new NumericUpDown();
-            label3 = new Label();
-            numericUpDown2 = new NumericUpDown();
+
             windowBar.SuspendLayout();
             panel4.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown10).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown11).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown8).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown9).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown6).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown7).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown4).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown5).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown1).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown2).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudSoLanLap).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudChoLuotFrom).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudChoLuotTo).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudTaiKhoanFrom).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudTaiKhoanTo).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudKichBanFrom).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudKichBanTo).BeginInit();
             SuspendLayout();
-            // 
+
             // windowBar
-            // 
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
             windowBar.CloseSize = 30;
             windowBar.Controls.Add(button1);
             windowBar.Controls.Add(txt_search);
@@ -94,27 +89,23 @@
             windowBar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Icon = Properties.Resources.logo_lamtool_v3_dark_16;
-            windowBar.Location = new Point(0, 0);
             windowBar.MDI = true;
             windowBar.Name = "windowBar";
             windowBar.ShowIcon = true;
             windowBar.Size = new Size(1300, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", 6.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            windowBar.SubFont = new Font("Microsoft Sans Serif", 6.75F);
             windowBar.SubGap = 1;
             windowBar.SubText = "v18.12.08.2025";
             windowBar.TabIndex = 10;
             windowBar.Text = "LamTool Auto Phone Farm";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
-            // 
-            // button1
-            // 
+
             button1.Dock = DockStyle.Right;
             button1.Ghost = true;
             button1.Icon = Properties.Resources.icons8_add_16;
             button1.IconRatio = 1F;
             button1.IconSvg = "";
-            button1.Location = new Point(946, 0);
             button1.Name = "button1";
             button1.Radius = 0;
             button1.Size = new Size(32, 35);
@@ -122,422 +113,361 @@
             button1.ToggleIconSvg = "MoonOutlined";
             button1.WaveSize = 0;
             button1.Click += button1_Click;
-            // 
-            // txt_search
-            // 
+
             txt_search.Dock = DockStyle.Right;
             txt_search.LocalizationPlaceholderText = "Overview.{id}";
-            txt_search.Location = new Point(978, 0);
             txt_search.Name = "txt_search";
             txt_search.Padding = new Padding(0, 2, 0, 2);
             txt_search.PlaceholderText = "Tìm kiếm...";
             txt_search.PrefixSvg = "SearchOutlined";
             txt_search.Size = new Size(242, 35);
             txt_search.TabIndex = 11;
-            // 
-            // btn_mode
-            // 
+
             btn_mode.Dock = DockStyle.Right;
             btn_mode.Ghost = true;
             btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
             btn_mode.IconSvg = "";
-            btn_mode.Location = new Point(1220, 0);
             btn_mode.Name = "btn_mode";
             btn_mode.Radius = 0;
             btn_mode.Size = new Size(26, 35);
             btn_mode.TabIndex = 6;
             btn_mode.ToggleIconSvg = "MoonOutlined";
             btn_mode.WaveSize = 0;
-            // 
-            // btn_global
-            // 
+
             btn_global.Dock = DockStyle.Right;
             btn_global.Ghost = true;
             btn_global.Icon = Properties.Resources.icons8_circle_16_Yellow;
             btn_global.IconSvg = "";
-            btn_global.Location = new Point(1246, 0);
             btn_global.Name = "btn_global";
             btn_global.Radius = 0;
             btn_global.Size = new Size(24, 35);
             btn_global.TabIndex = 7;
             btn_global.WaveSize = 0;
             btn_global.Click += btn_global_Click;
-            // 
-            // btn_setting
-            // 
+
             btn_setting.Dock = DockStyle.Right;
             btn_setting.Ghost = true;
             btn_setting.Icon = Properties.Resources.icons8_circle_16_Red;
             btn_setting.IconSvg = "";
-            btn_setting.Location = new Point(1270, 0);
             btn_setting.Name = "btn_setting";
             btn_setting.Radius = 0;
             btn_setting.Size = new Size(30, 35);
             btn_setting.TabIndex = 8;
             btn_setting.WaveSize = 0;
             btn_setting.Click += btn_setting_Click;
-            // 
-            // panel4
-            // 
+
+            // ── panel4 ──
             panel4.Back = Color.White;
             panel4.BackColor = Color.Transparent;
-            panel4.Controls.Add(label2);
-            panel4.Controls.Add(numericUpDown1);
-            panel4.Controls.Add(label3);
-            panel4.Controls.Add(numericUpDown2);
-            panel4.Controls.Add(label1);
-            panel4.Controls.Add(label12);
-            panel4.Controls.Add(numericUpDown10);
-            panel4.Controls.Add(label13);
-            panel4.Controls.Add(numericUpDown11);
-            panel4.Controls.Add(checkBox5);
-            panel4.Controls.Add(label10);
-            panel4.Controls.Add(numericUpDown8);
-            panel4.Controls.Add(label11);
-            panel4.Controls.Add(numericUpDown9);
-            panel4.Controls.Add(checkBox4);
-            panel4.Controls.Add(label8);
-            panel4.Controls.Add(numericUpDown6);
-            panel4.Controls.Add(label9);
-            panel4.Controls.Add(numericUpDown7);
-            panel4.Controls.Add(checkBox3);
-            panel4.Controls.Add(label6);
-            panel4.Controls.Add(numericUpDown4);
-            panel4.Controls.Add(label7);
-            panel4.Controls.Add(numericUpDown5);
-            panel4.Controls.Add(checkBox2);
-            panel4.Controls.Add(checkBox1);
-            panel4.Controls.Add(input6);
-            panel4.Controls.Add(button16);
             panel4.Dock = DockStyle.Top;
-            panel4.Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            panel4.Font = new Font("Microsoft YaHei UI", 9F);
             panel4.Location = new Point(0, 35);
             panel4.Name = "panel4";
-            panel4.padding = new Padding(20);
+            panel4.padding = new Padding(16);
             panel4.Radius = 16;
-            panel4.Size = new Size(1300, 241);
+            panel4.Size = new Size(1300, 200);
             panel4.TabIndex = 11;
             panel4.Text = "panel4";
-            // 
-            // label12
-            // 
-            label12.Anchor = AnchorStyles.Left;
-            label12.AutoSize = true;
-            label12.Location = new Point(462, 146);
-            label12.Name = "label12";
-            label12.Size = new Size(34, 17);
-            label12.TabIndex = 31;
-            label12.Text = "phút";
-            // 
-            // numericUpDown10
-            // 
-            numericUpDown10.Anchor = AnchorStyles.Left;
-            numericUpDown10.Location = new Point(410, 144);
-            numericUpDown10.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown10.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown10.Name = "numericUpDown10";
-            numericUpDown10.Size = new Size(46, 23);
-            numericUpDown10.TabIndex = 30;
-            numericUpDown10.Value = new decimal(new int[] { 20, 0, 0, 0 });
-            // 
-            // label13
-            // 
-            label13.Anchor = AnchorStyles.Left;
-            label13.AutoSize = true;
-            label13.Location = new Point(374, 146);
-            label13.Name = "label13";
-            label13.Size = new Size(30, 17);
-            label13.TabIndex = 29;
-            label13.Text = "đến";
-            // 
-            // numericUpDown11
-            // 
-            numericUpDown11.Anchor = AnchorStyles.Left;
-            numericUpDown11.Location = new Point(322, 144);
-            numericUpDown11.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown11.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown11.Name = "numericUpDown11";
-            numericUpDown11.Size = new Size(46, 23);
-            numericUpDown11.TabIndex = 28;
-            numericUpDown11.Value = new decimal(new int[] { 5, 0, 0, 0 });
-            // 
-            // checkBox5
-            // 
-            checkBox5.Anchor = AnchorStyles.Left;
-            checkBox5.AutoSize = true;
-            checkBox5.Location = new Point(63, 145);
-            checkBox5.Name = "checkBox5";
-            checkBox5.Size = new Size(252, 21);
-            checkBox5.TabIndex = 27;
-            checkBox5.Text = "Giới hạn thời gian chạy mỗi hành động:";
-            checkBox5.UseVisualStyleBackColor = true;
-            // 
-            // label10
-            // 
-            label10.Anchor = AnchorStyles.Left;
-            label10.AutoSize = true;
-            label10.Location = new Point(462, 118);
-            label10.Name = "label10";
-            label10.Size = new Size(34, 17);
-            label10.TabIndex = 26;
-            label10.Text = "phút";
-            // 
-            // numericUpDown8
-            // 
-            numericUpDown8.Anchor = AnchorStyles.Left;
-            numericUpDown8.Location = new Point(410, 116);
-            numericUpDown8.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown8.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown8.Name = "numericUpDown8";
-            numericUpDown8.Size = new Size(46, 23);
-            numericUpDown8.TabIndex = 25;
-            numericUpDown8.Value = new decimal(new int[] { 120, 0, 0, 0 });
-            // 
-            // label11
-            // 
-            label11.Anchor = AnchorStyles.Left;
-            label11.AutoSize = true;
-            label11.Location = new Point(374, 118);
-            label11.Name = "label11";
-            label11.Size = new Size(30, 17);
-            label11.TabIndex = 24;
-            label11.Text = "đến";
-            // 
-            // numericUpDown9
-            // 
-            numericUpDown9.Anchor = AnchorStyles.Left;
-            numericUpDown9.Location = new Point(322, 116);
-            numericUpDown9.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown9.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown9.Name = "numericUpDown9";
-            numericUpDown9.Size = new Size(46, 23);
-            numericUpDown9.TabIndex = 23;
-            numericUpDown9.Value = new decimal(new int[] { 60, 0, 0, 0 });
-            // 
-            // checkBox4
-            // 
-            checkBox4.Anchor = AnchorStyles.Left;
-            checkBox4.AutoSize = true;
-            checkBox4.Location = new Point(63, 118);
-            checkBox4.Name = "checkBox4";
-            checkBox4.Size = new Size(239, 21);
-            checkBox4.TabIndex = 22;
-            checkBox4.Text = "Giới hạn thời gian chạy mỗi kịch bản:";
-            checkBox4.UseVisualStyleBackColor = true;
-            // 
-            // label8
-            // 
-            label8.Anchor = AnchorStyles.Left;
-            label8.AutoSize = true;
-            label8.Location = new Point(462, 89);
-            label8.Name = "label8";
-            label8.Size = new Size(34, 17);
-            label8.TabIndex = 21;
-            label8.Text = "phút";
-            // 
-            // numericUpDown6
-            // 
-            numericUpDown6.Anchor = AnchorStyles.Left;
-            numericUpDown6.Location = new Point(410, 87);
-            numericUpDown6.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown6.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown6.Name = "numericUpDown6";
-            numericUpDown6.Size = new Size(46, 23);
-            numericUpDown6.TabIndex = 20;
-            numericUpDown6.Value = new decimal(new int[] { 120, 0, 0, 0 });
-            // 
-            // label9
-            // 
-            label9.Anchor = AnchorStyles.Left;
-            label9.AutoSize = true;
-            label9.Location = new Point(374, 89);
-            label9.Name = "label9";
-            label9.Size = new Size(30, 17);
-            label9.TabIndex = 19;
-            label9.Text = "đến";
-            // 
-            // numericUpDown7
-            // 
-            numericUpDown7.Anchor = AnchorStyles.Left;
-            numericUpDown7.Location = new Point(322, 87);
-            numericUpDown7.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown7.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown7.Name = "numericUpDown7";
-            numericUpDown7.Size = new Size(46, 23);
-            numericUpDown7.TabIndex = 18;
-            numericUpDown7.Value = new decimal(new int[] { 60, 0, 0, 0 });
-            // 
-            // checkBox3
-            // 
-            checkBox3.Anchor = AnchorStyles.Left;
-            checkBox3.AutoSize = true;
-            checkBox3.Location = new Point(63, 89);
-            checkBox3.Name = "checkBox3";
-            checkBox3.Size = new Size(244, 21);
-            checkBox3.TabIndex = 17;
-            checkBox3.Text = "Giới hạn thời gian chạy mỗi tài khoản:\r\n";
-            checkBox3.UseVisualStyleBackColor = true;
-            // 
-            // label6
-            // 
-            label6.Anchor = AnchorStyles.Left;
-            label6.AutoSize = true;
-            label6.Location = new Point(462, 62);
-            label6.Name = "label6";
-            label6.Size = new Size(70, 17);
-            label6.TabIndex = 16;
-            label6.Text = "hành động";
-            // 
-            // numericUpDown4
-            // 
-            numericUpDown4.Anchor = AnchorStyles.Left;
-            numericUpDown4.Location = new Point(410, 60);
-            numericUpDown4.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown4.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown4.Name = "numericUpDown4";
-            numericUpDown4.Size = new Size(46, 23);
-            numericUpDown4.TabIndex = 15;
-            numericUpDown4.Value = new decimal(new int[] { 5, 0, 0, 0 });
-            // 
-            // label7
-            // 
-            label7.Anchor = AnchorStyles.Left;
-            label7.AutoSize = true;
-            label7.Location = new Point(374, 62);
-            label7.Name = "label7";
-            label7.Size = new Size(30, 17);
-            label7.TabIndex = 14;
-            label7.Text = "đến";
-            // 
-            // numericUpDown5
-            // 
-            numericUpDown5.Anchor = AnchorStyles.Left;
-            numericUpDown5.Location = new Point(322, 60);
-            numericUpDown5.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown5.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown5.Name = "numericUpDown5";
-            numericUpDown5.Size = new Size(46, 23);
-            numericUpDown5.TabIndex = 13;
-            numericUpDown5.Value = new decimal(new int[] { 1, 0, 0, 0 });
-            // 
-            // checkBox2
-            // 
-            checkBox2.Anchor = AnchorStyles.Left;
-            checkBox2.AutoSize = true;
-            checkBox2.Location = new Point(63, 60);
-            checkBox2.Name = "checkBox2";
-            checkBox2.Size = new Size(132, 21);
-            checkBox2.TabIndex = 12;
-            checkBox2.Text = "Lấy ngẫu nhiên từ:";
-            checkBox2.UseVisualStyleBackColor = true;
-            // 
-            // checkBox1
-            // 
-            checkBox1.Anchor = AnchorStyles.Left;
+
+            // ── LEFT COLUMN: Radio buttons ──
+            // radioButton1
+            radioButton1.AutoSize = true;
+            radioButton1.Checked = true;
+            radioButton1.Location = new Point(20, 18);
+            radioButton1.Name = "radioButton1";
+            radioButton1.TabIndex = 0;
+            radioButton1.TabStop = true;
+            radioButton1.Text = "Chạy hết tương tác thì kết thúc";
+            radioButton1.UseVisualStyleBackColor = true;
+
+            radioButton2.AutoSize = true;
+            radioButton2.Location = new Point(20, 44);
+            radioButton2.Name = "radioButton2";
+            radioButton2.TabIndex = 1;
+            radioButton2.Text = "Chạy hết tương tác thì lướt newfeed";
+            radioButton2.UseVisualStyleBackColor = true;
+
+            radioButton3.AutoSize = true;
+            radioButton3.Location = new Point(20, 70);
+            radioButton3.Name = "radioButton3";
+            radioButton3.TabIndex = 2;
+            radioButton3.Text = "Chạy hết tương tác thì like newfeed";
+            radioButton3.UseVisualStyleBackColor = true;
+
+            radioButton4.AutoSize = true;
+            radioButton4.Location = new Point(20, 96);
+            radioButton4.Name = "radioButton4";
+            radioButton4.TabIndex = 3;
+            radioButton4.Text = "Chạy hết tương tác thì lặp lại toàn bộ tài khoản";
+            radioButton4.UseVisualStyleBackColor = true;
+
+            // Số lần lặp lại (row dưới radio4, indent thêm)
+            lblSoLanLap.AutoSize = true;
+            lblSoLanLap.Enabled = false;
+            lblSoLanLap.Location = new Point(40, 122);
+            lblSoLanLap.Name = "lblSoLanLap";
+            lblSoLanLap.Text = "Số lần lặp lại:";
+
+            nudSoLanLap.Enabled = false;
+            nudSoLanLap.Location = new Point(122, 119);
+            nudSoLanLap.Minimum = 1;
+            nudSoLanLap.Maximum = 9999;
+            nudSoLanLap.Value = 1;
+            nudSoLanLap.Name = "nudSoLanLap";
+            nudSoLanLap.Size = new Size(46, 23);
+            nudSoLanLap.TabIndex = 4;
+
+            lblLuot.AutoSize = true;
+            lblLuot.Enabled = false;
+            lblLuot.Location = new Point(172, 122);
+            lblLuot.Name = "lblLuot";
+            lblLuot.Text = "lượt";
+
+            lblChoLuot.AutoSize = true;
+            lblChoLuot.Enabled = false;
+            lblChoLuot.Location = new Point(210, 122);
+            lblChoLuot.Name = "lblChoLuot";
+            lblChoLuot.Text = "Chờ lượt kế tiếp:";
+
+            nudChoLuotFrom.Enabled = false;
+            nudChoLuotFrom.Location = new Point(310, 119);
+            nudChoLuotFrom.Minimum = 1;
+            nudChoLuotFrom.Maximum = 9999;
+            nudChoLuotFrom.Value = 300;
+            nudChoLuotFrom.Name = "nudChoLuotFrom";
+            nudChoLuotFrom.Size = new Size(50, 23);
+            nudChoLuotFrom.TabIndex = 5;
+
+            lblDenLuot.AutoSize = true;
+            lblDenLuot.Enabled = false;
+            lblDenLuot.Location = new Point(364, 122);
+            lblDenLuot.Name = "lblDenLuot";
+            lblDenLuot.Text = "đến";
+
+            nudChoLuotTo.Enabled = false;
+            nudChoLuotTo.Location = new Point(390, 119);
+            nudChoLuotTo.Minimum = 1;
+            nudChoLuotTo.Maximum = 9999;
+            nudChoLuotTo.Value = 600;
+            nudChoLuotTo.Name = "nudChoLuotTo";
+            nudChoLuotTo.Size = new Size(50, 23);
+            nudChoLuotTo.TabIndex = 6;
+
+            lblPhutLuot.AutoSize = true;
+            lblPhutLuot.Enabled = false;
+            lblPhutLuot.Location = new Point(444, 122);
+            lblPhutLuot.Name = "lblPhutLuot";
+            lblPhutLuot.Text = "phút";
+
+            // ── RIGHT COLUMN: Checkboxes (x=560) ──
+            // checkBox1 - Random
             checkBox1.AutoSize = true;
-            checkBox1.Location = new Point(63, 33);
+            checkBox1.Location = new Point(560, 18);
             checkBox1.Name = "checkBox1";
-            checkBox1.Size = new Size(179, 21);
-            checkBox1.TabIndex = 11;
-            checkBox1.Text = "Random thứ tự hành động";
+            checkBox1.TabIndex = 10;
+            checkBox1.Text = "Random thứ tự các hành động";
             checkBox1.UseVisualStyleBackColor = true;
-            // 
-            // input6
-            // 
-            input6.AllowClear = true;
-            input6.Anchor = AnchorStyles.Right;
-            input6.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            input6.Location = new Point(1716, 140);
+
+            // checkBox2 + numeric inline
+            checkBox2.AutoSize = true;
+            checkBox2.Location = new Point(560, 44);
+            checkBox2.Name = "checkBox2";
+            checkBox2.TabIndex = 11;
+            checkBox2.Text = "Giới hạn thời gian chạy mỗi tài khoản";
+            checkBox2.UseVisualStyleBackColor = true;
+
+            nudTaiKhoanFrom.Enabled = false;
+            nudTaiKhoanFrom.Location = new Point(800, 41);
+            nudTaiKhoanFrom.Minimum = 1;
+            nudTaiKhoanFrom.Maximum = 9999;
+            nudTaiKhoanFrom.Value = 40;
+            nudTaiKhoanFrom.Name = "nudTaiKhoanFrom";
+            nudTaiKhoanFrom.Size = new Size(46, 23);
+            nudTaiKhoanFrom.TabIndex = 12;
+
+            lblDenTaiKhoan.AutoSize = true;
+            lblDenTaiKhoan.Enabled = false;
+            lblDenTaiKhoan.Location = new Point(850, 44);
+            lblDenTaiKhoan.Name = "lblDenTaiKhoan";
+            lblDenTaiKhoan.Text = "đến";
+
+            nudTaiKhoanTo.Enabled = false;
+            nudTaiKhoanTo.Location = new Point(878, 41);
+            nudTaiKhoanTo.Minimum = 1;
+            nudTaiKhoanTo.Maximum = 9999;
+            nudTaiKhoanTo.Value = 60;
+            nudTaiKhoanTo.Name = "nudTaiKhoanTo";
+            nudTaiKhoanTo.Size = new Size(46, 23);
+            nudTaiKhoanTo.TabIndex = 13;
+
+            lblPhutTaiKhoan.AutoSize = true;
+            lblPhutTaiKhoan.Enabled = false;
+            lblPhutTaiKhoan.Location = new Point(928, 44);
+            lblPhutTaiKhoan.Name = "lblPhutTaiKhoan";
+            lblPhutTaiKhoan.Text = "phút";
+
+            // checkBox3 + numeric inline
+            checkBox3.AutoSize = true;
+            checkBox3.Location = new Point(560, 70);
+            checkBox3.Name = "checkBox3";
+            checkBox3.TabIndex = 14;
+            checkBox3.Text = "Giới hạn thời gian chạy mỗi kịch bản";
+            checkBox3.UseVisualStyleBackColor = true;
+
+            nudKichBanFrom.Enabled = false;
+            nudKichBanFrom.Location = new Point(800, 67);
+            nudKichBanFrom.Minimum = 1;
+            nudKichBanFrom.Maximum = 9999;
+            nudKichBanFrom.Value = 5;
+            nudKichBanFrom.Name = "nudKichBanFrom";
+            nudKichBanFrom.Size = new Size(46, 23);
+            nudKichBanFrom.TabIndex = 15;
+
+            lblDenKichBan.AutoSize = true;
+            lblDenKichBan.Enabled = false;
+            lblDenKichBan.Location = new Point(850, 70);
+            lblDenKichBan.Name = "lblDenKichBan";
+            lblDenKichBan.Text = "đến";
+
+            nudKichBanTo.Enabled = false;
+            nudKichBanTo.Location = new Point(878, 67);
+            nudKichBanTo.Minimum = 1;
+            nudKichBanTo.Maximum = 9999;
+            nudKichBanTo.Value = 10;
+            nudKichBanTo.Name = "nudKichBanTo";
+            nudKichBanTo.Size = new Size(46, 23);
+            nudKichBanTo.TabIndex = 16;
+
+            lblPhutKichBan.AutoSize = true;
+            lblPhutKichBan.Enabled = false;
+            lblPhutKichBan.Location = new Point(928, 70);
+            lblPhutKichBan.Name = "lblPhutKichBan";
+            lblPhutKichBan.Text = "phút";
+
+            // checkBox4 + timepicker inline
+            checkBox4.AutoSize = true;
+            checkBox4.Location = new Point(560, 96);
+            checkBox4.Name = "checkBox4";
+            checkBox4.TabIndex = 17;
+            checkBox4.Text = "Reset và chạy lại kịch bản khi qua ngày mới";
+            checkBox4.UseVisualStyleBackColor = true;
+
+            // timepicker row (dưới checkBox4)
+            lblThoiGianBatDau.AutoSize = true;
+            lblThoiGianBatDau.Enabled = false;
+            lblThoiGianBatDau.Location = new Point(580, 122);
+            lblThoiGianBatDau.Name = "lblThoiGianBatDau";
+            lblThoiGianBatDau.Text = "Thời gian bắt đầu chạy lại ngẫu nhiên từ:";
+
+            timepickerFrom.Enabled = false;
+            timepickerFrom.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            timepickerFrom.Location = new Point(815, 117);
+            timepickerFrom.Name = "timepickerFrom";
+            timepickerFrom.PlaceholderText = "";
+            timepickerFrom.SelectionStart = 8;
+            timepickerFrom.Size = new Size(88, 28);
+            timepickerFrom.TabIndex = 18;
+            timepickerFrom.Text = "09:46:23";
+            timepickerFrom.ValueTimeHorizontal = true;
+
+            lblDenNgay.AutoSize = true;
+            lblDenNgay.Enabled = false;
+            lblDenNgay.Location = new Point(907, 122);
+            lblDenNgay.Name = "lblDenNgay";
+            lblDenNgay.Text = "đến";
+
+            timepickerTo.Enabled = false;
+            timepickerTo.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            timepickerTo.Location = new Point(932, 117);
+            timepickerTo.Name = "timepickerTo";
+            timepickerTo.PlaceholderText = "";
+            timepickerTo.SelectionStart = 8;
+            timepickerTo.Size = new Size(88, 28);
+            timepickerTo.TabIndex = 19;
+            timepickerTo.Text = "09:46:23";
+            timepickerTo.ValueTimeHorizontal = true;
+
+            // ── Info row ──
+            llbHuongDan.AutoSize = true;
+            llbHuongDan.Location = new Point(20, 158);
+            llbHuongDan.Name = "llbHuongDan";
+            llbHuongDan.TabIndex = 20;
+            llbHuongDan.TabStop = true;
+            llbHuongDan.Text = "[ Hướng Dẫn Sử Dụng ]";
+            llbHuongDan.LinkClicked += llbHuongDan_LinkClicked;
+
+            lblCanhBao1.AutoSize = true;
+            lblCanhBao1.ForeColor = Color.Red;
+            lblCanhBao1.Location = new Point(200, 158);
+            lblCanhBao1.Name = "lblCanhBao1";
+            lblCanhBao1.TabIndex = 21;
+            lblCanhBao1.Text = "Lưu ý: Kiểm tra kịch bản của tài khoản trước khi chạy";
+
+            lblCanhBao2.AutoSize = true;
+            lblCanhBao2.ForeColor = Color.Red;
+            lblCanhBao2.Location = new Point(570, 158);
+            lblCanhBao2.Name = "lblCanhBao2";
+            lblCanhBao2.TabIndex = 22;
+            lblCanhBao2.Text = "Lưu ý: Nếu không chọn kịch bản cho tài khoản thì auto sẽ chạy kịch bản đầu tiên";
+
+            // Add all controls to panel4
+            panel4.Controls.Add(radioButton1);
+            panel4.Controls.Add(radioButton2);
+            panel4.Controls.Add(radioButton3);
+            panel4.Controls.Add(radioButton4);
+            panel4.Controls.Add(lblSoLanLap);
+            panel4.Controls.Add(nudSoLanLap);
+            panel4.Controls.Add(lblLuot);
+            panel4.Controls.Add(lblChoLuot);
+            panel4.Controls.Add(nudChoLuotFrom);
+            panel4.Controls.Add(lblDenLuot);
+            panel4.Controls.Add(nudChoLuotTo);
+            panel4.Controls.Add(lblPhutLuot);
+            panel4.Controls.Add(checkBox1);
+            panel4.Controls.Add(checkBox2);
+            panel4.Controls.Add(nudTaiKhoanFrom);
+            panel4.Controls.Add(lblDenTaiKhoan);
+            panel4.Controls.Add(nudTaiKhoanTo);
+            panel4.Controls.Add(lblPhutTaiKhoan);
+            panel4.Controls.Add(checkBox3);
+            panel4.Controls.Add(nudKichBanFrom);
+            panel4.Controls.Add(lblDenKichBan);
+            panel4.Controls.Add(nudKichBanTo);
+            panel4.Controls.Add(lblPhutKichBan);
+            panel4.Controls.Add(checkBox4);
+            panel4.Controls.Add(lblThoiGianBatDau);
+            panel4.Controls.Add(timepickerFrom);
+            panel4.Controls.Add(lblDenNgay);
+            panel4.Controls.Add(timepickerTo);
+            panel4.Controls.Add(llbHuongDan);
+            panel4.Controls.Add(lblCanhBao1);
+            panel4.Controls.Add(lblCanhBao2);
+            panel4.Controls.Add(input6);
+            panel4.Controls.Add(button16);
+
+            // hidden
+            input6.Location = new Point(9999, 0);
             input6.Name = "input6";
-            input6.PlaceholderText = "Tìm kiếm...";
-            input6.PrefixSvg = "SearchOutlined";
-            input6.Size = new Size(241, 40);
-            input6.TabIndex = 2;
-            // 
-            // button16
-            // 
-            button16.Anchor = AnchorStyles.Right;
-            button16.DefaultBack = Color.DodgerBlue;
-            button16.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
-            button16.ForeColor = Color.White;
-            button16.IconHoverSvg = "";
-            button16.IconRatio = 0.9F;
-            button16.IconSvg = "PlusOutlined";
-            button16.Location = new Point(1963, 140);
+            input6.Size = new Size(100, 23);
+            input6.TabIndex = 98;
+
+            button16.Location = new Point(9999, 0);
             button16.Name = "button16";
-            button16.Radius = 10;
-            button16.Shape = AntdUI.TShape.Round;
-            button16.Size = new Size(146, 40);
-            button16.TabIndex = 6;
-            button16.Text = "Thêm tài khoản";
-            button16.Type = AntdUI.TTypeMini.Info;
-            // 
-            // virtualPanel
-            // 
+            button16.Size = new Size(100, 30);
+            button16.TabIndex = 99;
+            button16.Text = "button16";
+
+            // ── virtualPanel ──
             virtualPanel.BackColor = Color.FromArgb(236, 240, 241);
             virtualPanel.Dock = DockStyle.Fill;
             virtualPanel.JustifyContent = AntdUI.TJustifyContent.SpaceEvenly;
-            virtualPanel.Location = new Point(0, 276);
             virtualPanel.Name = "virtualPanel";
             virtualPanel.Shadow = 20;
             virtualPanel.ShadowOpacityAnimation = true;
-            virtualPanel.Size = new Size(1300, 444);
             virtualPanel.TabIndex = 12;
             virtualPanel.Waterfall = true;
-            // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Location = new Point(63, 177);
-            label1.Name = "label1";
-            label1.Size = new Size(216, 17);
-            label1.TabIndex = 32;
-            label1.Text = "Delay sau khi hành động tương tác :";
-            // 
-            // label2
-            // 
-            label2.Anchor = AnchorStyles.Left;
-            label2.AutoSize = true;
-            label2.Location = new Point(462, 175);
-            label2.Name = "label2";
-            label2.Size = new Size(32, 17);
-            label2.TabIndex = 36;
-            label2.Text = "giây";
-            // 
-            // numericUpDown1
-            // 
-            numericUpDown1.Anchor = AnchorStyles.Left;
-            numericUpDown1.Location = new Point(410, 173);
-            numericUpDown1.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown1.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown1.Name = "numericUpDown1";
-            numericUpDown1.Size = new Size(46, 23);
-            numericUpDown1.TabIndex = 35;
-            numericUpDown1.Value = new decimal(new int[] { 30, 0, 0, 0 });
-            // 
-            // label3
-            // 
-            label3.Anchor = AnchorStyles.Left;
-            label3.AutoSize = true;
-            label3.Location = new Point(374, 175);
-            label3.Name = "label3";
-            label3.Size = new Size(30, 17);
-            label3.TabIndex = 34;
-            label3.Text = "đến";
-            // 
-            // numericUpDown2
-            // 
-            numericUpDown2.Anchor = AnchorStyles.Left;
-            numericUpDown2.Location = new Point(322, 173);
-            numericUpDown2.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
-            numericUpDown2.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
-            numericUpDown2.Name = "numericUpDown2";
-            numericUpDown2.Size = new Size(46, 23);
-            numericUpDown2.TabIndex = 33;
-            numericUpDown2.Value = new decimal(new int[] { 5, 0, 0, 0 });
-            // 
-            // fQuanLyKichBan
-            // 
+
+            // ── fQuanLyKichBan ──
             BackColor = Color.FromArgb(236, 240, 241);
             ClientSize = new Size(1300, 720);
             Controls.Add(virtualPanel);
@@ -549,58 +479,62 @@
             Name = "fQuanLyKichBan";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "AntdUI Overview";
+
             windowBar.ResumeLayout(false);
             panel4.ResumeLayout(false);
             panel4.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown10).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown11).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown8).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown9).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown6).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown7).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown4).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown5).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown1).EndInit();
-            ((System.ComponentModel.ISupportInitialize)numericUpDown2).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudSoLanLap).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudChoLuotFrom).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudChoLuotTo).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudTaiKhoanFrom).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudTaiKhoanTo).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudKichBanFrom).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudKichBanTo).EndInit();
             ResumeLayout(false);
         }
 
         #endregion
+
         private AntdUI.PageHeader windowBar;
+        private AntdUI.Button button1;
         private AntdUI.Input txt_search;
         private AntdUI.Button btn_mode;
         private AntdUI.Button btn_global;
         private AntdUI.Button btn_setting;
         private AntdUI.Panel panel4;
+        private RadioButton radioButton1;
+        private RadioButton radioButton2;
+        private RadioButton radioButton3;
+        private RadioButton radioButton4;
+        private Label lblSoLanLap;
+        private NumericUpDown nudSoLanLap;
+        private Label lblLuot;
+        private Label lblChoLuot;
+        private NumericUpDown nudChoLuotFrom;
+        private Label lblDenLuot;
+        private NumericUpDown nudChoLuotTo;
+        private Label lblPhutLuot;
+        private CheckBox checkBox1;
+        private CheckBox checkBox2;
+        private NumericUpDown nudTaiKhoanFrom;
+        private Label lblDenTaiKhoan;
+        private NumericUpDown nudTaiKhoanTo;
+        private Label lblPhutTaiKhoan;
+        private CheckBox checkBox3;
+        private NumericUpDown nudKichBanFrom;
+        private Label lblDenKichBan;
+        private NumericUpDown nudKichBanTo;
+        private Label lblPhutKichBan;
+        private CheckBox checkBox4;
+        private Label lblThoiGianBatDau;
+        private AntdUI.TimePicker timepickerFrom;
+        private Label lblDenNgay;
+        private AntdUI.TimePicker timepickerTo;
+        private LinkLabel llbHuongDan;
+        private Label lblCanhBao1;
+        private Label lblCanhBao2;
+        private AntdUI.VirtualPanel virtualPanel;
         private AntdUI.Input input6;
         private AntdUI.Button button16;
-        private AntdUI.Button button1;
-        private AntdUI.VirtualPanel virtualPanel;
-        private Label label6;
-        private NumericUpDown numericUpDown4;
-        private Label label7;
-        private NumericUpDown numericUpDown5;
-        private CheckBox checkBox2;
-        private CheckBox checkBox1;
-        private CheckBox checkBox3;
-        private Label label8;
-        private NumericUpDown numericUpDown6;
-        private Label label9;
-        private NumericUpDown numericUpDown7;
-        private Label label10;
-        private NumericUpDown numericUpDown8;
-        private Label label11;
-        private NumericUpDown numericUpDown9;
-        private CheckBox checkBox4;
-        private Label label12;
-        private NumericUpDown numericUpDown10;
-        private Label label13;
-        private NumericUpDown numericUpDown11;
-        private CheckBox checkBox5;
-        private Label label2;
-        private NumericUpDown numericUpDown1;
-        private Label label3;
-        private NumericUpDown numericUpDown2;
-        private Label label1;
     }
 }

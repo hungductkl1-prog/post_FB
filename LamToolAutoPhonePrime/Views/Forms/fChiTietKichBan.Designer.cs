@@ -1,16 +1,9 @@
-﻿namespace LamToolAutoPhonePrime.Views.Forms
+namespace LamToolAutoPhonePrime.Views.Forms
 {
     partial class fChiTietKichBan
     {
-        /// <summary>
-        /// Required designer variable.
-        /// </summary>
         private System.ComponentModel.IContainer components = null;
 
-        /// <summary>
-        /// Clean up any resources being used.
-        /// </summary>
-        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -22,10 +15,6 @@
 
         #region Windows Form Designer generated code
 
-        /// <summary>
-        /// Required method for Designer support - do not modify
-        /// the contents of this method with the code editor.
-        /// </summary>
         private void InitializeComponent()
         {
             DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
@@ -46,7 +35,7 @@
             input6 = new AntdUI.Input();
             button16 = new AntdUI.Button();
             panel2 = new AntdUI.Panel();
-            dataGridView1 = new DataGridView();
+            dataGridView1 = new LamToolAutoPhonePrime.Utils.DoubleBufferedDataGridView();
             dataGridViewTextBoxColumn1 = new DataGridViewTextBoxColumn();
             label3 = new Label();
             input2 = new AntdUI.Input();
@@ -56,9 +45,8 @@
             panel2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
             SuspendLayout();
-            // 
+
             // windowBar
-            // 
             windowBar.BackColor = Color.White;
             windowBar.BackgroundImageLayout = ImageLayout.Stretch;
             windowBar.CloseSize = 30;
@@ -84,9 +72,7 @@
             windowBar.Text = "LamTool Auto Phone Farm";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
-            // 
-            // btn_mode
-            // 
+
             btn_mode.Dock = DockStyle.Right;
             btn_mode.Ghost = true;
             btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
@@ -98,9 +84,7 @@
             btn_mode.TabIndex = 6;
             btn_mode.ToggleIconSvg = "MoonOutlined";
             btn_mode.WaveSize = 0;
-            // 
-            // btn_global
-            // 
+
             btn_global.Dock = DockStyle.Right;
             btn_global.Ghost = true;
             btn_global.Icon = Properties.Resources.icons8_circle_16_Yellow;
@@ -112,9 +96,7 @@
             btn_global.TabIndex = 7;
             btn_global.WaveSize = 0;
             btn_global.Click += btn_global_Click;
-            // 
-            // btn_setting
-            // 
+
             btn_setting.Dock = DockStyle.Right;
             btn_setting.Ghost = true;
             btn_setting.Icon = Properties.Resources.icons8_circle_16_Red;
@@ -126,9 +108,8 @@
             btn_setting.TabIndex = 8;
             btn_setting.WaveSize = 0;
             btn_setting.Click += btn_setting_Click;
-            // 
-            // panel4
-            // 
+
+            // panel4 (header: script name + buttons)
             panel4.Back = Color.White;
             panel4.BackColor = Color.Transparent;
             panel4.Controls.Add(button9);
@@ -148,9 +129,7 @@
             panel4.Size = new Size(958, 142);
             panel4.TabIndex = 12;
             panel4.Text = "panel4";
-            // 
-            // button9
-            // 
+
             button9.Anchor = AnchorStyles.Left;
             button9.DefaultBack = Color.DodgerBlue;
             button9.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
@@ -167,9 +146,7 @@
             button9.Text = "Reload";
             button9.Type = AntdUI.TTypeMini.Primary;
             button9.Click += button9_Click;
-            // 
-            // button5
-            // 
+
             button5.Anchor = AnchorStyles.Right;
             button5.DefaultBack = Color.DodgerBlue;
             button5.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
@@ -186,9 +163,7 @@
             button5.Text = "Thêm hành động";
             button5.Type = AntdUI.TTypeMini.Info;
             button5.Click += button5_Click;
-            // 
-            // button4
-            // 
+
             button4.Anchor = AnchorStyles.Right;
             button4.AutoSize = true;
             button4.BackColor = Color.White;
@@ -202,9 +177,7 @@
             button4.TabIndex = 10;
             button4.UseVisualStyleBackColor = false;
             button4.Click += button4_Click;
-            // 
-            // button3
-            // 
+
             button3.Anchor = AnchorStyles.Right;
             button3.AutoSize = true;
             button3.BackColor = Color.White;
@@ -218,18 +191,14 @@
             button3.TabIndex = 9;
             button3.UseVisualStyleBackColor = false;
             button3.Click += button3_Click;
-            // 
-            // textBox1
-            // 
+
             textBox1.Anchor = AnchorStyles.Left;
             textBox1.Location = new Point(128, 33);
             textBox1.Name = "textBox1";
             textBox1.ReadOnly = true;
             textBox1.Size = new Size(238, 23);
             textBox1.TabIndex = 8;
-            // 
-            // label1
-            // 
+
             label1.Anchor = AnchorStyles.Left;
             label1.AutoSize = true;
             label1.Location = new Point(34, 36);
@@ -237,9 +206,7 @@
             label1.Size = new Size(85, 17);
             label1.TabIndex = 7;
             label1.Text = "Tên kịch bản:";
-            // 
-            // input6
-            // 
+
             input6.AllowClear = true;
             input6.Anchor = AnchorStyles.Right;
             input6.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
@@ -249,9 +216,7 @@
             input6.PrefixSvg = "SearchOutlined";
             input6.Size = new Size(241, 40);
             input6.TabIndex = 2;
-            // 
-            // button16
-            // 
+
             button16.Anchor = AnchorStyles.Right;
             button16.DefaultBack = Color.DodgerBlue;
             button16.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
@@ -267,9 +232,8 @@
             button16.TabIndex = 6;
             button16.Text = "Thêm tài khoản";
             button16.Type = AntdUI.TTypeMini.Info;
-            // 
-            // panel2
-            // 
+
+            // panel2 (action list)
             panel2.Back = Color.White;
             panel2.BackColor = Color.Transparent;
             panel2.Controls.Add(dataGridView1);
@@ -286,9 +250,7 @@
             panel2.Size = new Size(958, 376);
             panel2.TabIndex = 14;
             panel2.Text = "panel2";
-            // 
-            // dataGridView1
-            // 
+
             dataGridView1.AllowUserToAddRows = false;
             dataGridView1.AllowUserToDeleteRows = false;
             dataGridView1.AllowUserToResizeRows = false;
@@ -326,18 +288,14 @@
             dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dataGridView1.Size = new Size(908, 320);
             dataGridView1.TabIndex = 13;
-            // 
-            // dataGridViewTextBoxColumn1
-            // 
+
             dataGridViewCellStyle7.Font = new Font("Segoe UI", 9F, FontStyle.Italic);
             dataGridViewTextBoxColumn1.DefaultCellStyle = dataGridViewCellStyle7;
             dataGridViewTextBoxColumn1.HeaderText = "#";
             dataGridViewTextBoxColumn1.Name = "dataGridViewTextBoxColumn1";
             dataGridViewTextBoxColumn1.ReadOnly = true;
             dataGridViewTextBoxColumn1.Width = 41;
-            // 
-            // label3
-            // 
+
             label3.Dock = DockStyle.Top;
             label3.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             label3.Location = new Point(25, 5);
@@ -345,9 +303,7 @@
             label3.Size = new Size(908, 26);
             label3.TabIndex = 6;
             label3.Text = "Danh sách hành động của kịch bản (0)";
-            // 
-            // input2
-            // 
+
             input2.AllowClear = true;
             input2.Anchor = AnchorStyles.Right;
             input2.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
@@ -357,9 +313,7 @@
             input2.PrefixSvg = "SearchOutlined";
             input2.Size = new Size(241, 40);
             input2.TabIndex = 2;
-            // 
-            // button2
-            // 
+
             button2.Anchor = AnchorStyles.Right;
             button2.DefaultBack = Color.DodgerBlue;
             button2.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
@@ -375,9 +329,8 @@
             button2.TabIndex = 6;
             button2.Text = "Thêm tài khoản";
             button2.Type = AntdUI.TTypeMini.Info;
-            // 
+
             // fChiTietKichBan
-            // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(236, 240, 241);
@@ -409,7 +362,7 @@
         private AntdUI.Input input2;
         private AntdUI.Button button2;
         private Label label3;
-        public DataGridView dataGridView1;
+        public LamToolAutoPhonePrime.Utils.DoubleBufferedDataGridView dataGridView1;
         private TextBox textBox1;
         private Label label1;
         private Button button3;

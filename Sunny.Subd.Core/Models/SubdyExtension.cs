@@ -14,6 +14,7 @@
         Success,
         EmailExist,
         DIE,
+        No_Internet,
     }
     public class SubdyExtension : Exception
     {

@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
-using RestSharp;
+using System.Text.Json.Nodes;
 using Sunny.Subd.Core.Utils;
 using Sunny.Subdy.Common.Logs;
 
@@ -15,24 +14,27 @@ namespace Sunny.Subd.Core.Facebook
                 {
                     return false;
                 }
-                var client = RestShapService.RestClientUrl("https://graph.facebook.com", null, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0");
+                var client = RestShapService.CreateClient(
+                    "https://graph.facebook.com",
+                    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0");
 
-                var request = new RestRequest($"/{uid}/picture?redirect=false", Method.Get);
-                RestResponse response = await client.ExecuteAsync(request);
+                var request = new HttpRequestMessage(HttpMethod.Get, $"/{uid}/picture?redirect=false");
+                var response = await client.SendAsync(request);
+                string content = await response.Content.ReadAsStringAsync();
 
-                if (string.IsNullOrEmpty(response.Content))
+                if (string.IsNullOrEmpty(content))
                 {
-                    throw new Exception($"Response content is empty or null. [{response.ErrorMessage}]");
+                    throw new Exception($"Response content is empty or null.");
                 }
-                JObject content = JObject.Parse(response.Content!);
+                JsonObject jsonContent = JsonNode.Parse(content!)!.AsObject();
                 bool isLive = false;
-                if (content.ContainsKey("data"))
+                if (jsonContent.ContainsKey("data"))
                 {
-                    isLive = content["data"]!["height"] != null;
+                    isLive = jsonContent["data"]!["height"] != null;
                 }
                 return isLive;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogManager.Error(ex);
             }

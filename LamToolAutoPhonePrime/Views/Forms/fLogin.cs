@@ -38,13 +38,14 @@ namespace LamToolAutoPhonePrime.Views.Forms
             button5.Enabled = false;
             try
             {
-                User user = LamToolClient.Authentication(txt_search.Text.Trim(), input1.Text.Trim());
+                User user = SubdyClient.Login(txt_search.Text.Trim(), input1.Text.Trim());
                 Globals.User = user;
                 new TempLoginStorage
                 {
                     Username = txt_search.Text,
                     Password = input1.Text
                 }.Save();
+                Program.SetStartup(true);
                 DialogResult = DialogResult.OK;
                 Close();
             }
@@ -56,7 +57,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         }
         private void button9_Click(object sender, EventArgs e)
         {
-            OpenLink("https://www.facebook.com/groups/lamtool.net");
+            OpenLink("https://subdy.net");
         }
         private void OpenLink(string url)
         {
@@ -70,33 +71,36 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             catch (Exception ex)
             {
-                AntdUI.Notification.warn(this, "LamTool Thông Báo", "Không thể mở link: " + ex.Message, AntdUI.TAlignFrom.TR, Font);
+                AntdUI.Notification.warn(this, "Subdy Thông Báo", "Không thể mở link: " + ex.Message, AntdUI.TAlignFrom.TR, Font);
             }
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            OpenLink("https://t.me/lamtool_net");
+            OpenLink("https://subdy.net");
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
-            OpenLink("https://www.tiktok.com/@lamtool.net?");
+            OpenLink("https://subdy.net");
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
-            OpenLink("https://www.youtube.com/channel/UCJoKRG-V3-QaGGlisVKEscQ");
+            OpenLink("https://subdy.net");
         }
 
         private void button4_Click(object sender, EventArgs e)
         {
-            OpenLink("https://zalo.me/g/uubote459");
+            OpenLink("https://subdy.net");
         }
 
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
-            OpenLink("https://lamtool.net/register");
+            using (var frm = new fRegister())
+            {
+                frm.ShowDialog(this);
+            }
         }
 
         private void button5_Click(object sender, EventArgs e)
@@ -114,7 +118,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
 
-        private static string FilePath => Path.Combine(Path.GetTempPath(), "LamTool_LoginCache.json");
+        private static string FilePath => Path.Combine(Path.GetTempPath(), "Subdy_LoginCache.json");
 
         public static TempLoginStorage Load()
         {

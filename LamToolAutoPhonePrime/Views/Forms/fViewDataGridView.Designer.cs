@@ -38,6 +38,8 @@
             panel2 = new AntdUI.Panel();
             button2 = new AntdUI.Button();
             button3 = new AntdUI.Button();
+            btnShowAll = new AntdUI.Button();
+            btnShowOptimal = new AntdUI.Button();
             label2 = new Label();
             flowLayoutPanel1 = new FlowLayoutPanel();
             windowBar.SuspendLayout();
@@ -114,6 +116,8 @@
             // 
             panel1.Controls.Add(button1);
             panel1.Controls.Add(button9);
+            panel1.Controls.Add(btnShowAll);
+            panel1.Controls.Add(btnShowOptimal);
             panel1.Dock = DockStyle.Bottom;
             panel1.Location = new Point(0, 314);
             panel1.Name = "panel1";
@@ -123,14 +127,14 @@
             panel1.TabIndex = 10;
             panel1.Text = "panel1";
             // 
-            // button1
-            // 
+            // button1 (Đóng)
+            //
             button1.Anchor = AnchorStyles.Bottom;
             button1.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button1.IconRatio = 1F;
             button1.IconSvg = "CloseOutlined";
             button1.IconToggleAnimation = 400;
-            button1.Location = new Point(472, 23);
+            button1.Location = new Point(634, 23);
             button1.Name = "button1";
             button1.Shape = AntdUI.TShape.Round;
             button1.Size = new Size(139, 42);
@@ -138,15 +142,15 @@
             button1.Text = "Đóng";
             button1.Type = AntdUI.TTypeMini.Error;
             button1.Click += button1_Click;
-            // 
-            // button9
-            // 
+            //
+            // button9 (Lưu)
+            //
             button9.Anchor = AnchorStyles.Bottom;
             button9.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button9.IconRatio = 1.1F;
             button9.IconSvg = "SaveOutlined";
             button9.IconToggleAnimation = 400;
-            button9.Location = new Point(323, 23);
+            button9.Location = new Point(485, 23);
             button9.Name = "button9";
             button9.Shape = AntdUI.TShape.Round;
             button9.Size = new Size(131, 42);
@@ -172,7 +176,7 @@
             panel2.Text = "panel2";
             // 
             // button2
-            // 
+            //
             button2.Anchor = AnchorStyles.Bottom;
             button2.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button2.IconRatio = 1F;
@@ -185,9 +189,10 @@
             button2.TabIndex = 16;
             button2.Text = "Đóng";
             button2.Type = AntdUI.TTypeMini.Error;
-            // 
+            button2.Click += button1_Click;
+            //
             // button3
-            // 
+            //
             button3.Anchor = AnchorStyles.Bottom;
             button3.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             button3.IconRatio = 1.1F;
@@ -200,6 +205,39 @@
             button3.TabIndex = 15;
             button3.Text = "Lưu";
             button3.Type = AntdUI.TTypeMini.Success;
+            button3.Click += button9_Click;
+            //
+            // btnShowAll
+            //
+            btnShowAll.Anchor = AnchorStyles.Bottom;
+            btnShowAll.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            btnShowAll.IconRatio = 1F;
+            btnShowAll.IconSvg = "AppstoreOutlined";
+            btnShowAll.IconToggleAnimation = 400;
+            btnShowAll.Location = new Point(230, 23);
+            btnShowAll.Name = "btnShowAll";
+            btnShowAll.Shape = AntdUI.TShape.Round;
+            btnShowAll.Size = new Size(139, 42);
+            btnShowAll.TabIndex = 17;
+            btnShowAll.Text = "Hiển thị tất cả";
+            btnShowAll.Type = AntdUI.TTypeMini.Primary;
+            btnShowAll.Click += btnShowAll_Click;
+            //
+            // btnShowOptimal
+            //
+            btnShowOptimal.Anchor = AnchorStyles.Bottom;
+            btnShowOptimal.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            btnShowOptimal.IconRatio = 1F;
+            btnShowOptimal.IconSvg = "FilterOutlined";
+            btnShowOptimal.IconToggleAnimation = 400;
+            btnShowOptimal.Location = new Point(81, 23);
+            btnShowOptimal.Name = "btnShowOptimal";
+            btnShowOptimal.Shape = AntdUI.TShape.Round;
+            btnShowOptimal.Size = new Size(139, 42);
+            btnShowOptimal.TabIndex = 18;
+            btnShowOptimal.Text = "Hiển thị tối ưu";
+            btnShowOptimal.Type = AntdUI.TTypeMini.Warn;
+            btnShowOptimal.Click += btnShowOptimal_Click;
             // 
             // label2
             // 
@@ -256,6 +294,8 @@
         private AntdUI.Panel panel2;
         private AntdUI.Button button2;
         private AntdUI.Button button3;
+        private AntdUI.Button btnShowAll;
+        private AntdUI.Button btnShowOptimal;
         private Label label2;
         private FlowLayoutPanel flowLayoutPanel1;
     }

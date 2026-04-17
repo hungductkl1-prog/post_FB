@@ -1,6 +1,6 @@
-﻿using System.Text.Json;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
-using RestSharp;
 using Sunny.Subd.Core.Utils;
 using Sunny.Subdy.Common.Helper;
 
@@ -12,17 +12,22 @@ namespace Sunny.Subd.Core.Email
         {
             try
             {
-                var client = new RestClient("https://api.mail.tm");
-                var request = new RestRequest("/domains", Method.Get);
-                request.AddHeader("Accept", "application/json"); // Thêm header đúng
+                var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://api.mail.tm/domains");
+                request.Headers.Add("Accept", "application/json");
 
-                RestResponse response = await client.ExecuteAsync(request);
-                if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+                var response = await client.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return "";
+                }
+                string content = await response.Content.ReadAsStringAsync();
+                if (string.IsNullOrWhiteSpace(content))
                 {
                     return "";
                 }
 
-                using var doc = JsonDocument.Parse(response.Content);
+                using var doc = JsonDocument.Parse(content);
                 var root = doc.RootElement;
 
                 if (root.TryGetProperty("hydra:member", out JsonElement members) && members.GetArrayLength() > 0)
@@ -46,6 +51,7 @@ namespace Sunny.Subd.Core.Email
                 return "";
             }
         }
+
         public static async Task<string> GetEmail()
         {
             try
@@ -56,37 +62,27 @@ namespace Sunny.Subd.Core.Email
                     return "ERROR:NO get domain.";
                 }
                 string email = SubdyHelper.RandomString(length: SubdyHelper.RandomValue(6, 20)) + domain;
-                var options = new RestClientOptions("https://api.mail.tm")
+
+                var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+                var body = $"{{\"address\":\"{email}\",\"password\":\"{email}\"}}";
+                var content = new StringContent(body, Encoding.UTF8, "application/json");
+                var response = await client.PostAsync("https://api.mail.tm/accounts", content);
+                string responseText = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
                 {
-                    Timeout = TimeSpan.FromSeconds(60),
-                };
-
-                var client = new RestClient(options);
-                var request = new RestRequest("/accounts", Method.Post);
-                request.AddHeader("Content-Type", "application/json");
-
-                var body = @$"{{
-            ""address"": ""{email}"",
-            ""password"": ""{email}""
-        }}";
-                request.AddStringBody(body, DataFormat.Json);
-
-                RestResponse response = await client.ExecuteAsync(request);
-
-                if (response.IsSuccessful)
-                {
-                    using var doc = JsonDocument.Parse(response.Content);
+                    using var doc = JsonDocument.Parse(responseText);
                     var root = doc.RootElement;
                     if (root.TryGetProperty("id", out var idProp))
                         return $"Success|{email}";
                 }
-                else if ((int)response.StatusCode == 422 && response.Content.Contains("This value is already used"))
+                else if ((int)response.StatusCode == 422 && responseText.Contains("This value is already used"))
                 {
                     return $"Error: Email '{email}' already used.";
                 }
                 else
                 {
-                    return $"Error: {response.StatusCode} - {response.Content}";
+                    return $"Error: {response.StatusCode} - {responseText}";
                 }
             }
             catch (Exception ex)
@@ -95,11 +91,11 @@ namespace Sunny.Subd.Core.Email
             }
             return string.Empty;
         }
+
         public static async Task<string> GetOTP(string email, int timeOut = 120)
         {
             try
             {
-                string urlId = string.Empty;
                 int tickCount = Environment.TickCount;
                 while (Environment.TickCount - tickCount <= timeOut * 1000)
                 {
@@ -107,63 +103,60 @@ namespace Sunny.Subd.Core.Email
                     {
                         try
                         {
-                            var options = new RestClientOptions("https://api.mail.tm")
-                            {
-                                Timeout = TimeSpan.FromSeconds(60),
-                            };
-                            var client = new RestClient(options);
-                            var request = new RestRequest("/token", Method.Post);
-                            request.AddHeader("Content-Type", "application/json");
+                            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
 
-                            var body = @$"{{
-            ""address"": ""{email}"",
-            ""password"": ""{email}""
-        }}";
-                            request.AddStringBody(body, DataFormat.Json);
-
-                            RestResponse response = await client.ExecuteAsync(request);
-                            if (!response.IsSuccessful)
+                            // Step 1: get token
+                            var tokenBody = $"{{\"address\":\"{email}\",\"password\":\"{email}\"}}";
+                            var tokenContent = new StringContent(tokenBody, Encoding.UTF8, "application/json");
+                            var tokenResponse = await client.PostAsync("https://api.mail.tm/token", tokenContent);
+                            if (!tokenResponse.IsSuccessStatusCode)
                             {
                                 continue;
                             }
 
-                            var doc = JsonDocument.Parse(response.Content);
-                            var root = doc.RootElement;
+                            string tokenResponseText = await tokenResponse.Content.ReadAsStringAsync();
+                            var tokenDoc = JsonDocument.Parse(tokenResponseText);
+                            var tokenRoot = tokenDoc.RootElement;
 
-                            if (root.TryGetProperty("token", out var tokenProp))
+                            if (tokenRoot.TryGetProperty("token", out var tokenProp))
                             {
-                                request = new RestRequest("/messages", Method.Get);
-                                request.AddHeader("Authorization", $"Bearer {tokenProp.GetString()}");
+                                string bearerToken = tokenProp.GetString();
 
-                                response = await client.ExecuteAsync(request);
+                                // Step 2: list messages
+                                var messagesRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.mail.tm/messages");
+                                messagesRequest.Headers.Add("Authorization", $"Bearer {bearerToken}");
+                                var messagesResponse = await client.SendAsync(messagesRequest);
 
-                                if (!response.IsSuccessful)
+                                if (!messagesResponse.IsSuccessStatusCode)
                                 {
                                     continue;
                                 }
 
-                                doc = JsonDocument.Parse(response.Content);
-                                root = doc.RootElement;
+                                string messagesText = await messagesResponse.Content.ReadAsStringAsync();
+                                var messagesDoc = JsonDocument.Parse(messagesText);
+                                var messagesRoot = messagesDoc.RootElement;
 
-                                if (root.TryGetProperty("hydra:member", out var messagesArray))
+                                if (messagesRoot.TryGetProperty("hydra:member", out var messagesArray))
                                 {
                                     foreach (var message in messagesArray.EnumerateArray())
                                     {
                                         if (message.TryGetProperty("id", out var idProp))
                                         {
-                                            request = new RestRequest($"/messages/{idProp.GetString()}", Method.Get);
-                                            request.AddHeader("Authorization", $"Bearer {tokenProp.GetString()}");
+                                            // Step 3: fetch individual message
+                                            var msgRequest = new HttpRequestMessage(HttpMethod.Get, $"https://api.mail.tm/messages/{idProp.GetString()}");
+                                            msgRequest.Headers.Add("Authorization", $"Bearer {bearerToken}");
+                                            var msgResponse = await client.SendAsync(msgRequest);
 
-                                            response = await client.ExecuteAsync(request);
-
-                                            if (!response.IsSuccessful)
+                                            if (!msgResponse.IsSuccessStatusCode)
                                             {
                                                 continue;
                                             }
 
-                                            doc = JsonDocument.Parse(response.Content);
-                                            root = doc.RootElement;
-                                            if (root.TryGetProperty("text", out var text))
+                                            string msgText = await msgResponse.Content.ReadAsStringAsync();
+                                            var msgDoc = JsonDocument.Parse(msgText);
+                                            var msgRoot = msgDoc.RootElement;
+
+                                            if (msgRoot.TryGetProperty("text", out var text))
                                             {
                                                 string cleanedText = Regex.Replace(text.GetString(), @"[^\d\s]", "");
                                                 string pattern = @"\b\d{4,8}(?!\S)";
@@ -180,8 +173,6 @@ namespace Sunny.Subd.Core.Email
                                         }
                                     }
                                 }
-
-
 
                                 return tokenProp.GetString(); // Trả về token
                             }

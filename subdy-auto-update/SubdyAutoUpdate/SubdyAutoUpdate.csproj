@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- Native AOT -->
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>
+    <CustomResourceTypesSupport>true</CustomResourceTypesSupport>
+    <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <PublishLzmaCompressed>true</PublishLzmaCompressed>
+
+    <!-- Auto versioning -->
+    <CurrentTime>$([System.DateTime]::Now.ToString("HH.dd.MM.yyyy"))</CurrentTime>
+    <Version>$(CurrentTime)</Version>
+    <AssemblyVersion>$(CurrentTime)</AssemblyVersion>
+    <FileVersion>$(CurrentTime)</FileVersion>
+
+    <AssemblyName>SubdyAutoUpdate</AssemblyName>
+    <Product>SubdyAutoUpdate</Product>
+    <Company>Subdy</Company>
+    <Copyright>Subdy</Copyright>
+    <Title>Subdy Auto Update</Title>
+    <PackageProjectUrl>https://subdy.net/</PackageProjectUrl>
+    <ApplicationIcon>Resources\logo.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- AOT Reflection Config -->
+  <ItemGroup>
+    <RdXmlFile Include="rd.xml" />
+  </ItemGroup>
+
+  <!-- Trimming Rules -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="System.Drawing.Common" />
+    <TrimmerRootAssembly Include="System.Resources.Extensions" />
+    <TrimmerRootAssembly Include="System.ComponentModel.TypeConverter" />
+    <TrimmerRootAssembly Include="System.ComponentModel" />
+    <TrimmerRootAssembly Include="System.Windows.Forms" />
+    <TrimmerRootAssembly Include="mscorlib" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <IlcCompileInput Include="--parallelism:1" />
+  </ItemGroup>
+
+  <!-- Force WinForms binding support -->
+  <PropertyGroup>
+    <_WinFormsBindingSupport>true</_WinFormsBindingSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DeviceId.Windows" Version="6.9.0" />
+    <PackageReference Include="WinFormsComInterop" Version="0.5.0" />
+    <PackageReference Include="VC-LTL" Version="5.2.2" />
+    <PackageReference Include="YY-Thunks" Version="1.1.7" />
+    <PackageReference Include="PublishAotCompressed" Version="1.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\AntdUI\AntdUI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\logo.png" />
+  </ItemGroup>
+
+</Project>

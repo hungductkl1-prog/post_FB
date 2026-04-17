@@ -8,7 +8,7 @@
     using System.Threading;
 
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-    public class JobHistory : INotifyPropertyChanged
+    public class JobHistory : INotifyPropertyChanged, IThrottledNotify
     {
         private Guid _id = Guid.NewGuid();
         private string? _uid = string.Empty;
@@ -27,20 +27,15 @@
         public int STT { get; set; }
         public event PropertyChangedEventHandler? PropertyChanged;
 
+        public void RaisePropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
-            var handler = PropertyChanged;
-            if (handler == null) return;
-
-            var context = SynchronizationContext.Current;
-            if (context != null)
-            {
-                context.Post(_ => handler(this, new PropertyChangedEventArgs(propertyName)), null);
-            }
-            else
-            {
-                handler(this, new PropertyChangedEventArgs(propertyName));
-            }
+            if (propertyName == null) return;
+            ThrottledPropertyNotifier.MarkDirty(this, propertyName);
         }
 
         public Guid Id

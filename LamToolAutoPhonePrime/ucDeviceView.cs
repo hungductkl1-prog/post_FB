@@ -185,6 +185,7 @@ namespace LamToolAutoPhonePrime
                 }
 
 
+                if (instance == null) return;
                 instance.OnLoadSizeEvent += Scrcpy_OnLoadSizeEvent;
                 instance.VideoStreamDecoder.NewFrameEvent += VideoStreamDecoder_NewFrameEvent;
                 // Ẩn button4, button5 từ Designer (chúng ta dùng SDL buttons)
@@ -193,7 +194,7 @@ namespace LamToolAutoPhonePrime
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi khởi tạo ScrcpyManager: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine($"[ucDeviceView] Load error: {ex.Message}");
             }
         }
 

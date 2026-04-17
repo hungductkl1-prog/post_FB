@@ -7,7 +7,7 @@ using static Sunny.Subdy.Data.AppDbContext;
 namespace Sunny.Subdy.Data.Models
 {
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-    public class DeviceModel : INotifyPropertyChanged
+    public class DeviceModel : INotifyPropertyChanged, IThrottledNotify
     {
         [SqlKey]
         public int Id
@@ -22,6 +22,7 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
+
         private string _status;
         private string _os;
         private string _name;
@@ -35,6 +36,35 @@ namespace Sunny.Subdy.Data.Models
         private string _model;
         private string _nameFolder;
         private bool _isSelectControl;
+        private bool _isLive;
+        private bool _isAdbOnline;
+        private int _index;
+
+        // Cache PropertyChangedEventArgs to avoid allocations
+        private static readonly Dictionary<string, PropertyChangedEventArgs> _eventArgsCache = new()
+    {
+        { nameof(Id), new PropertyChangedEventArgs(nameof(Id)) },
+        { nameof(Status), new PropertyChangedEventArgs(nameof(Status)) },
+        { nameof(State), new PropertyChangedEventArgs(nameof(State)) },
+        { nameof(Serial), new PropertyChangedEventArgs(nameof(Serial)) },
+        { nameof(OS), new PropertyChangedEventArgs(nameof(OS)) },
+        { nameof(NameDevice), new PropertyChangedEventArgs(nameof(NameDevice)) },
+        { nameof(Checked), new PropertyChangedEventArgs(nameof(Checked)) },
+        { nameof(TypeColor), new PropertyChangedEventArgs(nameof(TypeColor)) },
+        { nameof(IsScrcpy), new PropertyChangedEventArgs(nameof(IsScrcpy)) },
+        { nameof(IsControl), new PropertyChangedEventArgs(nameof(IsControl)) },
+        { nameof(IsSelectControl), new PropertyChangedEventArgs(nameof(IsSelectControl)) },
+        { nameof(Model), new PropertyChangedEventArgs(nameof(Model)) },
+        { nameof(NameFolder), new PropertyChangedEventArgs(nameof(NameFolder)) },
+        { nameof(IsLive), new PropertyChangedEventArgs(nameof(IsLive)) },
+        { nameof(IsAdbOnline), new PropertyChangedEventArgs(nameof(IsAdbOnline)) },
+        { nameof(Index), new PropertyChangedEventArgs(nameof(Index)) }
+    };
+
+        public DeviceModel()
+        {
+        }
+
         public string Model
         {
             get => _model;
@@ -47,8 +77,10 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
+
         [NotMapped]
         public int RotationAngle { get; set; } = 0;
+
         [NotMapped]
         public bool IsControl
         {
@@ -62,6 +94,7 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
+
         [NotMapped]
         public bool IsSelectControl
         {
@@ -75,6 +108,7 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
+
         public int Port { get; set; }
 
         public bool IsScrcpy
@@ -89,7 +123,8 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
-        public string NameFolder    
+
+        public string NameFolder
         {
             get => _nameFolder;
             set
@@ -101,6 +136,7 @@ namespace Sunny.Subdy.Data.Models
                 }
             }
         }
+
         public string State
         {
             get => _state;
@@ -179,6 +215,50 @@ namespace Sunny.Subdy.Data.Models
             }
         }
 
+        /// <summary>IsLive = ATX/Appium connected successfully</summary>
+        [NotMapped]
+        public bool IsLive
+        {
+            get => _isLive;
+            set
+            {
+                if (_isLive != value)
+                {
+                    _isLive = value;
+                    OnPropertyChanged(nameof(IsLive));
+                }
+            }
+        }
+
+        /// <summary>IsAdbOnline = device visible in 'adb devices'</summary>
+        [NotMapped]
+        public bool IsAdbOnline
+        {
+            get => _isAdbOnline;
+            set
+            {
+                if (_isAdbOnline != value)
+                {
+                    _isAdbOnline = value;
+                    OnPropertyChanged(nameof(IsAdbOnline));
+                }
+            }
+        }
+
+        [NotMapped]
+        public int Index
+        {
+            get => _index;
+            set
+            {
+                if (_index != value)
+                {
+                    _index = value;
+                    OnPropertyChanged(nameof(Index));
+                }
+            }
+        }
+
         [NotMapped]
         public int TypeColor
         {
@@ -193,23 +273,21 @@ namespace Sunny.Subdy.Data.Models
             }
         }
 
-
         public event PropertyChangedEventHandler PropertyChanged;
+
+        public void RaisePropertyChanged(string propertyName)
+        {
+            if (!_eventArgsCache.TryGetValue(propertyName, out var eventArgs))
+            {
+                eventArgs = new PropertyChangedEventArgs(propertyName);
+            }
+            PropertyChanged?.Invoke(this, eventArgs);
+        }
 
         protected void OnPropertyChanged(string propertyName)
         {
-            var handler = PropertyChanged;
-            if (handler == null) return;
-
-            var context = SynchronizationContext.Current;
-            if (context != null)
-            {
-                context.Post(_ => handler(this, new PropertyChangedEventArgs(propertyName)), null);
-            }
-            else
-            {
-                handler(this, new PropertyChangedEventArgs(propertyName));
-            }
+            // Throttled: just mark dirty, the shared timer will fire the event on UI thread
+            ThrottledPropertyNotifier.MarkDirty(this, propertyName);
         }
     }
 }

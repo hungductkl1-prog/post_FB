@@ -1,5 +1,6 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Sunny.Subdy.Common.API.Model;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
@@ -28,8 +29,8 @@ namespace Sunny.Subdy.Common.API
                 {
                     throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
                 }
-                JObject jObject = JObject.Parse(resurl);
-                if (!Convert.ToBoolean(jObject["success"])) throw new Exception(jObject["error"].ToString());
+                var jObject = JsonNode.Parse(resurl)!.AsObject();
+                if (!Convert.ToBoolean(jObject["success"]?.ToString())) throw new Exception(jObject["error"].ToString());
                 User user = new User();
                 user.UserName = username;
                 user.Password = password;
@@ -68,8 +69,8 @@ namespace Sunny.Subdy.Common.API
                 {
                     throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
                 }
-                JObject jObject = JObject.Parse(resurl);
-                if (!Convert.ToBoolean(jObject["success"])) return jObject["error"].ToString();
+                var jObject = JsonNode.Parse(resurl)!.AsObject();
+                if (!Convert.ToBoolean(jObject["success"]?.ToString())) return jObject["error"].ToString();
 
                 return jObject["message"].ToString();
 
@@ -104,9 +105,9 @@ namespace Sunny.Subdy.Common.API
                     throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
                 }
 
-                JObject jObject = JObject.Parse(resurl);
+                var jObject = JsonNode.Parse(resurl)!.AsObject();
                 if (!resurl.Contains("success")) return ("error: " + jObject["error"]?.ToString(), "0");
-                if (!Convert.ToBoolean(jObject["success"])) return ("error: " + jObject["error"]?.ToString(), "0");
+                if (!Convert.ToBoolean(jObject["success"]?.ToString())) return ("error: " + jObject["error"]?.ToString(), "0");
 
                 return (jObject["message"].ToString(), jObject["balance"]["current"].ToString());
             }
@@ -122,9 +123,9 @@ namespace Sunny.Subdy.Common.API
                 string url = $"https://lamtool.net/api/license/check?tool_slug={nameApp}&device_code={key}";
                 string json = HttpRequestHelper.GET(url);
 
-                var obj = JObject.Parse(json);
+                var obj = JsonNode.Parse(json)!.AsObject();
 
-                bool success = obj["success"]?.Value<bool>() ?? false;
+                bool success = obj["success"]?.GetValue<bool>() ?? false;
                 string newVersion = obj["license"]?["tool"]?["version"]?.ToString() ?? "";
                 string updateUrl = obj["license"]?["tool"]?["updateUrl"]?.ToString() ?? "";
 
@@ -138,6 +139,9 @@ namespace Sunny.Subdy.Common.API
         }
         public static bool IsNewerVersion(string oldVersion, string newVersion)
         {
+            if (string.IsNullOrWhiteSpace(oldVersion) || string.IsNullOrWhiteSpace(newVersion))
+                return false;
+
             string[] currentVersionParts = oldVersion.Split('.');
             string[] newVersionParts = newVersion.Split('.');
 
@@ -148,8 +152,8 @@ namespace Sunny.Subdy.Common.API
 
             for (int i = 0; i < len; i++)
             {
-                int currentPart = i < currentVersionParts.Length ? int.Parse(currentVersionParts[i]) : 0;
-                int newPart = i < newVersionParts.Length ? int.Parse(newVersionParts[i]) : 0;
+                int currentPart = i < currentVersionParts.Length && int.TryParse(currentVersionParts[i], out var cp) ? cp : 0;
+                int newPart = i < newVersionParts.Length && int.TryParse(newVersionParts[i], out var np) ? np : 0;
 
                 if (currentPart < newPart)
                     return true;
@@ -196,7 +200,7 @@ WHERE uid IN ({inClause});";
             var jobs = new List<JobModel>();
             try
             {
-              
+
                 if (uids == null || uids.Count == 0)
                     return jobs;
                 string sqlQuery = BuildFindJobsByUidsQuery(uids);
@@ -209,19 +213,19 @@ WHERE uid IN ({inClause});";
                     ["sql"] = sqlQuery,
                     ["db_query_admin_password"] = "lam@300925",
                 };
-                string bodyJson = JsonConvert.SerializeObject(body);
+                string bodyJson = System.Text.Json.JsonSerializer.Serialize(body);
                 string json = HttpRequestHelper.POST_JSON(url, jsonBody: bodyJson);
                 if (string.IsNullOrEmpty(json))
                 {
                     throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
                 }
-                var responseObj = JObject.Parse(json);
+                var responseObj = JsonNode.Parse(json)!.AsObject();
                 bool isSuccess = Convert.ToBoolean(responseObj["success"].ToString());
                 if (!isSuccess)
                 {
                     throw new Exception(responseObj["error"].ToString());
                 }
-                var dataArray = responseObj["result"] as JArray;
+                var dataArray = responseObj["result"]?.AsArray();
                 if (dataArray != null)
                 {
                     foreach (var item in dataArray)
@@ -263,14 +267,14 @@ WHERE uid IN ({inClause});";
                     ["sql"] = sqlQuery,
                     ["db_query_admin_password"] = "lam@300925",
                 };
-                string bodyJson = JsonConvert.SerializeObject(body);
+                string bodyJson = System.Text.Json.JsonSerializer.Serialize(body);
                 string resurl = HttpRequestHelper.POST_JSON(url, jsonBody: bodyJson);
                 if (string.IsNullOrEmpty(resurl))
                 {
                     throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
                 }
-                JObject jObject = JObject.Parse(resurl);
-                if (!Convert.ToBoolean(jObject["success"])) return jObject["error"].ToString();
+                var jObject = JsonNode.Parse(resurl)!.AsObject();
+                if (!Convert.ToBoolean(jObject["success"]?.ToString())) return jObject["error"].ToString();
                 return jObject["success"].ToString();
             }
             catch (Exception ex)
@@ -283,7 +287,7 @@ WHERE uid IN ({inClause});";
         {
             try
             {
-                
+
                 string url = "https://vipfb.lamtool.net/api/db/query";
 
                 var body = new Dictionary<string, string>
@@ -291,14 +295,14 @@ WHERE uid IN ({inClause});";
                     ["sql"] = $"DELETE FROM jobs WHERE id = {id}",
                     ["db_query_admin_password"] = "lam@300925",
                 };
-                string bodyJson = JsonConvert.SerializeObject(body);
+                string bodyJson = System.Text.Json.JsonSerializer.Serialize(body);
                 string resurl = HttpRequestHelper.POST_JSON(url, jsonBody: bodyJson);
                 if (string.IsNullOrEmpty(resurl))
                 {
                     throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
                 }
-                JObject jObject = JObject.Parse(resurl);
-                if (!Convert.ToBoolean(jObject["success"])) return jObject["error"].ToString();
+                var jObject = JsonNode.Parse(resurl)!.AsObject();
+                if (!Convert.ToBoolean(jObject["success"]?.ToString())) return jObject["error"].ToString();
                 return jObject["success"].ToString();
             }
             catch (Exception ex)
@@ -310,13 +314,13 @@ WHERE uid IN ({inClause});";
     }
     public class AccountsVip
     {
-        [JsonProperty("uid")]
+        [JsonPropertyName("uid")]
         public string Uid { get; set; }
-        [JsonProperty("state")]
+        [JsonPropertyName("state")]
         public string State { get; set; }
-        [JsonProperty("deviceid")]
+        [JsonPropertyName("deviceid")]
         public string DeviceId { get; set; }
-        [JsonProperty("dateAt")]
+        [JsonPropertyName("dateAt")]
         public DateTime DateAt { get; set; }
     }
 }

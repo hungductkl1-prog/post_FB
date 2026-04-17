@@ -43,9 +43,6 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                 btnSave.Text = "Lưu";
             }
             jsonConfig = new ConfigHelper(this, configJson);
-            btnCancel.Click += btnCancel_Click;
-            btnSave.Click += btnSave_Click;
-            btn_setting.Click += btnCancel_Click;
             LoadEnable();
         }
         private void LoadEnable()

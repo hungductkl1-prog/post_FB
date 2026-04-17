@@ -463,6 +463,9 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
             Name = "fHDCapNhatThongTin";
             StartPosition = FormStartPosition.CenterParent;
             Text = "Cấu hình tương tác";
+            btnCancel.Click += btnCancel_Click;
+            btnSave.Click += btnSave_Click;
+            btn_setting.Click += btnCancel_Click;
             pnlHeader.ResumeLayout(false);
             ((ISupportInitialize)pictureBox1).EndInit();
             panel1.ResumeLayout(false);

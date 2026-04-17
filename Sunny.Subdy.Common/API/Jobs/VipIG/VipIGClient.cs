@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.Logs;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -54,7 +54,7 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
             response.EnsureSuccessStatusCode();
             string responseBody = await response.Content.ReadAsStringAsync();
 
-            JObject jObject = JObject.Parse(responseBody);
+            JsonObject jObject = JsonNode.Parse(responseBody)!.AsObject();
             string name = jObject["data"]?["user"]?.ToString();
             string coin = jObject["data"]?["sodu"]?.ToString();
 
@@ -131,8 +131,8 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
             var match = Regex.Match(html, @"id=""soduchinh"">(.+?)<");
             return match.Success ? match.Groups[1].Value : "";
         }
-       
-        public async Task<JObject> ClaimLikeReward(string id)
+
+        public async Task<JsonObject> ClaimLikeReward(string id)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "https://vipig.net/kiemtien/nhantien.php")
             {
@@ -140,10 +140,10 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
             };
             ApplyDefaultHeaders(request);
             var response = await _client.SendAsync(request);
-            return JObject.Parse(await response.Content.ReadAsStringAsync());
+            return JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsObject();
         }
 
-        public async Task<JObject> ClaimFollowReward(string id)
+        public async Task<JsonObject> ClaimFollowReward(string id)
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "https://vipig.net/kiemtien/subcheo/nhantien2.php")
             {
@@ -151,7 +151,7 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
             };
             ApplyDefaultHeaders(request);
             var response = await _client.SendAsync(request);
-            return JObject.Parse(await response.Content.ReadAsStringAsync());
+            return JsonNode.Parse(await response.Content.ReadAsStringAsync())!.AsObject();
         }
 
         public async Task<List<JobModel>> GetJobInstagram(string type)
@@ -168,7 +168,7 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
             var response = await _client.SendAsync(request);
             string content = await response.Content.ReadAsStringAsync();
 
-            var jsonArray = JArray.Parse(content);
+            var jsonArray = JsonNode.Parse(content)!.AsArray();
             var jobs = new List<JobModel>();
 
             foreach (var item in jsonArray)
@@ -240,7 +240,7 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
 
             }
             return "";
-           
+
         }
         public async Task<string> Register(string username, string password, string token)
         {

@@ -1,5 +1,5 @@
 ﻿using AutoAndroid;
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Services;
 using Sunny.Subdy.Common.Helper;
@@ -131,14 +131,15 @@ namespace Sunny.Subd.Core.Facebook
                 setting["timeoutHanhDong"] = SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown11", 5), _configKichBan.GetIntType("numericUpDown10", 20));
             }
             _stopwatch.Restart();
+            _mainService._sate = "Tải kịch bản";
 
             for (int i = 1; i <= actions.Count; i++)
             {
                 var action = actions[i - 1];
                 if (Stop())
                     return;
-                _mainService._sate = $"{i}/{actions.Count}: {action.Name}: ";
-                _mainService.SetStatus($"Đang chạy hành động...", 0);
+                _mainService._sate = $"Thực hiện {i}/{actions.Count}: {action.Name}";
+                _mainService.SetStatus($"Đang thực hiện...", 0);
                 await StartAction(action);
             }
         }
@@ -149,6 +150,7 @@ namespace Sunny.Subd.Core.Facebook
             try
             {
 
+                _mainService.SetStatus("Đang kiểm tra tài khoản...", 2);
                 await _mainService._facebookService.HanderAccount(_client, _account, 5, _mainService._ct, _mainService);
                 JsonHelper jsonHelper = new JsonHelper(action.Json, true);
                 lock (Globals.Lock)
@@ -432,7 +434,7 @@ namespace Sunny.Subd.Core.Facebook
                 {
                     if (!_client.ElementWithAttributes("//*[@content-desc=\"Make a post on Facebook\"]", 1, click: false))
                     {
-                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Go to Home...", 2);
+                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang về trang chủ...", 2);
                         OpenFacebookTimeline();
                         _client.Delay(2);
                     }
@@ -449,11 +451,11 @@ namespace Sunny.Subd.Core.Facebook
                         switch (xpath)
                         {
                             case "//*[@content-desc=\"Make a post on Facebook\"]":
-                                _mainService.SetStatus("Tap " + xpath + "...", 2);
+                                _mainService.SetStatus("Đang mở khung đăng bài...", 2, logDetail: $"[Farming.DangBai] tap={xpath}");
                                 _client.ElementWithAttributes(xpath, 5, xml);
                                 break;
                             default:
-                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Scroll...", 2);
+                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang lướt tìm nút đăng bài...", 2);
                                 if (ScrollScreen(-1))
                                 {
                                     //  kiem tra dang nhap
@@ -480,7 +482,7 @@ namespace Sunny.Subd.Core.Facebook
                                 _client.ADBKeyboardService.ClearInputWithADBKeyboard();
                                 if (!string.IsNullOrEmpty(content))
                                 {
-                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Đăng text...", 2);
+                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập nội dung bài viết...", 2);
                                     content = SubdyHelper.SpinText(content);
                                     _client.Delay(2);
 
@@ -490,20 +492,20 @@ namespace Sunny.Subd.Core.Facebook
                                     _client.Delay(2);
                                     if (isBackgroud)
                                     {
-                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Find background...", 2);
+                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang tìm màu nền...", 2);
                                         var list3 = _client.FindBounds("", "//*[contains(@content-desc,\", background\")]", 0);
                                         if (list3.Count > 2)
                                         {
                                             var list4 = _client.GetAttributeValuesFromXmlNodes("", "//*[contains(@content-desc,\", background\")]");
                                             list4.RemoveAt(list4.Count - 1);
-                                            _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Tap background...", 2);
+                                            _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang chọn màu nền...", 2);
                                             var point = ParseCoordinate(list4[SubdyHelper.RandomValue(0, list4.Count)]);
                                             _client.Click(point.X, point.Y);
                                         }
                                     }
                                     if (isHastag && hastag.Any())
                                     {
-                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Nhập hastag...", 2);
+                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập hashtag...", 2);
                                         foreach (var item in hastag)
                                         {
                                             string text = "";
@@ -544,7 +546,7 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 if (isLink && !string.IsNullOrEmpty(link))
                                 {
-                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Nhập link...", 2);
+                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập liên kết...", 2);
                                     _client.ADBKeyboardService.Input(link, false);
                                     _client.ADB.Shell("input keyevent 62");
                                     if (_client.ElementWithAttributes("//*[contains(@content-desc,'Shared Link')]", 10, click: false))
@@ -557,7 +559,7 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 if (isNeuBat)
                                 {
-                                    _mainService.SetStatus($"Tag highlight...", 2);
+                                    _mainService.SetStatus($"Đang gắn thẻ nổi bật...", 2);
                                     List<string> neubats = new List<string> { "@highlight", "@neu" };
                                     foreach (var item in neubats)
                                     {
@@ -590,7 +592,7 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 if (isFollower)
                                 {
-                                    _mainService.SetStatus($"Tag followers...", 2);
+                                    _mainService.SetStatus($"Đang gắn thẻ người theo dõi...", 2);
 
                                     List<string> neubats = new List<string> { "@followers", "@nguoi" };
                                     foreach (var item in neubats)
@@ -626,7 +628,7 @@ namespace Sunny.Subd.Core.Facebook
                                 {
                                     UploadMediaFiles(medias);
                                     _client.ElementWithAttributes("//*[@content-desc='Photo/video']", 5);
-                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Upload media...", 2);
+                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang tải ảnh/video lên...", 2);
                                     bool flag8 = false;
                                     for (int j = 0; j < 5; j++)
                                     {
@@ -637,7 +639,7 @@ namespace Sunny.Subd.Core.Facebook
                                         {
                                             if (xpath != "")
                                             {
-                                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet})," + "Tap " + xpath + "...", 2);
+                                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang mở khung đăng bài...", 2, logDetail: $"[Farming.DangBai] tap={xpath}");
                                                 _client.ElementWithAttributes(xpath);
                                             }
                                             else
@@ -662,7 +664,7 @@ namespace Sunny.Subd.Core.Facebook
                                             {
                                                 while (list4.Count == 0)
                                                 {
-                                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Scroll...", 2);
+                                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang lướt tìm nút đăng bài...", 2);
                                                     if (ScrollScreen())
                                                     {
                                                         break;
@@ -693,7 +695,7 @@ namespace Sunny.Subd.Core.Facebook
                                         _client.Shell("input keyevent 4");
                                     }
                                 }
-                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Tap " + xpath + "...", 2);
+                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang mở khung đăng bài...", 2, logDetail: $"[Farming.DangBai] tap={xpath}");
                                 _client.ElementWithAttributes("//*[@content-desc='NEXT'][@enabled='true']");
                                 int tickCount1 = Environment.TickCount;
                                 await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(3, 6), $"({countPost}/{soLuongBaiViet}), Tap Post, " + "đợi" + " {time}s...", 2);
@@ -1464,11 +1466,11 @@ namespace Sunny.Subd.Core.Facebook
                         switch (xpath)
                         {
                             case "//*[@content-desc=\"Make a post on Facebook\"]":
-                                _mainService.SetStatus("Tap " + xpath + "...", 2);
+                                _mainService.SetStatus("Đang mở khung đăng bài...", 2, logDetail: $"[Farming.DangBai] tap={xpath}");
                                 _client.ElementWithAttributes(xpath, 5, xml);
                                 break;
                             default:
-                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Scroll...", 2);
+                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang lướt tìm nút đăng bài...", 2);
                                 if (ScrollScreen(-1))
                                 {
                                     //  kiem tra dang nhap
@@ -1495,7 +1497,7 @@ namespace Sunny.Subd.Core.Facebook
                                 _client.ADBKeyboardService.ClearInputWithADBKeyboard();
                                 if (!string.IsNullOrEmpty(content))
                                 {
-                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Đăng text...", 2);
+                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập nội dung bài viết...", 2);
                                     content = SubdyHelper.SpinText(content);
                                     _client.Delay(2);
 
@@ -1505,20 +1507,20 @@ namespace Sunny.Subd.Core.Facebook
                                     _client.Delay(2);
                                     if (isBackgroud)
                                     {
-                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Find background...", 2);
+                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang tìm màu nền...", 2);
                                         var list3 = _client.FindBounds("", "//*[contains(@content-desc,\", background\")]", 0);
                                         if (list3.Count > 2)
                                         {
                                             var list4 = _client.GetAttributeValuesFromXmlNodes("", "//*[contains(@content-desc,\", background\")]");
                                             list4.RemoveAt(list4.Count - 1);
-                                            _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Tap background...", 2);
+                                            _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang chọn màu nền...", 2);
                                             var point = ParseCoordinate(list4[SubdyHelper.RandomValue(0, list4.Count)]);
                                             _client.Click(point.X, point.Y);
                                         }
                                     }
                                     if (isHastag && hastag.Any())
                                     {
-                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Nhập hastag...", 2);
+                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập hashtag...", 2);
                                         foreach (var item in hastag)
                                         {
                                             string text = "";
@@ -1559,7 +1561,7 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 if (isLink && !string.IsNullOrEmpty(link))
                                 {
-                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Nhập link...", 2);
+                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập liên kết...", 2);
                                     _client.ADBKeyboardService.Input(link, false);
                                     _client.ADB.Shell("input keyevent 62");
                                     if (_client.ElementWithAttributes("//*[contains(translate(@content-desc, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'shared link')]", 10, click: false))
@@ -1572,7 +1574,7 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 if (isNeuBat)
                                 {
-                                    _mainService.SetStatus($"Tag highlight...", 2);
+                                    _mainService.SetStatus($"Đang gắn thẻ nổi bật...", 2);
                                     List<string> neubats = new List<string> { "@highlight", "@neu" };
                                     foreach (var item in neubats)
                                     {
@@ -1605,7 +1607,7 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 if (isFollower)
                                 {
-                                    _mainService.SetStatus($"Tag followers...", 2);
+                                    _mainService.SetStatus($"Đang gắn thẻ người theo dõi...", 2);
 
                                     List<string> neubats = new List<string> { "@followers", "@nguoi" };
                                     foreach (var item in neubats)
@@ -1641,7 +1643,7 @@ namespace Sunny.Subd.Core.Facebook
                                 {
                                     UploadMediaFiles(medias);
                                     _client.ElementWithAttributes("//*[@content-desc='Photo/video']", 5);
-                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Upload media...", 2);
+                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang tải ảnh/video lên...", 2);
                                     bool flag8 = false;
                                     for (int j = 0; j < 5; j++)
                                     {
@@ -1652,7 +1654,7 @@ namespace Sunny.Subd.Core.Facebook
                                         {
                                             if (xpath != "")
                                             {
-                                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet})," + "Tap " + xpath + "...", 2);
+                                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang mở khung đăng bài...", 2, logDetail: $"[Farming.DangBai] tap={xpath}");
                                                 _client.ElementWithAttributes(xpath);
                                             }
                                             else
@@ -1677,7 +1679,7 @@ namespace Sunny.Subd.Core.Facebook
                                             {
                                                 while (list4.Count == 0)
                                                 {
-                                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Scroll...", 2);
+                                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang lướt tìm nút đăng bài...", 2);
                                                     if (ScrollScreen())
                                                     {
                                                         break;
@@ -1710,7 +1712,7 @@ namespace Sunny.Subd.Core.Facebook
                                 break;
                             case "//*[@content-desc='POST'][@enabled='true']":
                                 {
-                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Tap " + xpath + "...", 2);
+                                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang mở khung đăng bài...", 2, logDetail: $"[Farming.DangBai] tap={xpath}");
                                     _client.ElementWithAttributes(xpath);
                                     int tickCount1 = Environment.TickCount;
                                     await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(3, 6), $"({countPost}/{soLuongBaiViet}), Tap Post, " + "đợi" + " {time}s...", 2);
@@ -1904,7 +1906,7 @@ namespace Sunny.Subd.Core.Facebook
                 if (!File.Exists(medias)) continue;
                 try
                 {
-                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Upload media...", 2);
+                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang tải ảnh/video lên...", 2);
                     UploadMediaFiles(new List<string> { medias });
                     DeplinkFacebook("fb://profile");
                     int tickCount = Environment.TickCount;
@@ -1921,11 +1923,11 @@ namespace Sunny.Subd.Core.Facebook
                         switch (xpath)
                         {
                             case "//*[@content-desc=\"Reel\"]":
-                                _mainService.SetStatus("Tap " + xpath + "...", 2);
+                                _mainService.SetStatus("Đang mở khung đăng bài...", 2, logDetail: $"[Farming.DangBai] tap={xpath}");
                                 _client.ElementWithAttributes(xpath, 5, xml);
                                 break;
                             default:
-                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Scroll...", 2);
+                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang lướt tìm nút đăng bài...", 2);
                                 if (ScrollScreen(1, 1))
                                 {
                                     //  kiem tra dang nhap
@@ -1944,7 +1946,7 @@ namespace Sunny.Subd.Core.Facebook
                                     _client.ADBKeyboardService.ClearInputWithADBKeyboard();
                                     if (!string.IsNullOrEmpty(content))
                                     {
-                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Đăng text...", 2);
+                                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập nội dung bài viết...", 2);
                                         content = SubdyHelper.SpinText(content);
                                         _client.Delay(2);
 
@@ -1954,7 +1956,7 @@ namespace Sunny.Subd.Core.Facebook
                                         _client.Delay(2);
                                         if (isHastag && hastag.Any())
                                         {
-                                            _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Nhập hastag...", 2);
+                                            _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Đang nhập hashtag...", 2);
                                             foreach (var item in hastag)
                                             {
                                                 string text = "";
@@ -2375,7 +2377,7 @@ namespace Sunny.Subd.Core.Facebook
                 while (true)
                 {
                 IL_Restart:
-                    SetStatusAccount(accountId, status + "Go to Home...");
+                    SetStatusAccount(accountId, status + "Đang về trang chủ...");
                     OpenFacebookTimeline();
                     _client.Delay(3);
                     switch (Login())
@@ -3256,7 +3258,7 @@ namespace Sunny.Subd.Core.Facebook
                 }
                 if (neubat)
                 {
-                    _mainService.SetStatus($"Tag highlight...", 2);
+                    _mainService.SetStatus($"Đang gắn thẻ nổi bật...", 2);
                     List<string> neubats = new List<string> { "@highlight", "@neu" };
                     foreach (var item in neubats)
                     {
@@ -3286,7 +3288,7 @@ namespace Sunny.Subd.Core.Facebook
                 }
                 if (follower)
                 {
-                    _mainService.SetStatus($"Tag followers...", 2);
+                    _mainService.SetStatus($"Đang gắn thẻ người theo dõi...", 2);
                     List<string> neubats = new List<string> { "@followers", "@người", };
                     foreach (var item in neubats)
                     {
@@ -8152,7 +8154,7 @@ namespace Sunny.Subd.Core.Facebook
 
                     if (isNeuBat)
                     {
-                        _mainService.SetStatus($"Tag highlight...", 2);
+                        _mainService.SetStatus($"Đang gắn thẻ nổi bật...", 2);
                         List<string> neubats = new List<string> { "@highlight", "@neu" };
                         foreach (var item in neubats)
                         {
@@ -8185,7 +8187,7 @@ namespace Sunny.Subd.Core.Facebook
                     }
                     if (isFollowers)
                     {
-                        _mainService.SetStatus($"Tag followers...", 2);
+                        _mainService.SetStatus($"Đang gắn thẻ người theo dõi...", 2);
 
                         List<string> neubats = new List<string> { "@followers", "@nguoi" };
                         foreach (var item in neubats)
@@ -8276,7 +8278,7 @@ namespace Sunny.Subd.Core.Facebook
                                             }
                                             if (isNeuBat)
                                             {
-                                                _mainService.SetStatus($"Tag highlight...", 2);
+                                                _mainService.SetStatus($"Đang gắn thẻ nổi bật...", 2);
                                                 List<string> neubats = new List<string> { "@highlight", "@neu" };
                                                 foreach (var item in neubats)
                                                 {
@@ -8309,7 +8311,7 @@ namespace Sunny.Subd.Core.Facebook
                                             }
                                             if (isFollowers)
                                             {
-                                                _mainService.SetStatus($"Tag followers...", 2);
+                                                _mainService.SetStatus($"Đang gắn thẻ người theo dõi...", 2);
 
                                                 List<string> neubats = new List<string> { "@followers", "@nguoi" };
                                                 foreach (var item in neubats)
@@ -11193,12 +11195,12 @@ namespace Sunny.Subd.Core.Facebook
                     $"q=me(){{friends}}&fb_dtsg={fbDtsg}"
                 );
 
-                JObject obj = JObject.Parse(json);
+                JsonObject obj = JsonNode.Parse(json)!.AsObject();
 
-                int friendCount = obj[userId]!["friends"]!["nodes"].Count();
+                int friendCount = obj[userId]!["friends"]!["nodes"]!.AsArray().Count;
                 for (int i = 0; i < friendCount; i++)
                 {
-                    friendUids.Add(obj[userId]!["friends"]!["nodes"]![i]!["id"]!.ToString());
+                    friendUids.Add(obj[userId]!["friends"]!["nodes"]![i]!["id"]!.GetValue<string>());
                 }
             }
             catch (Exception)
@@ -12125,7 +12127,7 @@ namespace Sunny.Subd.Core.Facebook
             catch (IOException ex)
             {
                 // Ghi log hoặc xử lý khi có lỗi I/O
-                Console.WriteLine($"[ERROR] Cannot write to {PostsFile}: {ex.Message}");
+                Debug.WriteLine($"[ERROR] Cannot write to {PostsFile}: {ex.Message}");
             }
         }
         private int CreateGroups(int accountId, string prefixStatus, JsonHelper config, string actionName)
@@ -12262,8 +12264,8 @@ namespace Sunny.Subd.Core.Facebook
                     string response = request.RequestPost("https://www.facebook.com/api/graphql/", graphQL)
                                              .Replace("for (;;);", "");
 
-                    JObject json = JObject.Parse(response);
-                    foreach (JToken item in json[userId]!["groups"]!["nodes"]!)
+                    JsonObject json = JsonNode.Parse(response)!.AsObject();
+                    foreach (JsonNode? item in json[userId]!["groups"]!["nodes"]!.AsArray())
                     {
                         try
                         {
@@ -12286,8 +12288,8 @@ namespace Sunny.Subd.Core.Facebook
                     string url = $"https://www.facebook.com/ajax/typeahead/first_degree.php?fb_dtsg_ag={fb_dtsg_ag}&filter%5B0%5D=group&viewer={userId}&__user={userId}&__a=1&__dyn=&__comet_req=0&jazoest=26581";
                     string response = request.RequestGet(url).Replace("for (;;);", "");
 
-                    JObject json = JObject.Parse(response);
-                    foreach (JToken item in json["payload"]!["entries"]!)
+                    JsonObject json = JsonNode.Parse(response)!.AsObject();
+                    foreach (JsonNode? item in json["payload"]!["entries"]!.AsArray())
                     {
                         try
                         {
@@ -12382,12 +12384,13 @@ namespace Sunny.Subd.Core.Facebook
                         }
 
                         string json = "{\"data\": [" + Regex.Match(rawAuthData, "\\[(.*?)\\]").Groups[1].Value + "]}";
-                        JObject authJson = JObject.Parse(json);
+                        JsonObject authJson = JsonNode.Parse(json)!.AsObject();
 
-                        for (int j = 0; j < authJson["data"].Count(); j++)
+                        var authData = authJson["data"]!.AsArray();
+                        for (int j = 0; j < authData.Count; j++)
                         {
-                            cookies += authJson["data"]![j]!["name"]!.ToString() + "=" +
-                                       authJson["data"]![j]!["value"]!.ToString() + ";";
+                            cookies += authData[j]!["name"]!.GetValue<string>() + "=" +
+                                       authData[j]!["value"]!.GetValue<string>() + ";";
                         }
 
                         if (!string.IsNullOrEmpty(accessToken))
@@ -13557,7 +13560,7 @@ namespace Sunny.Subd.Core.Facebook
         }
         public bool ScrollScreen(int direction = 1, int repeatCount = 1, int speed = 0)
         {//CE16082B  FB3ACF2E
-            _mainService.SetStatus("Scroll...", 2);
+            _mainService.SetStatus("Đang lướt tìm nút đăng bài...", 2);
             var screen = _client.GetScreenResolution();
             int screenHeight = screen.Y;  // method_13
             int screenWidth = screen.X;    // method_14

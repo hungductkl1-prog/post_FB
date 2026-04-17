@@ -42,10 +42,6 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                 configJson = action?.Json ?? "";
             }
             jsonConfig = new JsonHelper(configJson, isJsonString: true);
-            this.Load += fHDDocThongBao_Load;
-            btnCancel.Click += btnCancel_Click;
-            btnSave.Click += btnSave_Click;
-            btn_setting.Click += btnCancel_Click;
             FontUtil.ApplyFontToAllControls(this);
         }
 

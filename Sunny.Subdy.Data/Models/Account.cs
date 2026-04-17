@@ -7,7 +7,7 @@ using static Sunny.Subdy.Data.AppDbContext;
 namespace Sunny.Subdy.Data.Models;
 
 [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-public class Account : INotifyPropertyChanged
+public class Account : INotifyPropertyChanged, IThrottledNotify
 {
     [SqlKey]
     public Guid Id { get => _id; set => SetField(ref _id, value); }
@@ -63,7 +63,7 @@ public class Account : INotifyPropertyChanged
 
     private bool _checked = false, _running = false, _isView = true;
     private int _colorType = 0, _total=0;
-    private string _jobToday = "0", _summary = "", _summary_Skip = "";
+    private string _jobToday = "0", _summary = "", _summary_Skip = "", _xuToday = "";
     private int _index = 0;
     public int JobTotal { get => _total; set => SetField(ref _total, value); }
     [NotMapped]
@@ -72,6 +72,8 @@ public class Account : INotifyPropertyChanged
     public string Summary { get => _summary; set => SetField(ref _summary, value); }
     [NotMapped]
     public string Summary_Skip { get => _summary_Skip; set => SetField(ref _summary_Skip, value); }
+    [NotMapped]
+    public string XuToday { get => _xuToday; set => SetField(ref _xuToday, value); }
 
     [NotMapped]
     public string NameScript  { get => _nameScript; set => SetField(ref _nameScript, value); }
@@ -81,20 +83,16 @@ public class Account : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    public void RaisePropertyChanged(string propertyName)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        var handler = PropertyChanged;
-        if (handler == null) return;
-
-        var context = SynchronizationContext.Current;
-        if (context != null)
-        {
-            context.Post(_ => handler(this, new PropertyChangedEventArgs(propertyName)), null);
-        }
-        else
-        {
-            handler(this, new PropertyChangedEventArgs(propertyName));
-        }
+        if (propertyName == null) return;
+        // Throttled: just mark dirty, the shared timer will fire the event on UI thread
+        ThrottledPropertyNotifier.MarkDirty(this, propertyName);
     }
 
     protected bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

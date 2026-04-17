@@ -18,12 +18,6 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
         {
             InitializeComponent();
             FontUtil.ApplyFontToAllControls(this);
-            checkBox5.CheckedChanged += ckbDefault_CheckedChanged;
-            checkBox6.CheckedChanged += ckbDefault_CheckedChanged;
-            checkBox7.CheckedChanged += ckbDefault_CheckedChanged;
-            radioButton5.CheckedChanged += ckbDefault_CheckedChanged;
-            txtLinks.TextChanged += txtLinks_TextChanged;
-            textBox1.TextChanged += txtLinks_TextChanged;
             _context = new ScriptActionContext();
             this.scriptId = scriptId;
             this.actionId = actionId;
@@ -49,9 +43,6 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                 btnSave.Text = "Lưu";
             }
             jsonConfig = new ConfigHelper(this, configJson);
-            btnCancel.Click += btnCancel_Click;
-            btnSave.Click += btnSave_Click;
-            btn_setting.Click += btnCancel_Click;
             LoadEnable();
         }
         private void LoadEnable()
