@@ -1132,6 +1132,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             string svgLoginPhone = "<svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\" width=\"24px\" fill=\"#1890ff\"><path d=\"M480-120v-80h280v-560H480v-80h280q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H480Zm-80-160-57-56 103-104H120v-80h326L343-624l57-56 200 200-200 200Z\"/></svg>";
             string svgDuplicate = "<svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\" width=\"24px\" fill=\"#531dab\"><path d=\"M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h168q13-36 43.5-58t68.5-22q38 0 68.5 22t43.5 58h168q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm280-560q17 0 28.5-11.5T520-800q0-17-11.5-28.5T480-840q-17 0-28.5 11.5T440-800q0 17 11.5 28.5T480-760ZM200-200v-560 560Z\"/></svg>";
             string svgName      = "<svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\" width=\"24px\" fill=\"#1890ff\"><path d=\"M160-160v-100l80-80v180h-80Zm160 0v-260l80-80v340h-80Zm160 0v-340l80 81v259h-80Zm160 0v-259l80-80v339h-80Zm160 0v-419l80-80v499h-80ZM160-440l280-280 160 160 200-200 80 80-280 280-160-160-280 280v-160Z\"/></svg>";
+            string svgSync      = "<svg xmlns=\"http://www.w3.org/2000/svg\" height=\"24px\" viewBox=\"0 -960 960 960\" width=\"24px\" fill=\"#13c2c2\"><path d=\"M160-160v-80h110l-16-14q-52-46-73-105t-21-119q0-111 66.5-197.5T400-790v84q-72 26-116 88.5T240-478q0 45 17 87.5t53 78.5l10 10v-98h80v240H160Zm400-10v-84q72-26 116-88.5T720-482q0-45-17-87.5T650-648l-10-10v98h-80v-240h240v80H690l16 14q49 49 71.5 106.5T800-482q0 111-66.5 197.5T560-170Z\"/></svg>";
 
             // Load dynamic items
             var scripts = _scriptContext.GetByPlatform(_platform);
@@ -1250,6 +1251,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 ),
                 // 11. Lọc trùng
                 new AntdUI.ContextMenuStripItem("Lọc trùng tài khoản").SetIcon(svgDuplicate),
+                // 11.5 Đồng bộ từ tool khác
+                new AntdUI.ContextMenuStripItem("Đồng bộ từ tool khác").SetIcon(svgSync).SetSub(
+                    new AntdUI.ContextMenuStripItem("MaxCare").SetIcon(svgSync),
+                    new AntdUI.ContextMenuStripItem("FPlus").SetIcon(svgSync),
+                    new AntdUI.ContextMenuStripItem("MetaMax").SetIcon(svgSync)
+                ),
                 // 12. Lịch sử
                 new AntdUI.ContextMenuStripItem("Lịch sử hoạt động [ HOT ]").SetIcon(svgHistory),
                 // 13. Xóa checkpoint
@@ -1585,6 +1592,11 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Lọc trùng tài khoản"))
             {
                 FilterDuplicateAccounts();
+            }
+            // ── Đồng bộ từ tool khác ──────────────────────────────────────────
+            else if (it.Text.Equals("MaxCare") || it.Text.Equals("FPlus") || it.Text.Equals("MetaMax"))
+            {
+                OpenSyncFromOtherTool(it.Text);
             }
             // ── Lịch sử ───────────────────────────────────────────────────────
             else if (it.Text.Equals("Lịch sử hoạt động [ HOT ]"))
@@ -2695,6 +2707,27 @@ namespace LamToolAutoPhonePrime.Views.Controls
             }
             string result = sb.ToString().Replace("Đã xóa: 0", $"Đã xóa: {deleted}");
             ShowBackupResultDialog("Dọn dẹp backup dư thừa", result);
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // ĐỒNG BỘ TỪ TOOL KHÁC (MaxCare / FPlus / MetaMax)
+        // ══════════════════════════════════════════════════════════════════════
+        private void OpenSyncFromOtherTool(string tool)
+        {
+            try
+            {
+                var f = new fSyncOtherTool(tool, _platform);
+                f.ShowDialog(_form);
+                if (f.IsOk)
+                {
+                    _ = LoadFolders();
+                    _ = LoadAccounts();
+                }
+            }
+            catch (Exception ex)
+            {
+                AntdHelper.MsgError(_form, $"Lỗi mở đồng bộ {tool}: {ex.Message}");
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════════

@@ -108,7 +108,19 @@ public sealed class ThrottledPropertyNotifier
             if (!_active.ContainsKey(owner)) continue;
 
             if (owner is IThrottledNotify t)
-                t.RaisePropertyChanged(propertyName);
+            {
+                try { t.RaisePropertyChanged(propertyName); }
+                catch (ObjectDisposedException)
+                {
+                    // Bound control was disposed between snapshot and raise — drop the owner.
+                    _active.TryRemove(owner, out _);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Bound control's handle not created yet (e.g. tab never shown).
+                    // The control will read the current value when its handle is created.
+                }
+            }
         }
     }
 }

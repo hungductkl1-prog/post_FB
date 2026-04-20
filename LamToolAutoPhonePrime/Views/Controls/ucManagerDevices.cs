@@ -1320,7 +1320,19 @@ namespace Sunny.Subdy.UI.View.Pages
 
                 // ── Wifi ──────────────────────────────────────────────────────
                 else if (text == "Kết nối wifi")
-                    await RunOnSelected(async c => { c.Shell("am start -a android.intent.action.MAIN -n com.android.settings/.wifi.WifiSettings"); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã mở cài đặt Wifi."); });
+                {
+                    var devices = GetSelectedDevices();
+                    if (devices.Count == 0) devices = DeviceServices.DeviceModels?.ToList() ?? new List<DeviceModel>();
+                    if (devices.Count == 0)
+                    {
+                        AntdUI.Message.warn(this.FindForm()!, "Không có thiết bị nào.", autoClose: 2);
+                    }
+                    else
+                    {
+                        var form = new LamToolAutoPhonePrime.Views.Forms.fDevicesWifi(devices);
+                        form.ShowDialog(this.FindForm());
+                    }
+                }
                 else if (text == "Bật wifi")
                     await RunOnSelected(async c => { await c.EnableWifi(); c.LogHelper.SUCCESS("Đã bật Wifi."); });
                 else if (text == "Tắt wifi")

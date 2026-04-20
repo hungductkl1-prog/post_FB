@@ -767,8 +767,8 @@ namespace Sunny.Subd.Core.Services
                     _sate = "Thực hiện kịch bản";
                     //if (SubdyHelper.JobServiceByPlatform(_platform).Contains(_config.JobService.Trim()))
                     //{
-                    _farmxu = new SpamXuHandler(_platform, _client, _config, _ct, _config.SettingJob, _account);
-                    await _farmxu.ExecuteAsync();
+                    //_farmxu = new SpamXuHandler(_platform, _client, _config, _ct, _config.SettingJob, _account);
+                    //await _farmxu.ExecuteAsync();
                     //}
                     //else
                     //{

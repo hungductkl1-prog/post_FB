@@ -230,10 +230,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             }
         }
 
-        private void RemoveOverLimitReactions()
+        private static readonly (string Type, string Low, string High)[] _jobLimitChecks = new (string Type, string Low, string High)[]
         {
-            var checks = new (string Type, string Low, string High)[]
-            {
             (JobTypes.Like, "numericUpDown3", "numericUpDown4"),
             (JobTypes.Love, "numericUpDown6", "numericUpDown5"),
             (JobTypes.Care, "numericUpDown27", "numericUpDown26"),
@@ -246,7 +244,37 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             (JobTypes.Share, "numericUpDown37", "numericUpDown38"),
             (JobTypes.Follow, "numericUpDown35", "numericUpDown34"),
             (JobTypes.LikeComment, "numericUpDown41", "numericUpDown40")
-            };
+        };
+
+        private List<JobModel> LimitJobsByQuota(List<JobModel> jobs)
+        {
+            var limited = new List<JobModel>();
+            foreach (var job in jobs)
+            {
+                string type = job.Type.ToLower();
+                if (!_job_types.Contains(type))
+                    continue;
+
+                int done = _doJobInfo.ContainsKey(type) ? _doJobInfo[type] : 0;
+                var check = _jobLimitChecks.FirstOrDefault(c => c.Type == type);
+                if (check.Type != null)
+                {
+                    int limit = SubdyHelper.RandomValue(
+                        _settingScriptAction.GetIntType(check.Low, 100),
+                        _settingScriptAction.GetIntType(check.High, 500));
+                    int remaining = limit - done;
+                    int countInList = limited.Count(j => j.Type.ToLower() == type);
+                    if (countInList >= remaining)
+                        continue;
+                }
+                limited.Add(job);
+            }
+            return limited;
+        }
+
+        private void RemoveOverLimitReactions()
+        {
+            var checks = _jobLimitChecks;
 
             foreach (var (type, minKey, maxKey) in checks)
             {
@@ -300,6 +328,14 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             //}
                             continue;
                         }
+
+                        // Giới hạn số job theo cài đặt min/max cho từng loại
+                        jobs = LimitJobsByQuota(jobs);
+                        if (!jobs.Any())
+                        {
+                            continue;
+                        }
+
                         List<string> listJob = new List<string>();
                         bool isClaim = true;
                         for (int index = 0; index < jobs.Count; index++)
@@ -310,6 +346,13 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                 continue;
                             }
                             _typeJob = job.Type.ToLower();
+
+                            // Kiểm tra nếu loại job đã bị xóa (đã đạt giới hạn) thì bỏ qua
+                            if (!_job_types.Contains(_typeJob))
+                            {
+                                continue;
+                            }
+
                             _sate = $"Thực hiện {_typeJob.ToUpper()} job {index + 1}/{jobs.Count}";
                             if (_typeJob == JobTypes.Follow && jobs.Count < 5 && _jobService == "https://vipig.net/" && _platform == "Instagram")
                             {
@@ -1186,6 +1229,19 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     _doJobInfo[type]++;
                     _doJobInfo[$"{type}_faillientiep"] = 0;
                     _account.JobTotal++;
+
+                    // Kiểm tra ngay sau khi tăng counter: nếu đã đủ lượt thì remove loại job này luôn
+                    var matchedCheck = _jobLimitChecks.FirstOrDefault(c => c.Type == type);
+                    if (matchedCheck.Type != null && _job_types.Contains(type))
+                    {
+                        int limit = SubdyHelper.RandomValue(
+                            _settingScriptAction.GetIntType(matchedCheck.Low, 100),
+                            _settingScriptAction.GetIntType(matchedCheck.High, 500));
+                        if (_doJobInfo[type] >= limit)
+                        {
+                            _job_types.Remove(type);
+                        }
+                    }
                     break;
             }
 
