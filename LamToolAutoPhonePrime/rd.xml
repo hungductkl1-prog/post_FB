@@ -62,6 +62,17 @@
 		<Assembly Name="Sunny.Subdy.Data" Dynamic="Required All" />
 		<Assembly Name="Sunny.Subdy.Server" Dynamic="Required All" />
 
+		<!-- SsaTheme uses reflection (GetField with BindingFlags.NonPublic) to retune designer-generated
+		     private fields. Without these directives, the trimmer strips private field metadata and
+		     GetField() returns null at runtime, so theme silently skips and UI falls back to legacy Designer layout. -->
+		<Assembly Name="GolikePhoneFarm" Dynamic="Required All">
+			<Type Name="LamToolAutoPhonePrime.fMain" Dynamic="Required All" />
+			<Type Name="LamToolAutoPhonePrime.Views.Controls.ucdgvAccount" Dynamic="Required All" />
+			<Type Name="LamToolAutoPhonePrime.Views.fQuanLyKichBan" Dynamic="Required All" />
+			<Type Name="LamToolAutoPhonePrime.Views.Forms.fSettingDefault" Dynamic="Required All" />
+			<Type Name="LamToolAutoPhonePrime.Views.Forms.fSettingJob" Dynamic="Required All" />
+		</Assembly>
+
 		<!-- Models sử dụng binding (chỉ rõ kiểu cần giữ metadata) -->
 		<Assembly Name="Sunny.Subdy.Data">
 			<Type Name="Sunny.Subdy.Data.Models.Account" Dynamic="Required All" />

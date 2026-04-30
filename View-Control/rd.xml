@@ -61,8 +61,8 @@
 			<Type Name="Sunny.Subdy.Data.Models.DeviceModel" Dynamic="Required All" />
 		</Assembly>
 
-		<!-- ViewControl forms -->
-		<Assembly Name="ViewControl">
+		<!-- ViewControl forms (assembly name = AssemblyName trong csproj = Golike-Android-View) -->
+		<Assembly Name="Golike-Android-View">
 			<Type Name="ViewControl.fSingleView" Dynamic="Required All" Preserve="All" />
 			<Type Name="ViewControl.fMultiView" Dynamic="Required All" Preserve="All" />
 			<Type Name="LamToolAutoPhonePrime.ucDeviceView" Dynamic="Required All" Preserve="All" />

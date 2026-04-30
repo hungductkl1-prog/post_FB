@@ -2,6 +2,7 @@
 using System.Text.Json.Nodes;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Services;
+using Sunny.Subd.Core.Utils;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Json;
 using Sunny.Subdy.Common.Logs;
@@ -92,7 +93,18 @@ namespace Sunny.Subd.Core.Facebook
         }
         public async Task ExecuteAsync()
         {
-            _script = _scriptContext.GetByName(_config.JobService, _mainService._platform);
+            string scriptName = _account?.NameScript?.Trim() ?? "";
+            if (string.IsNullOrEmpty(scriptName))
+            {
+                // Không gán script → chạy script đầu tiên (không phải FarmXu) trong list
+                var all = _scriptContext.GetByPlatform(_mainService._platform) ?? new List<Script>();
+                _script = all.FirstOrDefault(s => !string.Equals(s.Name, "FarmXu", StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                _script = _scriptContext.GetByName(scriptName, _mainService._platform);
+            }
+
             if (_script == null)
             {
                 _mainService.SetStatus("Không tồn tại kịch bản.", 1);
@@ -140,7 +152,17 @@ namespace Sunny.Subd.Core.Facebook
                     return;
                 _mainService._sate = $"Thực hiện {i}/{actions.Count}: {action.Name}";
                 _mainService.SetStatus($"Đang thực hiện...", 0);
-                await StartAction(action);
+                _mainService.SetStatus("Đang kiểm tra tài khoản...", 2);
+                await _mainService._facebookService.HanderAccount(_client, _account, 5, _mainService._ct, _mainService);
+                try
+                {
+                    await StartAction(action);
+                }
+                catch
+                {
+                    
+                }
+                
             }
         }
 
@@ -149,9 +171,6 @@ namespace Sunny.Subd.Core.Facebook
             string error = "Thành công";
             try
             {
-
-                _mainService.SetStatus("Đang kiểm tra tài khoản...", 2);
-                await _mainService._facebookService.HanderAccount(_client, _account, 5, _mainService._ct, _mainService);
                 JsonHelper jsonHelper = new JsonHelper(action.Json, true);
                 lock (Globals.Lock)
                 {
@@ -196,6 +215,7 @@ namespace Sunny.Subd.Core.Facebook
                         await HDXemReel(jsonHelper, action);
                         break;
                     case FacebookFarmingType.HDXemStory:
+                        HDXemStory(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDXemWatch:
                         await HDXemWatch(jsonHelper, action);
@@ -237,10 +257,13 @@ namespace Sunny.Subd.Core.Facebook
                         await HDThamGiaNhom(jsonHelper, action);
                         break;
                     case FacebookFarmingType.HDRoiNhom:
+                        HDRoiNhom(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDTaoNhom:
+                        HDTaoNhom(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDTaoPage:
+                        HDTaoPage(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDDangBaiTuong:
                         await HDDangBaiTuong(jsonHelper, action);
@@ -255,48 +278,117 @@ namespace Sunny.Subd.Core.Facebook
                         await HDDangReel(jsonHelper, action);
                         break;
                     case FacebookFarmingType.HDDangStory:
+                        await HDDangStory(jsonHelper, action);
                         break;
                     case FacebookFarmingType.HDDanhGiaPage:
+                        HDDanhGiaPage(0, "", jsonHelper, action.Id.ToString(), action.Name);
                         break;
                     case FacebookFarmingType.HDBuffFollowUID:
+                        HDBuffFollowUID(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDMoiBanBeLikePage:
+                        HDMoiBanBeLikePage(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDMoiBanBeVaoNhom:
+                        HDMoiBanBeVaoNhom(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDDoiTen:
+                        {
+                            int status = 0;
+                            HDDoiTen(ref status, 0, "", jsonHelper, action.Name);
+                        }
                         break;
                     case FacebookFarmingType.HDDoiMatKhau:
+                        {
+                            int status = 0;
+                            HDDoiMatKhau(ref status, 0, "", jsonHelper, action.Name);
+                        }
                         break;
                     case FacebookFarmingType.HDOnOff2FA:
+                        HDOnOff2FA(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDXoaSdt:
+                        HDXoaSdt(0, "", action.Name);
                         break;
                     case FacebookFarmingType.HDAddMail:
+                        {
+                            int resultCode = 0, primaryStatus = 0, addMailStatus = 0;
+                            HDAddMail(ref resultCode, ref primaryStatus, ref addMailStatus, 0, "", jsonHelper, action.Id.ToString(), action.Name);
+                        }
                         break;
                     case FacebookFarmingType.HDCapNhatThongTin:
+                        {
+                            string updatedFields = "";
+                            HDCapNhatThongTin(ref updatedFields, 0, "", jsonHelper, action.Name);
+                        }
                         break;
                     case FacebookFarmingType.HDDangXuatThietBiCu:
+                        HDDangXuatThietBiCu(0, "", action.Name);
                         break;
                     case FacebookFarmingType.HDXoaThietBiTinCay:
+                        HDXoaThietBiTinCay(0, "", action.Name);
                         break;
                     case FacebookFarmingType.HDBatCheDoChuyenNghiep:
+                        HDBatCheDoChuyenNghiep(0, "", action.Name);
                         break;
                     case FacebookFarmingType.HDDongBoDanhBa:
+                        HDDongBoDanhBa(0, "", jsonHelper, action.Id.ToString(), action.Name);
                         break;
                     case FacebookFarmingType.HDTimKiemGoogle:
                         break;
                     case FacebookFarmingType.HDNhanTinBanBe:
                         break;
                     case FacebookFarmingType.HDUpAvatar:
+                        HDUpAvatar(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDUpCover:
+                        HDUpCover(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDNghiGiaiLao:
+                        HDNghiGiaiLao(0, "", jsonHelper, action.Name);
                         break;
                     case FacebookFarmingType.HDDangBaiPage:
+                        HDDangBaiPage(0, "", jsonHelper, action.Name, action.Id.ToString());
                         break;
                     case FacebookFarmingType.HDBuffLikePage:
+                        HDBuffLikePage(0, "", jsonHelper, action.Name);
+                        break;
+
+                    // Sub-mode (Phase C)
+                    case FacebookFarmingType.HDKetBanGoiY:
+                        {
+                            int successCount = 0;
+                            HDKetBanGoiY(ref successCount, 0, "", jsonHelper, action.Name);
+                        }
+                        break;
+                    case FacebookFarmingType.HDKetBanTheoTuKhoa:
+                        HDKetBanTheoTuKhoa(0, "", jsonHelper, action.Name);
+                        break;
+
+                    // Form 2B (Phase C)
+                    case FacebookFarmingType.HDSpamBanBe:
+                        HDSpamBanBe(0, "", jsonHelper, action.Name, action.Id.ToString());
+                        break;
+                    case FacebookFarmingType.HDSpamNhom:
+                        HDSpamNhom(0, "", jsonHelper, action.Name, action.Id.ToString());
+                        break;
+                    case FacebookFarmingType.HDSpamBaiViet:
+                        HDSpamBaiViet(0, "", jsonHelper, action.Name, action.Id.ToString());
+                        break;
+                    case FacebookFarmingType.HDSpamNewfeed:
+                        HDSpamNewfeed(0, "", jsonHelper, action.Name);
+                        break;
+                    case FacebookFarmingType.HDXoaReel:
+                        HDXoaReel(0, "", jsonHelper, action.Name, "", "");
+                        break;
+                    case FacebookFarmingType.HDVerifyAccount:
+                        {
+                            int verifyResult = 0;
+                            HDVerifyAccount(ref verifyResult, 0, "", jsonHelper, action.Id.ToString(), action.Name);
+                        }
+                        break;
+                    case FacebookFarmingType.HDCauHinhTaiKhoan:
+                        HDCauHinhTaiKhoan(0, "", action.Name);
                         break;
                 }
             }
@@ -350,7 +442,12 @@ namespace Sunny.Subd.Core.Facebook
 
         private void SetStatusAccount(int accountId, string status, int delay = 0)
         {
+            _mainService.SetStatus(status, 0);
+        }
 
+        private void SetStatusAccount(int accountId, string format, int time, int delay = 0)
+        {
+            _mainService.SetStatus(format.Replace("{time}", time.ToString()), 0);
         }
         public async Task<int> HDDangBaiTuong(JsonHelper settings, ScriptAction action)
         {
@@ -2464,7 +2561,16 @@ namespace Sunny.Subd.Core.Facebook
                                                                 SetStatusAccount(accountId, status + "Tap Reaction...");
                                                                 _client.ATXSwipe(point.X, point.Y, point2.X, point2.Y);
                                                                 _client.Delay(1);
-                                                                ReactToPost((Convert.ToInt32(reactionType[SubdyHelper.RandomValue(0, reactionType.Length - 1)].ToString()) + 1).ToString());
+                                                                if (!string.IsNullOrEmpty(reactionType))
+                                                                {
+                                                                    char rc = reactionType[SubdyHelper.RandomValue(0, reactionType.Length - 1)];
+                                                                    int rv;
+                                                                    if (int.TryParse(rc.ToString(), out rv))
+                                                                        ReactToPost((rv + 1).ToString());
+                                                                    else
+                                                                        ReactToPost();
+                                                                }
+                                                                else ReactToPost();
                                                                 _client.Delay(1);
                                                                 _client.ATXSwipe(point2.X, point2.Y, point.X, point.Y);
                                                                 _client.Delay(1);
@@ -3107,9 +3213,9 @@ namespace Sunny.Subd.Core.Facebook
                 string num = reation.ToLower();
 
                 _client.LongClick(elementLike.X, elementLike.Y, 1000);
-                if (!type.Contains("like"))
+                if (!type.Contains("like") && !string.IsNullOrEmpty(type))
                 {
-                    num = char.ToUpper(type[0]) + type.Substring(1);
+                    num = char.ToUpper(type[0]) + (type.Length > 1 ? type.Substring(1) : "");
                 }
                 if (_client.ElementWithAttributes($"//*[@content-desc='{num}']", 3))
                 {
@@ -4139,7 +4245,7 @@ namespace Sunny.Subd.Core.Facebook
                     if (groupType == 0)
                     {
                         SetStatusAccount(accountId, status + "Scan page...");
-                        string pageProxy = GetFacebookTokenAndCookies().Split('|')[1];
+                        string pageProxy = SafeParseHelper.SafeSplit(GetFacebookTokenAndCookies(), '|', 1);
                         pageList = GetSuggestedPageIds(pageProxy, "Proxy", 30);
                     }
                     else
@@ -5035,14 +5141,15 @@ namespace Sunny.Subd.Core.Facebook
                 else
                 {
                     SetStatusAccount(accountId, status + "Scan groups...");
-                    string fbToken = GetFacebookTokenAndCookies().Split('|')[1];
+                    var tokenParts = GetFacebookTokenAndCookies().Split('|');
+                    string fbToken = tokenParts.Length > 1 ? tokenParts[1] : "";
                     List<string> rawGroups = GetUserGroups(fbToken, "Proxy", 30, requireApproval);
 
                     // Filter groups according to settings
                     List<string> groups;
                     if (leaveType == 0)
                     {
-                        groups = rawGroups.Select(e => e.Split('|')[0]).ToList();
+                        groups = rawGroups.Select(e => SafeParseHelper.SafeSplit(e, '|', 0)).Where(s => !string.IsNullOrEmpty(s)).ToList();
                     }
                     else
                     {
@@ -5050,12 +5157,14 @@ namespace Sunny.Subd.Core.Facebook
                         if (requireApproval)
                         {
                             filteredGroups.AddRange(
-                                rawGroups.Where(g => g.Split('|')[3].ToLower() == "true").Select(g => g.Split('|')[0]));
+                                rawGroups.Where(g => { var p = g.Split('|'); return p.Length > 3 && p[3].ToLower() == "true"; })
+                                         .Select(g => SafeParseHelper.SafeSplit(g, '|', 0)));
                         }
                         if (requireMemberCondition)
                         {
                             filteredGroups.AddRange(
-                                rawGroups.Where(g => Convert.ToInt32(g.Split('|')[2]) < maxMembers).Select(g => g.Split('|')[0]));
+                                rawGroups.Where(g => { var p = g.Split('|'); return p.Length > 2 && int.TryParse(p[2], out int mc) && mc < maxMembers; })
+                                         .Select(g => SafeParseHelper.SafeSplit(g, '|', 0)));
                         }
                         if (requireKeyword)
                         {
@@ -11435,23 +11544,32 @@ namespace Sunny.Subd.Core.Facebook
                 string likeElement = _client.FindBounds("", "//*[contains(@content-desc, \"Like\")]", 1).FirstOrDefault();
                 if (!string.IsNullOrEmpty(likeElement))
                 {
-                    Point point = new RectangleArea(likeElement).GetCenterPoint();
-                    Point point2 = new RectangleArea("[35," + likeElement.Split(new string[3] { "[", ",", "]" }, StringSplitOptions.RemoveEmptyEntries)[1]
-                        + "][65," + likeElement.Split(new string[3] { "[", ",", "]" }, StringSplitOptions.RemoveEmptyEntries)[3] + "]").GetCenterPoint();
-                    SetStatusAccount(accountId, statusPrefix + "Tap Reaction...");
-                    _client.Swipe(point.X, point.Y, point2.X, point2.Y);
-                    _client.Delay(1, 1);
-
-                    string d80AC = "";
-                    if (likeParam != "")
+                    var likeCoords = likeElement.Split(new string[3] { "[", ",", "]" }, StringSplitOptions.RemoveEmptyEntries);
+                    if (likeCoords.Length >= 4)
                     {
-                        d80AC = (Convert.ToInt32(likeParam[SubdyHelper.RandomValue(0, likeParam.Length - 1)].ToString()) + 1).ToString();
+                        Point point = new RectangleArea(likeElement).GetCenterPoint();
+                        Point point2 = new RectangleArea("[35," + likeCoords[1] + "][65," + likeCoords[3] + "]").GetCenterPoint();
+                        SetStatusAccount(accountId, statusPrefix + "Tap Reaction...");
+                        _client.Swipe(point.X, point.Y, point2.X, point2.Y);
+                        _client.Delay(1, 1);
+
+                        string d80AC = "";
+                        if (!string.IsNullOrEmpty(likeParam))
+                        {
+                            char rc = likeParam[SubdyHelper.RandomValue(0, likeParam.Length - 1)];
+                            int rv;
+                            if (int.TryParse(rc.ToString(), out rv)) d80AC = (rv + 1).ToString();
+                        }
+                        ReactToPost(d80AC);
+                        _client.Delay(1, 1);
+                        _client.Swipe(point2.X, point2.Y, point.X, point.Y);
+                        _client.Delay(1, 1);
+                        likeCount++;
                     }
-                    ReactToPost(d80AC);
-                    _client.Delay(1, 1);
-                    _client.Swipe(point2.X, point2.Y, point.X, point.Y);
-                    _client.Delay(1, 1);
-                    likeCount++;
+                    else
+                    {
+                        SetStatusAccount(accountId, statusPrefix + "Like bounds parse lỗi, bỏ qua...");
+                    }
                 }
             }
 
@@ -13171,21 +13289,27 @@ namespace Sunny.Subd.Core.Facebook
                 string text2 = _client.FindBounds("", "//*[contains(@content-desc, \"Like\")]", 1).FirstOrDefault();
                 if (!string.IsNullOrEmpty(text2))
                 {
-                    Point point = new RectangleArea(text2).GetCenterPoint();
-                    Point point2 = new RectangleArea("[35," + text2.Split(new string[3] { "[", ",", "]" }, StringSplitOptions.RemoveEmptyEntries)[1] + "][65," + text2.Split(new string[3] { "[", ",", "]" }, StringSplitOptions.RemoveEmptyEntries)[3] + "]").GetCenterPoint();
-                    SetStatusAccount(accountId, accountName + "Tap Reaction...");
-                    _client.Swipe(point.X, point.Y, point2.X, point2.Y);
-                    _client.Delay(1);
-                    string d80AC = "";
-                    if (reactionPattern != "")
+                    var coords2 = text2.Split(new string[3] { "[", ",", "]" }, StringSplitOptions.RemoveEmptyEntries);
+                    if (coords2.Length >= 4)
                     {
-                        d80AC = (Convert.ToInt32(reactionPattern[SubdyHelper.RandomValue(0, reactionPattern.Length - 1)].ToString()) + 1).ToString();
+                        Point point = new RectangleArea(text2).GetCenterPoint();
+                        Point point2 = new RectangleArea("[35," + coords2[1] + "][65," + coords2[3] + "]").GetCenterPoint();
+                        SetStatusAccount(accountId, accountName + "Tap Reaction...");
+                        _client.Swipe(point.X, point.Y, point2.X, point2.Y);
+                        _client.Delay(1);
+                        string d80AC = "";
+                        if (!string.IsNullOrEmpty(reactionPattern))
+                        {
+                            char rc = reactionPattern[SubdyHelper.RandomValue(0, reactionPattern.Length - 1)];
+                            int rv;
+                            if (int.TryParse(rc.ToString(), out rv)) d80AC = (rv + 1).ToString();
+                        }
+                        ReactToPost(d80AC);
+                        _client.Delay(1);
+                        _client.Swipe(point2.X, point2.Y, point.X, point.Y);
+                        _client.Delay(1);
+                        likeCount++;
                     }
-                    ReactToPost(d80AC);
-                    _client.Delay(1);
-                    _client.Swipe(point2.X, point2.Y, point.X, point.Y);
-                    _client.Delay(1);
-                    likeCount++;
                 }
             }
             if (enableComment)
@@ -13266,11 +13390,18 @@ namespace Sunny.Subd.Core.Facebook
                 string output = _client.Shell("dumpsys activity activities | findstr mResumedActivity");
                 if (!string.IsNullOrEmpty(output))
                 {
-                    int startIndex = output.IndexOf("u0 ") + 3;
-                    int endIndex = output.IndexOf("}", startIndex);
-                    if (startIndex >= 0 && endIndex > startIndex)
+                    int iu0 = output.IndexOf("u0 ");
+                    if (iu0 >= 0)
                     {
-                        result = output.Substring(startIndex, endIndex - startIndex).Trim();
+                        int startIndex = iu0 + 3;
+                        if (startIndex <= output.Length)
+                        {
+                            int endIndex = output.IndexOf("}", startIndex);
+                            if (endIndex > startIndex)
+                            {
+                                result = output.Substring(startIndex, endIndex - startIndex).Trim();
+                            }
+                        }
                     }
                 }
             }
@@ -13305,7 +13436,14 @@ namespace Sunny.Subd.Core.Facebook
             {
                 // Chọn ngẫu nhiên 1 reaction trong danh sách cho phép
                 string pickedIndex = SubdyHelper.GetStringRandom(allowedList); // smethod_8 -> PickRandom
-                chosenReaction = reactions[Convert.ToInt32(pickedIndex) - 1];
+                if (int.TryParse((pickedIndex ?? "").Trim(), out int idx))
+                {
+                    int zeroBased = idx - 1;
+                    if (zeroBased >= 0 && zeroBased < reactions.Count)
+                    {
+                        chosenReaction = reactions[zeroBased];
+                    }
+                }
             }
 
             // Nếu không chọn được thì chọn random toàn bộ danh sách

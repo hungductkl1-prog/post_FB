@@ -6,6 +6,8 @@ using Sunny.Subdy.Data.Models;
 using System.Windows.Forms;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
 using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
+using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
@@ -197,7 +199,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             var folder = txtFolder.Text?.Trim() ?? "";
             if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
             {
-                CommonMethod.ShowMessageWarning($"Vui lòng kiểm tra lại thư mục: {folder}");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", $"Vui lòng kiểm tra lại thư mục: {folder}");
                 return;
             }
 
@@ -213,7 +215,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
                 if (categories.Count == 0)
                 {
-                    CommonMethod.ShowMessageWarning($"Không tìm thấy thư mục/nhóm trong {_tool}.");
+                    AntdHelper.NotifyWarn(this, "Cảnh báo", $"Không tìm thấy thư mục/nhóm trong {_tool}.");
                     return;
                 }
 
@@ -222,7 +224,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             catch (Exception ex)
             {
-                CommonMethod.ShowMessageError($"Lỗi đọc dữ liệu {_tool}: {ex.Message}");
+                ErrorHandler.Show(this, ex, "Lỗi đọc dữ liệu {_tool}");
             }
         }
 
@@ -231,7 +233,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             var r = new MaxCareReader(folder);
             if (!r.Exists())
             {
-                CommonMethod.ShowMessageWarning("Không tìm thấy file database của MaxCare.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Không tìm thấy file database của MaxCare.");
                 return new List<string>();
             }
             return r.GetFolders();
@@ -242,7 +244,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             var r = new FPlusReader(folder);
             if (!r.Exists())
             {
-                CommonMethod.ShowMessageWarning("Không tìm thấy file database của FPlus.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Không tìm thấy file database của FPlus.");
                 return new List<string>();
             }
             return r.GetFolders();
@@ -253,7 +255,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             var r = new MetaMaxReader(folder);
             if (!r.Exists())
             {
-                CommonMethod.ShowMessageWarning("Không tìm thấy file database của MetaMax.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Không tìm thấy file database của MetaMax.");
                 return new List<string>();
             }
             return r.GetFolders();
@@ -264,7 +266,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             string folder = txtFolder.Text?.Trim() ?? "";
             if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
             {
-                CommonMethod.ShowMessageWarning($"Vui lòng kiểm tra lại thư mục: {folder}");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", $"Vui lòng kiểm tra lại thư mục: {folder}");
                 return;
             }
 
@@ -279,12 +281,12 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             if (byFolder && string.IsNullOrEmpty(category))
             {
-                CommonMethod.ShowMessageWarning("Vui lòng chọn nhóm tài khoản.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng chọn nhóm tài khoản.");
                 return;
             }
             if (!byFolder && uids.Length == 0)
             {
-                CommonMethod.ShowMessageWarning("Vui lòng nhập danh sách UID cần đồng bộ.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng nhập danh sách UID cần đồng bộ.");
                 return;
             }
 
@@ -314,7 +316,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
                 Enabled = true;
             }
 
-            if (!string.IsNullOrEmpty(message)) CommonMethod.ShowMessageSuccess(message);
+            if (!string.IsNullOrEmpty(message)) AntdHelper.NotifySuccess(this, "Thành công", message);
             Close();
         }
 

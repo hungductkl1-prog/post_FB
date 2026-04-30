@@ -35,16 +35,7 @@ namespace LamToolAutoPhonePrime
         private int frameIntervalMs = 1000 / 30;
         private long lastFrameTimestamp = 0;
         private int processingFrame = 0;
-
-        // SDL Button state
-        private bool showButtons = false;
-        private SDL.SDL_Rect btnSettingsRect;
-        private SDL.SDL_Rect btnInfoRect;
-        private bool btnSettingsHovered = false;
-        private bool btnInfoHovered = false;
-        private System.Windows.Forms.Timer hideButtonsTimer;
-        private IntPtr btnSettingsTexture = IntPtr.Zero;
-        private IntPtr btnInfoTexture = IntPtr.Zero;
+        private bool firstFrameLogged = false;
 
         // Drag & Drop support
         private bool isDragging = false;
@@ -52,9 +43,32 @@ namespace LamToolAutoPhonePrime
         private Point dragStartLocation;
         private string textRender = "";
         private bool showOverlayText = true;
+        private int overlayTextAlpha = 255;
 
+        /// <summary>
+        /// Giữ tương thích với Form1.cs (main project) — subscribe để nhận click
+        /// vào menu Settings trong context menu của device. Sự kiện không còn fire
+        /// từ SDL button (đã bỏ), chỉ fire khi user chọn item trong popover menu.
+        /// </summary>
         public event EventHandler? SettingsButtonClicked;
-        public event EventHandler? InfoButtonClicked;
+
+        /// <summary>
+        /// Fire khi user touch/drag trên view. Toạ độ normalized (0..1)
+        /// theo render size. fMultiView broadcast sang tile khác khi sync ON.
+        /// </summary>
+        public event Action<NormalizedTouch>? UserTouch;
+        public event Action<NormalizedScroll>? UserScroll;
+        public event Action<KeycodeControlMessage>? UserKey;
+
+        public readonly record struct NormalizedTouch(
+            AndroidMotionEventAction Action,
+            double Nx, double Ny,
+            ulong PointerId,
+            AndroidMotionEventButtons Buttons);
+
+        public readonly record struct NormalizedScroll(
+            double Nx, double Ny,
+            AndroidMotionEventButtons Buttons);
         public ucDeviceView(DeviceModel device, bool showOverlayText, string textRender, Scrcpy scrcpy)
         {
             InitializeComponent();
@@ -78,16 +92,6 @@ namespace LamToolAutoPhonePrime
             panel1.MouseMove += Panel1_MouseMove;
             panel1.MouseUp += Panel1_MouseUp;
 
-            // Timer để auto-hide buttons
-            hideButtonsTimer = new System.Windows.Forms.Timer
-            {
-                Interval = 2000
-            };
-            hideButtonsTimer.Tick += (s, e) =>
-            {
-                showButtons = false;
-                hideButtonsTimer.Stop();
-            };
             pictureBox1.PreviewKeyDown += PictureBox1_PreviewKeyDown;
         }
 
@@ -121,6 +125,7 @@ namespace LamToolAutoPhonePrime
                 Metastate = KeycodeHelper.ConvertModifiers(e.Modifiers)
             };
             instance.SendControlCommand(msg);
+            UserKey?.Invoke(msg);
         }
 
         private void RoundPictureBox(PictureBox pic, int radius)
@@ -174,27 +179,40 @@ namespace LamToolAutoPhonePrime
         {
             try
             {
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] Load begin. PB size={pictureBox1.Width}x{pictureBox1.Height}, handle={pictureBox1.IsHandleCreated}");
                 RoundPictureBox(pictureBox1, 4);
-
 
                 EnsureSdlInitialized();
 
-                if (pictureBox1.IsHandleCreated)
+                // Force-create handle nếu chưa có để SDL có HWND hợp lệ
+                if (!pictureBox1.IsHandleCreated)
                 {
-                    sdlWinPtr = SDL.SDL_CreateWindowFrom(pictureBox1.Handle);
+                    var _ = pictureBox1.Handle; // chạm property để force CreateHandle
+                }
+                sdlWinPtr = SDL.SDL_CreateWindowFrom(pictureBox1.Handle);
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] SDL_CreateWindowFrom => {sdlWinPtr}");
+
+                if (instance == null) { Trace.WriteLine($"[ucDeviceView/{device.Serial}] instance is null"); return; }
+
+                // Nếu Scrcpy đã có size sẵn (đã connect xong trước khi UC được Add) → init render ngay
+                if (instance.Width > 0 && instance.Height > 0)
+                {
+                    renderSize = new Size(instance.Width, instance.Height);
+                    Trace.WriteLine($"[ucDeviceView/{device.Serial}] Pre-known size {renderSize.Width}x{renderSize.Height}, calling InitRender");
+                    lock (locker) { InitRender(); }
+                    Trace.WriteLine($"[ucDeviceView/{device.Serial}] After InitRender: sdlRender={sdlRender}, sdlTexture={sdlTexture}");
                 }
 
-
-                if (instance == null) return;
                 instance.OnLoadSizeEvent += Scrcpy_OnLoadSizeEvent;
                 instance.VideoStreamDecoder.NewFrameEvent += VideoStreamDecoder_NewFrameEvent;
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] Subscribed events");
                 // Ẩn button4, button5 từ Designer (chúng ta dùng SDL buttons)
                 if (button4 != null) button4.Visible = false;
                 if (button5 != null) button5.Visible = false;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ucDeviceView] Load error: {ex.Message}");
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] Load EXCEPTION: {ex}");
             }
         }
 
@@ -202,9 +220,6 @@ namespace LamToolAutoPhonePrime
         {
             try
             {
-                hideButtonsTimer?.Stop();
-                hideButtonsTimer?.Dispose();
-
                 if (instance != null)
                 {
                     try
@@ -217,16 +232,6 @@ namespace LamToolAutoPhonePrime
 
                 lock (locker)
                 {
-                    if (btnSettingsTexture != IntPtr.Zero)
-                    {
-                        SDL.SDL_DestroyTexture(btnSettingsTexture);
-                        btnSettingsTexture = IntPtr.Zero;
-                    }
-                    if (btnInfoTexture != IntPtr.Zero)
-                    {
-                        SDL.SDL_DestroyTexture(btnInfoTexture);
-                        btnInfoTexture = IntPtr.Zero;
-                    }
                     if (sdlTexture != IntPtr.Zero)
                     {
                         SDL.SDL_DestroyTexture(sdlTexture);
@@ -253,29 +258,11 @@ namespace LamToolAutoPhonePrime
 
         private void PictureBox1_MouseEnter(object? sender, EventArgs e)
         {
-            showButtons = true;
-            hideButtonsTimer.Stop();
-            hideButtonsTimer.Start();
             try { pictureBox1.Focus(); panel1.BorderColor = Color.Green; } catch { }
         }
 
         private void PictureBox1_MouseDown(object? sender, MouseEventArgs e)
         {
-
-            // Kiểm tra click vào buttons
-            if (showButtons)
-            {
-                if (IsPointInRect(e.Location, btnSettingsRect))
-                {
-                    OnSettingsButtonClick();
-                    return;
-                }
-                if (IsPointInRect(e.Location, btnInfoRect))
-                {
-                    OnInfoButtonClick();
-                    return;
-                }
-            }
             if (showOverlayText && e.Button == MouseButtons.Right)
             {
                 var ucMenuscrip = new ucMenuscripDevice(false) { Height = this.Size.Height };
@@ -305,34 +292,6 @@ namespace LamToolAutoPhonePrime
 
         private void PictureBox1_MouseMove(object? sender, MouseEventArgs e)
         {
-            // Update button hover state
-            if (showButtons)
-            {
-                bool wasHovered = btnSettingsHovered || btnInfoHovered;
-                btnSettingsHovered = IsPointInRect(e.Location, btnSettingsRect);
-                btnInfoHovered = IsPointInRect(e.Location, btnInfoRect);
-
-                bool isHovered = btnSettingsHovered || btnInfoHovered;
-
-                // Reset hide timer if hovering buttons
-                if (isHovered)
-                {
-                    hideButtonsTimer.Stop();
-                    pictureBox1.Cursor = Cursors.Hand;
-                }
-                else
-                {
-                    hideButtonsTimer.Start();
-                    pictureBox1.Cursor = Cursors.Default;
-                }
-
-                // Force redraw if hover state changed
-                if (wasHovered != isHovered)
-                {
-                    // Trigger frame update
-                }
-            }
-
             // Touch move
             if (!isPointerDown || moveThrottle.ElapsedMilliseconds < moveIntervalMs)
                 return;
@@ -357,8 +316,6 @@ namespace LamToolAutoPhonePrime
 
         private void PictureBox1_MouseLeave(object? sender, EventArgs e)
         {
-            btnSettingsHovered = false;
-            btnInfoHovered = false;
             pictureBox1.Cursor = Cursors.Default;
             panel1.BorderColor = Color.RoyalBlue;
             if (!isPointerDown)
@@ -374,16 +331,24 @@ namespace LamToolAutoPhonePrime
         {
             if (panel1.BorderColor != Color.Green) return;
             var pos = GetTouchPosition(e.Location);
+            var buttons = e.Delta > 0
+                ? AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_FORWARD
+                : AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_BACK;
             var msg = new TouchEventControlMessage
             {
                 Action = AndroidMotionEventAction.AMOTION_EVENT_ACTION_SCROLL,
                 Position = pos,
                 PointerId = currentPointerId,
-                Buttons = e.Delta > 0
-                    ? AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_FORWARD
-                    : AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_BACK
+                Buttons = buttons
             };
             SafeSend(msg);
+
+            if (renderSize.Width > 0 && renderSize.Height > 0 && UserScroll != null)
+            {
+                double nx = pos.Point.X / (double)renderSize.Width;
+                double ny = pos.Point.Y / (double)renderSize.Height;
+                UserScroll.Invoke(new NormalizedScroll(nx, ny, buttons));
+            }
         }
 
 
@@ -486,43 +451,29 @@ namespace LamToolAutoPhonePrime
 
         #endregion
 
-        #region Button Actions
-
-        private void OnSettingsButtonClick()
-        {
-            SettingsButtonClicked?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void OnInfoButtonClick()
-        {
-            MessageBox.Show(
-                $"Device: {device.NameDevice}\n" +
-                $"Serial: {device.Serial}\n" +
-                $"Index: {device.Id}\n" +
-                $"Port: {device.Port}",
-                "Device Information",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
-        }
-
-        private bool IsPointInRect(Point p, SDL.SDL_Rect rect)
-        {
-            return p.X >= rect.x && p.X <= rect.x + rect.w &&
-                   p.Y >= rect.y && p.Y <= rect.y + rect.h;
-        }
-
-        #endregion
-
         #region Render
 
         private void Scrcpy_OnLoadSizeEvent(Size size)
         {
-            renderSize = size;
-            lock (locker)
+            Trace.WriteLine($"[ucDeviceView/{device.Serial}] OnLoadSizeEvent {size.Width}x{size.Height}, handle={IsHandleCreated}");
+            // Event này fire từ background thread của Scrcpy.ReadDeviceInfo
+            // Phải marshal về UI thread vì SDL_CreateWindowFrom/CreateRenderer
+            // cần HWND ở thread sở hữu cửa sổ.
+            if (IsDisposed || !IsHandleCreated) return;
+            try
             {
-                InitRender();
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    if (IsDisposed) return;
+                    renderSize = size;
+                    lock (locker)
+                    {
+                        InitRender();
+                    }
+                });
             }
+            catch (ObjectDisposedException) { }
+            catch (InvalidOperationException) { /* handle bị destroy */ }
         }
 
         private IntPtr CreateOutlinedTextTexture(IntPtr renderer, string text, Font font, Color fillColor, Color borderColor, int borderThickness = 2, int shadowOffset = 3)
@@ -613,6 +564,10 @@ namespace LamToolAutoPhonePrime
             if (tex1 == IntPtr.Zero && tex2 == IntPtr.Zero)
                 return;
 
+            byte alpha = (byte)Math.Max(0, Math.Min(255, overlayTextAlpha));
+            if (tex1 != IntPtr.Zero) SDL.SDL_SetTextureAlphaMod(tex1, alpha);
+            if (tex2 != IntPtr.Zero) SDL.SDL_SetTextureAlphaMod(tex2, alpha);
+
             int w1 = 0, h1 = 0, w2 = 0, h2 = 0;
             if (tex1 != IntPtr.Zero)
                 SDL.SDL_QueryTexture(tex1, out _, out _, out w1, out h1);
@@ -681,68 +636,17 @@ namespace LamToolAutoPhonePrime
 
             SDL.SDL_DestroyTexture(tex);
         }
-        private void DrawSDLButtons(IntPtr renderer)
-        {
-            if (!showButtons) return;
-
-            int winW = pictureBox1.ClientSize.Width;
-            int winH = pictureBox1.ClientSize.Height;
-
-            // Button size: 5% width, min 32, max 50
-            int btnSize = Math.Max(32, Math.Min(50, (int)(winW * 0.05)));
-            int marginRight = Math.Max(10, (int)(winW * 0.02));
-            int marginTop = Math.Max(10, (int)(winH * 0.02));
-            int spacing = Math.Max(8, btnSize / 5);
-
-            int x = winW - marginRight - btnSize;
-            int ySettings = marginTop;
-            int yInfo = ySettings + btnSize + spacing;
-
-            btnSettingsRect = new SDL.SDL_Rect { x = x, y = ySettings, w = btnSize, h = btnSize };
-            btnInfoRect = new SDL.SDL_Rect { x = x, y = yInfo, w = btnSize, h = btnSize };
-
-            // Draw Settings button
-            DrawButton(renderer, btnSettingsRect, "⚙", btnSettingsHovered);
-
-            // Draw Info button
-            DrawButton(renderer, btnInfoRect, "ℹ", btnInfoHovered);
-        }
-
-        private void DrawButton(IntPtr renderer, SDL.SDL_Rect rect, string icon, bool hovered)
-        {
-            // Background
-            byte alpha = (byte)(hovered ? 220 : 180);
-            SDL.SDL_SetRenderDrawBlendMode(renderer, SDL.SDL_BlendMode.SDL_BLENDMODE_BLEND);
-            SDL.SDL_SetRenderDrawColor(renderer, 40, 40, 40, alpha);
-            SDL.SDL_RenderFillRect(renderer, ref rect);
-
-            // Border
-            SDL.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100);
-            SDL.SDL_RenderDrawRect(renderer, ref rect);
-
-            // Icon
-            int iconSize = Math.Max(12, rect.w / 3);
-            using var font = new Font("Segoe UI Symbol", iconSize, FontStyle.Bold, GraphicsUnit.Pixel);
-            var iconTex = CreateOutlinedTextTexture(renderer, icon, font, Color.White, Color.Black, 1, 1);
-
-            if (iconTex != IntPtr.Zero)
-            {
-                SDL.SDL_QueryTexture(iconTex, out _, out _, out int w, out int h);
-                var iconRect = new SDL.SDL_Rect
-                {
-                    x = rect.x + (rect.w - w) / 2,
-                    y = rect.y + (rect.h - h) / 2,
-                    w = w,
-                    h = h
-                };
-                SDL.SDL_RenderCopy(renderer, iconTex, IntPtr.Zero, ref iconRect);
-                SDL.SDL_DestroyTexture(iconTex);
-            }
-        }
-
         private unsafe void VideoStreamDecoder_NewFrameEvent(AVFrame frame)
         {
-            if (!IsHandleCreated || !Visible || !pictureBox1.Visible)
+            if (!firstFrameLogged)
+            {
+                firstFrameLogged = true;
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] FIRST FRAME received {frame.width}x{frame.height}. handle={IsHandleCreated} visible={Visible} pbVisible={pictureBox1.Visible} pbHandle={pictureBox1.IsHandleCreated}");
+            }
+
+            // Chỉ kiểm tra handle hợp lệ — không kiểm tra Visible vì SDL render trực tiếp lên HWND
+            // Visible == false trong WinForms khi parent đang layout, nhưng HWND vẫn render được.
+            if (!pictureBox1.IsHandleCreated || IsDisposed)
                 return;
 
             long now = Stopwatch.GetTimestamp();
@@ -766,32 +670,55 @@ namespace LamToolAutoPhonePrime
                         InitRender();
                     }
 
+                    // Lazy re-init: frame đến nhưng render chưa sẵn sàng (race với OnLoadSizeEvent)
+                    if (sdlRender == IntPtr.Zero || sdlTexture == IntPtr.Zero)
+                    {
+                        if (renderSize.Width <= 0 || renderSize.Height <= 0)
+                        {
+                            renderSize = new Size(frame.width, frame.height);
+                        }
+                        InitRender();
+                    }
+
                     if (sdlTexture == IntPtr.Zero || sdlRender == IntPtr.Zero)
                         return;
 
-                    SDL_UpdateYUVTexture(sdlTexture, IntPtr.Zero,
+                    int rc = SDL_UpdateYUVTexture(sdlTexture, IntPtr.Zero,
                         new IntPtr(frame.data[0]), frame.linesize[0],
                         new IntPtr(frame.data[1]), frame.linesize[1],
                         new IntPtr(frame.data[2]), frame.linesize[2]);
+                    if (rc != 0)
+                    {
+                        Trace.WriteLine($"[ucDeviceView/{device.Serial}] UpdateYUV fail rc={rc} err={SDL.SDL_GetError()}");
+                    }
 
                     SDL.SDL_RenderClear(sdlRender);
                     SDL_RenderCopy(sdlRender, sdlTexture, IntPtr.Zero, ref updateRect);
-                    if (showOverlayText)
+                    if (showOverlayText && overlayTextAlpha > 0)
                     {
-                        DrawSDLButtons(sdlRender);
-                        DrawOverlayText(sdlRender, device.Id.ToString(), device.NameDevice.ToString());
+                        try
+                        {
+                            DrawOverlayText(sdlRender, device.Id.ToString(), device.NameDevice ?? device.Serial ?? "");
+                        }
+                        catch (Exception exOverlay)
+                        {
+                            Trace.WriteLine($"[ucDeviceView/{device.Serial}] Overlay error: {exOverlay.Message}");
+                        }
                     }
                     if (!string.IsNullOrEmpty(textRender))
                     {
-                        DrawBottomText(sdlRender, textRender);
+                        try { DrawBottomText(sdlRender, textRender); }
+                        catch (Exception exBottom) { Trace.WriteLine($"[ucDeviceView/{device.Serial}] Bottom text error: {exBottom.Message}"); }
                     }
-
-
 
                     SDL.SDL_RenderPresent(sdlRender);
 
                     lastFrameTimestamp = Stopwatch.GetTimestamp();
                 }
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] Frame render EXCEPTION: {ex.GetType().Name}: {ex.Message}");
             }
             finally
             {
@@ -801,6 +728,8 @@ namespace LamToolAutoPhonePrime
 
         private void PictureBox1_SizeChanged(object? sender, EventArgs e)
         {
+            if (pictureBox1.Width <= 0 || pictureBox1.Height <= 0) return;
+
             try
             {
                 RoundPictureBox(pictureBox1, 4);
@@ -810,6 +739,9 @@ namespace LamToolAutoPhonePrime
             lock (locker)
             {
                 isResize = true;
+                // KHÔNG destroy sdlWinPtr — SDL_CreateWindowFrom chỉ wrap HWND của PictureBox,
+                // SDL_DestroyWindow có thể destroy luôn HWND gốc → crash.
+                // Chỉ cần recreate renderer/texture; updateRect dùng ClientSize trực tiếp.
                 InitRender();
                 isResize = false;
             }
@@ -844,16 +776,45 @@ namespace LamToolAutoPhonePrime
             if (sdlWinPtr == IntPtr.Zero)
                 return;
 
-            SDL.SDL_GetWindowSize(sdlWinPtr, out int winW, out int winH);
+            // Lấy size thực tế từ Win32 window (PictureBox.ClientSize) — SDL_GetWindowSize
+            // chỉ cache size lúc CreateWindowFrom, không update khi HWND resize.
+            int winW = pictureBox1.ClientSize.Width;
+            int winH = pictureBox1.ClientSize.Height;
+            if (winW <= 0) winW = pictureBox1.Width;
+            if (winH <= 0) winH = pictureBox1.Height;
             updateRect = MakeThumb(renderSize.Width, renderSize.Height, winW, winH);
 
+            // Try ACCELERATED first; fallback SOFTWARE nếu GPU/D3D context fail
+            // (xảy ra khi nhiều SDL window con chia sẻ cùng GPU context trong multi-view)
             sdlRender = SDL.SDL_CreateRenderer(sdlWinPtr, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED);
-            if (renderSize.Width <= 0 || renderSize.Height <= 0)
+            if (sdlRender == IntPtr.Zero)
+            {
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] ACCELERATED renderer failed: {SDL.SDL_GetError()}, fallback to SOFTWARE");
+                sdlRender = SDL.SDL_CreateRenderer(sdlWinPtr, -1, SDL.SDL_RendererFlags.SDL_RENDERER_SOFTWARE);
+            }
+            if (sdlRender == IntPtr.Zero)
+            {
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] SDL_CreateRenderer failed entirely: {SDL.SDL_GetError()}");
                 return;
+            }
+
+            if (renderSize.Width <= 0 || renderSize.Height <= 0)
+            {
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] InitRender: renderSize invalid {renderSize.Width}x{renderSize.Height}, skip texture create");
+                return;
+            }
 
             sdlTexture = SDL.SDL_CreateTexture(sdlRender, SDL.SDL_PIXELFORMAT_IYUV,
-                (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_TARGET,
+                (int)SDL.SDL_TextureAccess.SDL_TEXTUREACCESS_STREAMING,
                 renderSize.Width, renderSize.Height);
+            if (sdlTexture == IntPtr.Zero)
+            {
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] SDL_CreateTexture failed: {SDL.SDL_GetError()}");
+            }
+            else
+            {
+                Trace.WriteLine($"[ucDeviceView/{device.Serial}] InitRender OK: render={sdlRender}, tex={sdlTexture}, size={renderSize.Width}x{renderSize.Height}, win={winW}x{winH}");
+            }
         }
 
         private SDL.SDL_Rect MakeThumb(int pw, int ph, int ww, int wh)
@@ -886,16 +847,26 @@ namespace LamToolAutoPhonePrime
 
         private void SendTouch(AndroidMotionEventAction action, Position pos, MouseButtons button)
         {
+            var buttons = button == MouseButtons.Right
+                ? AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_SECONDARY
+                : AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_PRIMARY;
+
             var msg = new TouchEventControlMessage
             {
                 Action = action,
                 Position = pos,
                 PointerId = currentPointerId,
-                Buttons = button == MouseButtons.Right
-                    ? AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_SECONDARY
-                    : AndroidMotionEventButtons.AMOTION_EVENT_BUTTON_PRIMARY
+                Buttons = buttons
             };
             SafeSend(msg);
+
+            // Broadcast normalized coords (chỉ khi pos hợp lệ)
+            if (renderSize.Width > 0 && renderSize.Height > 0 && UserTouch != null)
+            {
+                double nx = pos.Point.X / (double)renderSize.Width;
+                double ny = pos.Point.Y / (double)renderSize.Height;
+                UserTouch.Invoke(new NormalizedTouch(action, nx, ny, currentPointerId, buttons));
+            }
         }
 
         private void SafeSend(TouchEventControlMessage msg)
@@ -966,6 +937,109 @@ namespace LamToolAutoPhonePrime
             return instance != null && sdlRender != IntPtr.Zero;
         }
 
+        /// <summary>
+        /// Set độ trong suốt overlay text (deviceId + name). 0 = ẩn hẳn, 255 = đậm.
+        /// </summary>
+        public void SetOverlayAlpha(int alpha)
+        {
+            overlayTextAlpha = Math.Max(0, Math.Min(255, alpha));
+        }
+
+        /// <summary>
+        /// Bật/tắt hiển thị overlay text.
+        /// </summary>
+        public void SetOverlayVisible(bool visible)
+        {
+            showOverlayText = visible;
+        }
+
+        /// <summary>
+        /// Gửi 1 keycode (down + up) tới device qua scrcpy control channel.
+        /// Dùng cho các button Back/Home/Switch trên tile.
+        /// </summary>
+        public void SendKeycode(AndroidKeycode keycode)
+        {
+            if (instance == null) return;
+            try
+            {
+                var down = new KeycodeControlMessage
+                {
+                    Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_DOWN,
+                    KeyCode = keycode
+                };
+                var up = new KeycodeControlMessage
+                {
+                    Action = AndroidKeyEventAction.AKEY_EVENT_ACTION_UP,
+                    KeyCode = keycode
+                };
+                instance.SendControlCommand(down);
+                instance.SendControlCommand(up);
+            }
+            catch { }
+        }
+
+        public void ReplayKey(KeycodeControlMessage src)
+        {
+            if (instance == null) return;
+            try { instance.SendControlCommand(src); } catch { }
+        }
+
+        public Scrcpy? GetScrcpy() => instance;
+
+        /// <summary>
+        /// Replay 1 touch event từ tile khác (sync mode). Toạ độ normalized 0..1
+        /// được map sang renderSize của device này.
+        /// </summary>
+        public void ReplayTouch(NormalizedTouch t)
+        {
+            if (instance == null || renderSize.Width <= 0 || renderSize.Height <= 0) return;
+            int x = (int)Math.Max(0, Math.Min(t.Nx * renderSize.Width, renderSize.Width - 1));
+            int y = (int)Math.Max(0, Math.Min(t.Ny * renderSize.Height, renderSize.Height - 1));
+            try
+            {
+                instance.SendControlCommand(new TouchEventControlMessage
+                {
+                    Action = t.Action,
+                    PointerId = t.PointerId,
+                    Buttons = t.Buttons,
+                    Position = new Position
+                    {
+                        Point = new ScrcpyNet.Point { X = x, Y = y },
+                        ScreenSize = new ScreenSize
+                        {
+                            Width = (ushort)renderSize.Width,
+                            Height = (ushort)renderSize.Height
+                        }
+                    }
+                });
+            }
+            catch { }
+        }
+
+        public void ReplayScroll(NormalizedScroll s)
+        {
+            if (instance == null || renderSize.Width <= 0 || renderSize.Height <= 0) return;
+            int x = (int)Math.Max(0, Math.Min(s.Nx * renderSize.Width, renderSize.Width - 1));
+            int y = (int)Math.Max(0, Math.Min(s.Ny * renderSize.Height, renderSize.Height - 1));
+            try
+            {
+                instance.SendControlCommand(new TouchEventControlMessage
+                {
+                    Action = AndroidMotionEventAction.AMOTION_EVENT_ACTION_SCROLL,
+                    Buttons = s.Buttons,
+                    Position = new Position
+                    {
+                        Point = new ScrcpyNet.Point { X = x, Y = y },
+                        ScreenSize = new ScreenSize
+                        {
+                            Width = (ushort)renderSize.Width,
+                            Height = (ushort)renderSize.Height
+                        }
+                    }
+                });
+            }
+            catch { }
+        }
 
         #endregion
     }

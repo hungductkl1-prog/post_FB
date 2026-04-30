@@ -14,6 +14,20 @@ namespace Sunny.Subd.Core.Facebook
     public class FacebookHander
     {
         public const string DOWNLOAD_FACEBOOK = "https://www.facebook.com/download/direct/fb4a/";
+        public const string DOWNLOAD_INSTAGRAM = "https://vi.softonic.com/download/instagram/android/post-download/v/415.0.0.36.76?dt=internalDownload";
+
+        public static string DownloadUrl(string platform)
+        {
+            switch (platform)
+            {
+                case PlatformModel.Facebook:
+                    return DOWNLOAD_FACEBOOK;
+                case PlatformModel.Instagram:
+                    return DOWNLOAD_INSTAGRAM;
+                default:
+                    throw new ArgumentException("Unsupported platform: " + platform);
+            }
+        }
         public static List<string> TypeLogin = new List<string>
         {
             "Uid|Password",

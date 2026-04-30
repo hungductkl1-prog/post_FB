@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
 using System.Xml;
+using static Sunny.Subd.Core.Utils.XpathHelper;
 
 namespace Sunny.Subd.Core.Instagram
 {
@@ -81,27 +82,27 @@ namespace Sunny.Subd.Core.Instagram
                         case var c when XpathManagerInstagram.Get(XpathType.Loading).Contains(c): continue;
                         case var c when XpathManagerInstagram.Get(XpathType.CP282).Contains(c):
                             subyEnum = SubdyEnum.CP_282;
-                            message = $"Tài khoản bị 282. [{c}]";
+                            message = $"Tài khoản bị checkpoint 282 [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerInstagram.Get(XpathType.CP956).Contains(c):
                             subyEnum = SubdyEnum.CP_956;
-                            message = $"Tài khoản bị 956. [{c}]";
+                            message = $"Tài khoản bị checkpoint 956 [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerInstagram.Get(XpathType.Captcha).Contains(c):
                             subyEnum = SubdyEnum.Captcha;
-                            message = $"Tài khoản dính captcha. [{c}]";
+                            message = $"Tài khoản bị yêu cầu captcha [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerInstagram.Get(XpathType.Block).Contains(c):
                             subyEnum = SubdyEnum.Block;
-                            message = $"Tài khoản bị block. [{c}]";
+                            message = $"Tài khoản bị chặn [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerInstagram.Get(XpathType.Logout).Contains(c):
                             subyEnum = SubdyEnum.LogOut;
-                            message = $"Tài khoản bị đăng xuất. [{c}]";
+                            message = $"Tài khoản bị đăng xuất [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerInstagram.Get(XpathType.Success).Contains(c):
                             subyEnum = SubdyEnum.Success;
-                            message = $"Tài khoản đăng nhập thành công. [{c}]";
+                            message = $"Đăng nhập thành công [{ExtractReadable(c)}]";
                             return new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerInstagram.Get(XpathType.InputUserName).Contains(c):
                             await ImportUid();
@@ -198,44 +199,46 @@ namespace Sunny.Subd.Core.Instagram
                     case var c when XpathManagerInstagram.Get(XpathType.Loading).Contains(c): continue;
                     case var c when XpathManagerInstagram.Get(XpathType.CP282).Contains(c):
                         subyEnum = SubdyEnum.CP_282;
-                        message = $"Tài khoản bị 282. [{c}]";
+                        message = $"Tài khoản bị checkpoint 282 [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.CP956).Contains(c):
                         subyEnum = SubdyEnum.CP_956;
-                        message = $"Tài khoản bị 956. [{c}]";
+                        message = $"Tài khoản bị checkpoint 956 [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.Captcha).Contains(c):
                         subyEnum = SubdyEnum.Captcha;
-                        message = $"Tài khoản dính captcha. [{c}]";
+                        message = $"Tài khoản bị yêu cầu captcha [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.Block).Contains(c):
                         subyEnum = SubdyEnum.Block;
-                        message = $"Tài khoản bị block. [{c}]";
+                        message = $"Tài khoản bị chặn [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.Logout).Contains(c):
                         subyEnum = SubdyEnum.LogOut;
-                        message = $"Tài khoản bị đăng xuất. [{c}]";
+                        message = $"Tài khoản bị đăng xuất [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.Success).Contains(c):
                         subyEnum = SubdyEnum.Success;
-                        message = $"Tài khoản đăng nhập thành công. [{c}]";
+                        message = $"Đăng nhập thành công [{ExtractReadable(c)}]";
                         return new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.InputUserName).Contains(c):
                         subyEnum = SubdyEnum.LogOut;
-                        message = $"Tài khoản bị đăng xuất. [{c}]";
+                        message = $"Tài khoản bị đăng xuất [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.InputPassword).Contains(c):
                         subyEnum = SubdyEnum.LogOut;
-                        message = $"Tài khoản bị đăng xuất. [{c}]";
+                        message = $"Tài khoản bị đăng xuất [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.TowFA).Contains(c):
                         subyEnum = SubdyEnum.LogOut;
-                        message = $"Tài khoản bị đăng xuất. [{c}]";
+                        message = $"Tài khoản bị đăng xuất [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerInstagram.Get(XpathType.NavigationButton).Contains(c):
                         client.ElementWithAttributes(c, 1);
                         break;
                     case var c when XpathManagerFacebook.Get(XpathType.CashApp).Contains(c):
+                        SetStatus($"Phát hiện CashApp [{ExtractReadable(c)}], đang khôi phục và đăng nhập lại...", 2,
+                            logDetail: $"[InstagramService.HanderAccount] CashApp detected, case={c}");
                         await main.RestoreFacebookAsync();
                         return await Login(client, account, ct, timeout, main);
                 }

@@ -18,6 +18,7 @@ using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.Net;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace LamToolAutoPhonePrime
 {
@@ -39,6 +40,21 @@ namespace LamToolAutoPhonePrime
                 if (!IsEnvironmentReady())
                 {
                     RunLTPhoneHelper();
+
+                    // Re-check sau khi helper kết thúc. Nếu vẫn chưa ready
+                    // (user huỷ UAC, AppLocker chặn, helper crash...) thì báo
+                    // rõ thay vì RestartApp im lặng để rồi loop vô hạn.
+                    if (!IsEnvironmentReady())
+                    {
+                        MessageBox.Show(
+                            "Cài đặt môi trường chưa hoàn tất.\n" +
+                            "Vui lòng chạy GolikeHelper.exe (Right-click > Run as administrator) rồi thử lại.",
+                            "Thiếu môi trường",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                        return;
+                    }
+
                     RestartApp();
                     return;
                 }
@@ -46,6 +62,20 @@ namespace LamToolAutoPhonePrime
             catch (Exception ex)
             {
                 Trace.TraceError("Environment check failed: " + ex);
+            }
+
+            // Clean slate ADB: diệt mọi adb.exe zombie từ session khác (có thể đã
+            // được start dưới user thường, lock device khỏi context Admin của app).
+            // Sau đó start-server mới dưới quyền Admin để adb thực sự bind 5037 ổn định.
+            try
+            {
+                ADBHelper.KillAllAdbProcesses();
+                Thread.Sleep(500);
+                ADBHelper.EnsureServerStarted();
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("ADB clean slate failed: " + ex);
             }
 
             // Kiểm tra VCpp trước khi load font (chỉ mất thời gian nếu cần cài)
@@ -68,9 +98,11 @@ namespace LamToolAutoPhonePrime
             Globals.DeviceId = new DeviceIdBuilder()
                    .OnWindows(windows => windows.AddWindowsDeviceId())
                    .ToString();
+            // Gắn icon Golike cho toàn bộ form (cả dialog mở sau).
+            AppIconHelper.Install();
             using (var frm = new fLogin())
             {
-               frm.ShowDialog(); 
+               frm.ShowDialog();
             }
             Application.Run(new fMain());
         }
@@ -115,12 +147,12 @@ namespace LamToolAutoPhonePrime
         public static void RunLTPhoneHelper()
         {
             string helperPath = Path.Combine(
-                AppContext.BaseDirectory, "LTPhoneHelper.exe");
+                AppContext.BaseDirectory, "GolikeHelper.exe");
 
             if (!File.Exists(helperPath))
             {
                 MessageBox.Show(
-                    "Môi trường chưa được cài đặt.\nVui lòng chạy LTPhoneHelper.exe để thiết lập.",
+                    "Môi trường chưa được cài đặt.\nVui lòng chạy GolikeHelper.exe để thiết lập.",
                     "Thiếu môi trường",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -284,7 +316,7 @@ namespace LamToolAutoPhonePrime
         }
 
         private const string StartupRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-        private static string StartupAppName => Application.ProductName ?? "LamToolAutoPhonePrime";
+        private static string StartupAppName => Application.ProductName ?? "GolikePhoneFarm";
 
         public static bool IsStartupEnabled()
         {

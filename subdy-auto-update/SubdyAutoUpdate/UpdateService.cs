@@ -5,8 +5,8 @@ namespace SubdyAutoUpdate;
 
 internal static class UpdateService
 {
-    private const string MainExeName = "SubdyPhoneFarm.exe";
-    private const string MainProcessName = "SubdyPhoneFarm";
+    private const string MainExeName = "GolikePhoneFarm.exe";
+    private const string MainProcessName = "GolikePhoneFarm";
 
     public static string AppDir => AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
     public static string MainExePath => Path.Combine(AppDir, MainExeName);
@@ -28,7 +28,7 @@ internal static class UpdateService
         }
     }
 
-    // ── Lấy version hiện tại của SubdyPhoneFarm.exe ────────────────────────
+    // ── Lấy version hiện tại của GolikePhoneFarm.exe ───────────────────────
 
     public static string GetLocalVersion()
     {

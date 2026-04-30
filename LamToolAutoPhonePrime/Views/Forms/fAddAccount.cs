@@ -1,4 +1,5 @@
-﻿using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using Sunny.Subdy.Common.ControlMethod;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Models;
@@ -80,50 +81,52 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
         private async Task uiSymbolButton1_ClickSafe()
         {
+            if (string.IsNullOrWhiteSpace(txtLines.Text))
+            {
+                AntdHelper.NotifyWarn(this, "Thiếu dữ liệu", "Danh sách tài khoản không được để trống.");
+                return;
+            }
+
+            SetInputsEnabled(false);
             try
             {
-                panel1.Enabled = false;
-                panel3.Enabled = false;
-                txtLines.ReadOnly = true;
-                if (string.IsNullOrEmpty(txtLines.Text.Trim()))
-                {
-                    CommonMethod.ShowMessageWarning("Danh sách tài khoản không được để trống.");
-                    return;
-                }
-                txtLines.ReadOnly = true;
-                button1.Enabled = false;
-                button2.Enabled = false;
-                button9.Enabled = false;
-                select8.Enabled = false;
+                await AntdHelper.WithLoading(this,
+                    _add ? "Đang thêm tài khoản..." : "Đang cập nhật tài khoản...",
+                    async () =>
+                    {
+                        List<string> lines = txtLines.Lines
+                            .Where(line => !string.IsNullOrWhiteSpace(line))
+                            .ToList();
 
-                List<string> lines = txtLines.Lines.Where(line => !string.IsNullOrWhiteSpace(line)).ToList();
-                if (_add)
-                {
-                    await AddAccounts(lines);
-                }
-                else
-                {
-                    await UpdateAccounts(lines);
-                }
+                        if (_add) await AddAccounts(lines);
+                        else      await UpdateAccounts(lines);
 
-                txtLines.ReadOnly = false;
-                button1.Enabled = true;
-                button2.Enabled = true;
-                button9.Enabled = true;
-                select8.Enabled = true;
-              
+                        AntdHelper.NotifySuccess(
+                            this,
+                            _add ? "Đã thêm" : "Đã cập nhật",
+                            $"{lines.Count} tài khoản đã được xử lý.");
+                    });
             }
             catch (Exception ex)
             {
-                CommonMethod.ShowMessageError(ex.Message);
+                ErrorHandler.Show(this, ex,
+                    _add ? "Thêm tài khoản thất bại" : "Cập nhật tài khoản thất bại");
             }
             finally
             {
-                panel1.Enabled = true;
-                panel3.Enabled = true;
-                txtLines.ReadOnly = false;
+                SetInputsEnabled(true);
             }
+        }
 
+        private void SetInputsEnabled(bool enabled)
+        {
+            panel1.Enabled    = enabled;
+            panel3.Enabled    = enabled;
+            txtLines.ReadOnly = !enabled;
+            button1.Enabled   = enabled;
+            button2.Enabled   = enabled;
+            button9.Enabled   = enabled;
+            select8.Enabled   = enabled;
         }
         private async Task UpdateAccounts(List<string> lines)
         {
@@ -217,29 +220,41 @@ namespace LamToolAutoPhonePrime.Views.Forms
             {
                 if (accountContext.Update(accounts))
                 {
-                    CommonMethod.ShowMessageSuccess($"Đã cập nhật {accounts.Count} tài khoản.");
+                    AntdHelper.NotifySuccess(this, "Thành công", $"Đã cập nhật {accounts.Count} tài khoản.");
                     this.Close();
                 }
                 else
                 {
-                    CommonMethod.ShowMessageError("Cập nhật tài khoản thất bại.");
+                    AntdHelper.NotifyError(this, "Thao tác thất bại", "Cập nhật tài khoản thất bại.");
                 }
             }
             else
             {
-                CommonMethod.ShowMessageError("Không có tài khoản nào đã được lưu để cập nhật");
+                AntdHelper.NotifyError(this, "Thao tác thất bại", "Không có tài khoản nào đã được lưu để cập nhật");
             }
         }
 
         private async Task AddAccounts(List<string> lines)
         {
-            string nameFolder = string.Empty;
-            if (select8.Text != "[ Không cần nhóm ]")
+            string selectText = string.Empty;
+            string[] fieldMap = Array.Empty<string>();
+            if (this.InvokeRequired)
             {
-                nameFolder = select8.Text;
+                this.Invoke(new Action(() =>
+                {
+                    selectText = select8.Text ?? string.Empty;
+                    fieldMap = cbxs.Select(c => c.SelectedItem?.ToString() ?? string.Empty).ToArray();
+                }));
             }
+            else
+            {
+                selectText = select8.Text ?? string.Empty;
+                fieldMap = cbxs.Select(c => c.SelectedItem?.ToString() ?? string.Empty).ToArray();
+            }
+
+            string nameFolder = selectText != "[ Không cần nhóm ]" ? selectText : string.Empty;
             List<Account> accounts = new List<Account>();
-            string namefolder = select8.Text.Trim() == "[ Không cần nhóm ]" ? "" : select8.Text.Trim();
+            string namefolder = selectText.Trim() == "[ Không cần nhóm ]" ? "" : selectText.Trim();
             foreach (string line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line))
@@ -250,9 +265,9 @@ namespace LamToolAutoPhonePrime.Views.Forms
                 account.Platformt = _platform;
                 string[] parts = line.Split('|');
 
-                for (int i = 0; i < cbxs.Count && i < parts.Length; i++)
+                for (int i = 0; i < fieldMap.Length && i < parts.Length; i++)
                 {
-                    string field = cbxs[i].SelectedItem?.ToString() ?? string.Empty;
+                    string field = fieldMap[i];
                     if (string.IsNullOrWhiteSpace(field)) continue;
                     string value = parts[i].Trim();
 
@@ -307,6 +322,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     account.Uid = string.IsNullOrEmpty(account.Uid) ? account.Email : account.Uid;
                     account.NameFolder = nameFolder;
                     account.Id = Guid.NewGuid();
+                    account.NameScript = Sunny.Subdy.Data.Context.ScriptNames.FarmXuVip;
                     accounts.Add(account);
                 }
             }
@@ -320,16 +336,16 @@ namespace LamToolAutoPhonePrime.Views.Forms
             {
                 if (accountContext.AddRange(accountsToAdd))
                 {
-                    CommonMethod.ShowMessageSuccess($"Đã thêm {accountsToAdd.Count} tài khoản mới vào.");
+                    AntdHelper.NotifySuccess(this, "Thành công", $"Đã thêm {accountsToAdd.Count} tài khoản mới vào.");
                 }
                 else
                 {
-                    CommonMethod.ShowMessageError("Thêm tài khoản thất bại.");
+                    AntdHelper.NotifyError(this, "Thao tác thất bại", "Thêm tài khoản thất bại.");
                 }
             }
             else
             {
-                CommonMethod.ShowMessageError("Dữ liệu bị trùng.");
+                AntdHelper.NotifyError(this, "Thao tác thất bại", "Dữ liệu bị trùng.");
             }
         }
         private void cbx_SelectedIndexChanged(object sender, EventArgs e)

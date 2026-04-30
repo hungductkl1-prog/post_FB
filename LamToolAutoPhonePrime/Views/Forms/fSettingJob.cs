@@ -30,6 +30,8 @@ namespace LamToolAutoPhonePrime.Views.Forms
                 cbb_ListTypeProxy.SelectedIndex = 0;
             }
             FontUtil.ApplyFontToAllControls(this);
+
+            this.Load += (_, __) => LamToolAutoPhonePrime.Utils.Design.SsaTheme.ApplyFSettingJob(this);
         }
         private void btn_Click(object sender, EventArgs e)
         {

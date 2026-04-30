@@ -233,19 +233,33 @@ namespace Sunny.Subdy.Data
 
             foreach (var prop in props)
             {
-                // Bỏ qua cột khóa chính (SQLite tự tăng)
-                if (prop == keyProp)
-                    continue;
-
-                var value = prop.GetValue(entity);
-                if (value == null) continue;
-
                 var propType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
                 if (!(propType.IsPrimitive || propType == typeof(string) || propType == typeof(Guid) || propType.IsEnum))
                     continue;
 
-                if (value is Guid g)
-                    value = g.ToString();
+                object? value = prop.GetValue(entity);
+
+                // Khóa chính Guid: tự sinh nếu rỗng, INSERT kèm; khóa chính int auto-increment thì bỏ qua
+                if (prop == keyProp)
+                {
+                    if (prop.PropertyType == typeof(Guid))
+                    {
+                        var guid = (Guid?)value ?? Guid.Empty;
+                        if (guid == Guid.Empty)
+                        {
+                            guid = Guid.NewGuid();
+                            prop.SetValue(entity, guid);
+                            value = guid;
+                        }
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+                if (value == null) continue;
+                if (value is Guid g) value = g.ToString();
 
                 columnNames.Add(prop.Name);
                 string paramName = $"@{prop.Name}";

@@ -6,7 +6,7 @@ from modules.utils import print_step, print_status, print_info, run_cmd, run_cmd
 
 # Node.js LTS download (x64)
 NODE_URL = "https://nodejs.org/dist/v20.18.1/node-v20.18.1-win-x64.zip"
-NODE_DIR = r"C:\LTHelper\nodejs"
+NODE_DIR = r"C:\GolikeHelper\nodejs"
 
 
 def is_node_installed():

@@ -26,9 +26,10 @@ namespace LamToolAutoPhonePrime
         private static int _nextPort = 27183;
         private static readonly object _portLock = new();
 
-        // Serialize ADB operations: push JAR + reverse forward + TCP handshake
-        // Chỉ 1 device được Start tại một thời điểm — tránh ADB flood và forward conflict
-        private static readonly SemaphoreSlim _startLock = new(1, 1);
+        // Giới hạn 4 device đồng thời ở giai đoạn Start (push JAR + handshake)
+        // - Cho phép song song để giảm tổng thời gian khởi tạo nhiều thiết bị
+        // - Vẫn cap để tránh ADB server flood khi mở 20+ device cùng lúc
+        private static readonly SemaphoreSlim _startLock = new(4, 4);
 
         private static int GetFreePort()
         {
@@ -101,12 +102,15 @@ namespace LamToolAutoPhonePrime
 
             int port = GetFreePort();
             var scrcpy = new Scrcpy(deviceData, port);
+            // Path tuyệt đối -> chạy được kể cả khi working directory khác BaseDirectory
+            scrcpy.ScrcpyServerFile = Path.Combine(AppContext.BaseDirectory, "ScrcpyNet", "scrcpy-server.jar");
             instances[serial] = scrcpy;
             return scrcpy;
         }
 
         /// <summary>
         /// Start scrcpy đã được tạo bởi CreateForSerial.
+        /// Có gating bằng SemaphoreSlim để giới hạn số connect song song (tránh adb flood).
         /// </summary>
         public void StartCreated(string serial)
         {
@@ -115,9 +119,19 @@ namespace LamToolAutoPhonePrime
             {
                 if (instances.TryGetValue(serial, out var scrcpy))
                 {
-                    // Timeout 15s — scrcpy-server cần thời gian push JAR + khởi động lần đầu
-                    scrcpy.Start(timeoutMs: 15000);
-                    log.Information("[{Serial}] Scrcpy started.", serial);
+                    try
+                    {
+                        // Timeout 15s — scrcpy-server cần thời gian push JAR + khởi động lần đầu
+                        scrcpy.Start(timeoutMs: 15000);
+                        log.Information("[{Serial}] Scrcpy started.", serial);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Error(ex, "[{Serial}] Scrcpy.Start() failed.", serial);
+                        // Remove khỏi instances để lần sau có thể CreateForSerial lại
+                        instances.TryRemove(serial, out _);
+                        throw;
+                    }
                 }
             }
             finally

@@ -1,5 +1,7 @@
 ﻿using AntdUI;
+using LamToolAutoPhonePrime.Utils.Design;
 using Sunny.Subdy.Common.API;
+using Sunny.Subdy.Common.API.Jobs.GoLike;
 using Sunny.Subdy.Common.API.Model;
 using Sunny.Subdy.Common.Models;
 using System;
@@ -39,6 +41,21 @@ namespace LamToolAutoPhonePrime.Views.Forms
             try
             {
                 User user = SubdyClient.Login(txt_search.Text.Trim(), input1.Text.Trim());
+                // Lấy thêm pending coin ngay sau login để hiện cùng số dư.
+                string access_token = SubdyClient.GetTokenAutoGolike(txt_search.Text.Trim(), input1.Text.Trim());
+                user.Token_Golike =access_token;
+                try
+                {
+                  
+
+                    var report = new GoLikeClient().GetCoinReport(user.Token);
+                    if (report.CurrentCoin >= 0)
+                    {
+                        user.Balance = report.CurrentCoin;
+                        user.PendingBalance = report.PendingCoin;
+                    }
+                }
+                catch { /* ignore — login vẫn thành công */ }
                 Globals.User = user;
                 new TempLoginStorage
                 {
@@ -51,13 +68,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             catch (Exception ex)
             {
-                CommonMethod.ShowMessageError(ex.Message);
+                ErrorHandler.Show(this, ex, "Đăng nhập thất bại");
                 button5.Enabled = true;
             }
         }
         private void button9_Click(object sender, EventArgs e)
         {
-            OpenLink("https://subdy.net");
+            OpenLink("https://app.golike.net/register");
         }
         private void OpenLink(string url)
         {
@@ -71,28 +88,28 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             catch (Exception ex)
             {
-                AntdUI.Notification.warn(this, "Subdy Thông Báo", "Không thể mở link: " + ex.Message, AntdUI.TAlignFrom.TR, Font);
+                AntdUI.Notification.warn(this, "Golike Thông Báo", "Không thể mở link: " + ex.Message, AntdUI.TAlignFrom.TR, Font);
             }
         }
 
         private void button1_Click(object sender, EventArgs e)
         {
-            OpenLink("https://subdy.net");
+            OpenLink("https://app.golike.net/register");
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
-            OpenLink("https://subdy.net");
+            OpenLink("https://app.golike.net/register");
         }
 
         private void button2_Click(object sender, EventArgs e)
         {
-            OpenLink("https://subdy.net");
+            OpenLink("https://app.golike.net/register");
         }
 
         private void button4_Click(object sender, EventArgs e)
         {
-            OpenLink("https://subdy.net");
+            OpenLink("https://app.golike.net/register");
         }
 
         private void linkLabel1_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)

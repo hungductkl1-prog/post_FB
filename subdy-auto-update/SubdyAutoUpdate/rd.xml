@@ -43,7 +43,7 @@
     <Assembly Name="AntdUI" Dynamic="Required All" />
 
     <!-- This project -->
-    <Assembly Name="SubdyAutoUpdate" Dynamic="Required All" />
+    <Assembly Name="GolikeAutoUpdate" Dynamic="Required All" />
 
   </Application>
 </Directives>

@@ -5,6 +5,7 @@ using Sunny.Subd.Core.Utils;
 using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Models;
 using System.Diagnostics;
+using static Sunny.Subd.Core.Utils.XpathHelper;
 
 namespace Sunny.Subd.Core.Facebook
 {
@@ -76,27 +77,39 @@ namespace Sunny.Subd.Core.Facebook
                         case var c when XpathManagerFacebook.Get(XpathType.Loading).Contains(c): continue;
                         case var c when XpathManagerFacebook.Get(XpathType.CP282).Contains(c):
                             subyEnum = SubdyEnum.CP_282;
-                            message = "Tài khoản bị checkpoint 282.";
+                            message = $"Tài khoản bị checkpoint 282 [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerFacebook.Get(XpathType.CP956).Contains(c):
                             subyEnum = SubdyEnum.CP_956;
-                            message = "Tài khoản bị checkpoint 956.";
+                            message = $"Tài khoản bị checkpoint 956 [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerFacebook.Get(XpathType.Captcha).Contains(c):
                             subyEnum = SubdyEnum.Captcha;
-                            message = "Tài khoản bị yêu cầu captcha.";
+                            message = $"Tài khoản bị yêu cầu captcha [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerFacebook.Get(XpathType.Block).Contains(c):
+                            if (c == $"//*[contains(@text, \"Dismiss\")]")
+                            {
+                                client.ElementWithAttributes(c, 1);
+                                continue;
+                            }
                             subyEnum = SubdyEnum.Block;
-                            message = "Tài khoản bị chặn.";
+                            message = $"Tài khoản bị chặn [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerFacebook.Get(XpathType.Logout).Contains(c):
                             subyEnum = SubdyEnum.LogOut;
-                            message = "Tài khoản bị đăng xuất.";
+                            message = $"Tài khoản bị đăng xuất [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerFacebook.Get(XpathType.Success).Contains(c):
+                            if (client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"Something went wrong\"]", "//*[@content-desc=\"try again\"]" }, 2, "", false))
+                            {
+                                client.StopApp("com.facebook.katana");
+                                client.Delay(2);
+                                client.AppStart("com.facebook.katana");
+                                continue;
+                            }
                             subyEnum = SubdyEnum.Success;
-                            message = "Đăng nhập thành công.";
+                            message = $"Đăng nhập thành công [{ExtractReadable(c)}]";
                             return new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerFacebook.Get(XpathType.InputUserName).Contains(c):
                             await ImportUid();
@@ -138,11 +151,14 @@ namespace Sunny.Subd.Core.Facebook
             _client.ElementWithAttributes(new List<string> { "//*[@text=\"Log into another account\"]", "//*[@text=\"Use another profile\"]" }, 3);
             string uid = _account.Uid_Email;
             var elements = _client.FindElements(10, "", "//*[@class='android.widget.EditText']");
-            if (!elements.Any() || elements.Count != 2) return;
+            if (!elements.Any()) return;
             SetStatus("Đang nhập tên đăng nhập...", 2);
             _client.SendTextSlow("//*[@class='android.widget.EditText']", uid, xml: elements[0].OuterXml);
-            SetStatus("Đang nhập mật khẩu...", 2);
-            _client.SendTextSlow("//*[@class='android.widget.EditText']", _account.Password, xml: elements[1].OuterXml);
+            if (elements.Count >= 2)
+            {
+                SetStatus("Đang nhập mật khẩu...", 2);
+                _client.SendTextSlow("//*[@class='android.widget.EditText']", _account.Password, xml: elements[1].OuterXml);
+            }
             SetStatus("Đang xác nhận đăng nhập...", 2);
             _client.ElementWithAttributes(XpathManagerFacebook.Get(XpathType.NavigationButton));
             SetStatus("Đợi phản hồi từ Facebook...", 2);
@@ -206,6 +222,8 @@ namespace Sunny.Subd.Core.Facebook
             string _case = string.Empty;
             SubdyEnum subyEnum = SubdyEnum.None;
             string message = "Lỗi trong quá trình kiểm tra tài khoản!";
+            const int MAX_RELOGIN_ATTEMPTS = 2;
+            int reloginAttempts = 0;
             while (true)
             {
                 if (client.IsRunningApp(FacebookHander.Package(PlatformModel.Facebook)) == false && !client.ElementWithAttributes("//*[@text=\"Close app\"]"))
@@ -227,49 +245,55 @@ namespace Sunny.Subd.Core.Facebook
                     case var c when XpathManagerFacebook.Get(XpathType.Loading).Contains(c): continue;
                     case var c when XpathManagerFacebook.Get(XpathType.CP282).Contains(c):
                         subyEnum = SubdyEnum.CP_282;
-                        message = "Tài khoản bị checkpoint 282.";
+                        message = $"Tài khoản bị checkpoint 282 [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerFacebook.Get(XpathType.CP956).Contains(c):
                         subyEnum = SubdyEnum.CP_956;
-                        message = "Tài khoản bị checkpoint 956.";
+                        message = $"Tài khoản bị checkpoint 956 [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerFacebook.Get(XpathType.Captcha).Contains(c):
                         subyEnum = SubdyEnum.Captcha;
-                        message = "Tài khoản bị yêu cầu captcha.";
+                        message = $"Tài khoản bị yêu cầu captcha [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerFacebook.Get(XpathType.Block).Contains(c):
                         subyEnum = SubdyEnum.Block;
-                        message = "Tài khoản bị chặn.";
+                        message = $"Tài khoản bị chặn [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerFacebook.Get(XpathType.Logout).Contains(c):
-                        subyEnum = SubdyEnum.LogOut;
-                        message = "Tài khoản bị đăng xuất.";
-                        throw new SubdyExtension(subyEnum, message);
+                    case var c2 when XpathManagerFacebook.Get(XpathType.InputUserName).Contains(c2):
+                    case var c3 when XpathManagerFacebook.Get(XpathType.InputPassword).Contains(c3):
+                    case var c4 when XpathManagerFacebook.Get(XpathType.TowFA).Contains(c4):
+                        if (reloginAttempts >= MAX_RELOGIN_ATTEMPTS)
+                        {
+                            subyEnum = SubdyEnum.LogOut;
+                            message = $"Tài khoản bị đăng xuất [{ExtractReadable(_case)}]. Đã thử đăng nhập lại {reloginAttempts} lần nhưng thất bại.";
+                            throw new SubdyExtension(subyEnum, message);
+                        }
+                        reloginAttempts++;
+                        SetStatus($"Phát hiện bị đăng xuất [{ExtractReadable(_case)}], đang đăng nhập lại (lần {reloginAttempts}/{MAX_RELOGIN_ATTEMPTS})...", 2,
+                            logDetail: $"[FacebookService.HanderAccount] Relogin attempt {reloginAttempts}/{MAX_RELOGIN_ATTEMPTS}, case={_case}");
+                        await main.SessionExpired();
+                        await Login(client, account, ct, timeout, main);
+                        await main.ExtractAndUpdateAuthenticationInfoAsync();
+                        _sate = "Kiểm tra trạng thái tài khoản";
+                        break;
                     case var c when XpathManagerFacebook.Get(XpathType.Success).Contains(c):
                         subyEnum = SubdyEnum.Success;
-                        message = "Đăng nhập thành công.";
+                        message = $"Đăng nhập thành công [{ExtractReadable(c)}]";
                         return new SubdyExtension(subyEnum, message);
-                    case var c when XpathManagerFacebook.Get(XpathType.InputUserName).Contains(c):
-                        subyEnum = SubdyEnum.LogOut;
-                        message = "Tài khoản bị đăng xuất.";
-                        throw new SubdyExtension(subyEnum, message);
-                    case var c when XpathManagerFacebook.Get(XpathType.InputPassword).Contains(c):
-                        subyEnum = SubdyEnum.LogOut;
-                        message = "Tài khoản bị đăng xuất.";
-                        throw new SubdyExtension(subyEnum, message);
-                    case var c when XpathManagerFacebook.Get(XpathType.TowFA).Contains(c):
-                        subyEnum = SubdyEnum.LogOut;
-                        message = "Tài khoản bị đăng xuất.";
-                        throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerFacebook.Get(XpathType.NavigationButton).Contains(c):
                         client.ElementWithAttributes(c, 1);
                         break;
                     case var c when XpathManagerFacebook.Get(XpathType.CashApp).Contains(c):
+                        SetStatus($"Phát hiện CashApp [{ExtractReadable(c)}], đang đăng nhập lại...", 2,
+                            logDetail: $"[FacebookService.HanderAccount] CashApp detected, case={c}");
                         await main.SessionExpired();
                         await Login(client, account, ct, timeout, main);
                         await main.ExtractAndUpdateAuthenticationInfoAsync();
                         break;
                     case var c when XpathManagerFacebook.Get(XpathType.No_Internet).Contains(c):
+                        SetStatus($"Mất kết nối internet [{ExtractReadable(c)}], đang xử lý...", 2,
+                            logDetail: $"[FacebookService.HanderAccount] No_Internet detected, case={c}");
                         await HandleNoInternet();
                         break;
                 }

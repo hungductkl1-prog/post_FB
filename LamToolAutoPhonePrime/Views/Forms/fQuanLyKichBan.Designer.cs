@@ -1,4 +1,4 @@
-namespace LamToolAutoPhonePrime.Views
+﻿namespace LamToolAutoPhonePrime.Views
 {
     partial class fQuanLyKichBan
     {
@@ -93,11 +93,11 @@ namespace LamToolAutoPhonePrime.Views
             windowBar.Name = "windowBar";
             windowBar.ShowIcon = true;
             windowBar.Size = new Size(1300, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", 6.75F);
+            windowBar.SubFont = new Font("Microsoft Sans Serif", LamToolAutoPhonePrime.Utils.Design.FontScale.Caption, FontStyle.Regular, GraphicsUnit.Point, 0);
             windowBar.SubGap = 1;
-            windowBar.SubText = "v18.12.08.2025";
+            windowBar.SubText = "";
             windowBar.TabIndex = 10;
-            windowBar.Text = "LamTool Auto Phone Farm";
+            windowBar.Text = "Quản lý kịch bản";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
 

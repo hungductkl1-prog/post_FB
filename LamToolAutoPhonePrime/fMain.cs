@@ -1,5 +1,6 @@
 ﻿using AntdUI;
 using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using LamToolAutoPhonePrime.Views.Controls;
 using LamToolAutoPhonePrime.Views.Forms;
 using Sunny.Subdy.Common.API;
@@ -21,6 +22,7 @@ namespace LamToolAutoPhonePrime
 
         private CancellationTokenSource _uiCts;
         private CancellationTokenSource _loadingCts;
+        private System.Windows.Forms.Label? _lblPendingValue; // Giá trị "Chờ duyệt" — tạo runtime
         private DateTime _lastUiUpdate = DateTime.MinValue;
         private DateTime _lastHistoriesUpdate = DateTime.MinValue;
         private DateTime? _lastCheckUpdateTime;
@@ -33,10 +35,39 @@ namespace LamToolAutoPhonePrime
         {
             InitializeComponent();
 
+            // Dọn legacy FarmXu + remap "Farm-Xu-VIP" → "Làm Job Golike" ngay khi load app (idempotent).
+            try
+            {
+                var scriptCtx = new Sunny.Subdy.Data.Context.ScriptContext();
+                scriptCtx.PurgeFarmXu();
+                scriptCtx.RemapLegacyFarmXuVipName();
+                var accCtx = new Sunny.Subdy.Data.Context.AccountContext();
+                foreach (var platform in new[] { Sunny.Subdy.Common.Models.PlatformModel.Facebook, Sunny.Subdy.Common.Models.PlatformModel.Instagram })
+                {
+                    var all = accCtx.GetAll(new List<string>(), platform, true);
+                    if (all == null) continue;
+                    var legacy = all.Where(a =>
+                        string.Equals(a.NameScript, Sunny.Subdy.Data.Context.ScriptNames.FarmXu, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(a.NameScript, Sunny.Subdy.Data.Context.ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
+                    ).ToList();
+                    if (legacy.Count == 0) continue;
+                    foreach (var a in legacy) a.NameScript = Sunny.Subdy.Data.Context.ScriptNames.FarmXuVip;
+                    accCtx.Update(legacy);
+                }
+            }
+            catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
+
             // Tạo menu động (thứ tự ngược do DockStyle.Top stacking)
-            CreateMenu("Lịch sử", "history", Properties.Resources.icons8_history_30);
-            CreateMenu("Tài khoản", "facebook", Properties.Resources.icons8_facebook_30);
+            CreateMenu("Dashboard", "history", Properties.Resources.icons8_history_30);
+            CreateMenu("Instagram", "instagram", Properties.Resources.icons8_instagram_30);
+            CreateMenu("Facebook", "facebook", Properties.Resources.icons8_facebook_30);
             CreateMenu("Thiết bị", "android", Properties.Resources.icons8_android_30_New);
+
+            // Title cố định — không đổi theo section
+            windowBar.Text = "GolikeAutoPhone";
+
+            // SSA visual redesign — chỉ đụng UI, không đổi business logic
+            SsaTheme.ApplyFMain(this);
 
             this.Load += fMain_Load;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -52,6 +83,9 @@ namespace LamToolAutoPhonePrime
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
             windowBar.SubText = $"v{version}";
             Globals.CoinLable = label8;
+
+            label5.Visible = false; // Ẩn "Tài khoản chính" theo yêu cầu UI.
+            BuildPendingRow();
 
             // Tooltip cho các nút title bar và logout
             var toolTip = new ToolTip { AutoPopDelay = 3000, InitialDelay = 300, ReshowDelay = 200 };
@@ -81,7 +115,7 @@ namespace LamToolAutoPhonePrime
                 Dock = DockStyle.Fill,
                 FlatStyle = FlatStyle.Flat,
                 FlatAppearance = { BorderSize = 0, MouseDownBackColor = Color.White },
-                Font = new Font(FontUtil._fontSemiBold, 11.25F, FontStyle.Bold),
+                Font = new Font(FontScale.FamilyName, 11.25F, FontStyle.Bold),
                 ForeColor = Color.Black,
                 Image = icon,
                 ImageAlign = ContentAlignment.MiddleLeft,
@@ -150,16 +184,20 @@ namespace LamToolAutoPhonePrime
             string labelText = btn.Text switch
             {
                 "Thiết bị" => "Quản lý thiết bị",
-                "Tài khoản" => "Quản lý tài khoản Facebook",
-                "Lịch sử" => "Lịch sử hoạt động",
+                "Facebook" => "Quản lý tài khoản Facebook",
+                "Instagram" => "Quản lý tài khoản Instagram",
+                "Dashboard" => "Dashboard",
+                "Lịch sử" => "Dashboard",
                 _ => btn.Text
             };
             label1.Text = labelText;
+            // windowBar.Text giữ cố định ("GolikeAutoPhone") — không đổi theo section
 
             switch (btn.Name)
             {
                 case "btn_android": _ucDevices.BringToFront(); break;
                 case "btn_facebook": _ucFacebook.BringToFront(); break;
+                case "btn_instagram": _ucInstagram.BringToFront(); break;
                 case "btn_history": _ucHistoriesJob.BringToFront(); break;
             }
 
@@ -178,6 +216,7 @@ namespace LamToolAutoPhonePrime
         {
             "btn_android" => Properties.Resources.icons8_android_30_Acti,
             "btn_facebook" => Properties.Resources.icons8_facebook_30_Acti,
+            "btn_instagram" => Properties.Resources.icons8_instagram_30_Acti,
             "btn_history" => Properties.Resources.icons8_history_30_Acti,
             _ => null
         };
@@ -186,6 +225,7 @@ namespace LamToolAutoPhonePrime
         {
             "btn_android" => Properties.Resources.icons8_android_30_New,
             "btn_facebook" => Properties.Resources.icons8_facebook_30,
+            "btn_instagram" => Properties.Resources.icons8_instagram_30,
             "btn_history" => Properties.Resources.icons8_history_30,
             _ => null
         };
@@ -206,7 +246,7 @@ namespace LamToolAutoPhonePrime
             var spin = new AntdUI.Spin
             {
                 Dock = DockStyle.Fill,
-                Font = new Font(FontUtil._fontSemiBold, 16f),
+                Font = new Font(FontScale.FamilyName, 16f, FontStyle.Bold),
                 Text = "Đang khởi động...",
                 ForeColor = Color.FromArgb(70, 70, 70)
             };
@@ -215,7 +255,7 @@ namespace LamToolAutoPhonePrime
             Controls.Add(_loadingOverlay);
             _loadingOverlay.BringToFront();
 
-            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Subdy Phone Farm xin chào!" };
+            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Golike Phone Farm xin chào!" };
 
             _loadingCts = new CancellationTokenSource();
             var token = _loadingCts.Token;
@@ -285,10 +325,11 @@ namespace LamToolAutoPhonePrime
             // Tạo controls trên UI thread trong khi dữ liệu đang tải
             _ucDevices = new ucManagerDevices(this);
             _ucFacebook = new ucdgvAccount(this, PlatformModel.Facebook);
+            _ucInstagram = new ucdgvAccount(this, PlatformModel.Instagram);
             _ucHistoriesJob = new ucHistoriesJob();
 
             pContent.SuspendLayout();
-            foreach (var uc in new Control[] { _ucDevices, _ucFacebook, _ucHistoriesJob })
+            foreach (var uc in new Control[] { _ucDevices, _ucFacebook, _ucInstagram, _ucHistoriesJob })
             {
                 uc.Dock = DockStyle.Fill;
                 pContent.Controls.Add(uc);
@@ -304,19 +345,123 @@ namespace LamToolAutoPhonePrime
             HideLoading();
 
             var first = pMenu.Controls.OfType<System.Windows.Forms.Panel>().SelectMany(p => p.Controls.OfType<System.Windows.Forms.Button>())
-                .FirstOrDefault(b => b.Name == "btn_android");
+                .FirstOrDefault(b => b.Name == "btn_facebook");
             if (first != null)
                 MenuButton_Click(first, EventArgs.Empty);
+
+            // Hướng dẫn sử dụng lần đầu cho user mới — delay nhỏ để UI render xong.
+            if (!UserTourHelper.HasSeenTour())
+            {
+                await Task.Delay(400);
+                try { UserTourHelper.ShowFirstRunPrompt(this); }
+                catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
+            }
         }
+
+        /// <summary>Expose UserControl tài khoản cho UserTourHelper (giữ field private của designer).</summary>
+        internal ucdgvAccount UcAccount => _ucFacebook;
 
         private void UpdateUserInfo()
         {
             var user = Globals.User;
             if (user == null) return;
 
-            label4.Text = user.FullName ?? user.UserName ?? "Subdy.net";
+            label4.Text = user.FullName ?? user.UserName ?? "Golike.net";
             label8.Text = $"{user.Balance:N0} xu";
-            label9.Text = user.Email ?? "";
+            if (_lblPendingValue != null)
+                _lblPendingValue.Text = $"{user.PendingBalance:N0} xu";
+            label9.Text = MaskEmail(user.Email ?? "");
+        }
+
+        /// <summary>
+        /// Dựng lại 3 dòng info (Số dư / Chờ duyệt / Email) trong panel4 để tránh chồng text.
+        /// Designer gốc chỉ có 2 dòng; thay vì hack position, ta layout lại bằng tay sau khi
+        /// SsaTheme + FontUtil đã thay font (font mới làm label gốc overflow).
+        /// </summary>
+        private void BuildPendingRow()
+        {
+            const int rowHeight = 22;
+            const int firstRowY = 63;      // Giữ top giống designer (ngay dưới tên + "Tài khoản chính")
+            const int leftX = 17;          // Cột label trái (trùng label6/7 gốc)
+            const int rightMargin = 12;    // Lề phải panel4
+            const int gapBetween = 12;     // Khoảng trống giữa panel profile và menu phía dưới
+            const int labelColWidth = 85;  // Chừa ~85px cho "Chờ duyệt:" không bị cắt khi font lớn
+
+            int panelH = firstRowY + rowHeight * 3 + gapBetween;
+            panel4.Size = new Size(panel4.Width, panelH);
+            // panel2 chứa panel4 (dock=Fill với padding 10 mỗi phía) → panel2 cao = panelH + 20.
+            panel2.Size = new Size(panel2.Width, panelH + 20);
+
+            int valueX = leftX + labelColWidth;
+            int valueW = panel4.Width - valueX - rightMargin;
+
+            // Row 1: Số dư
+            label6.AutoSize = false;
+            label6.Location = new Point(leftX, firstRowY);
+            label6.Size = new Size(labelColWidth, rowHeight);
+            label6.TextAlign = ContentAlignment.MiddleLeft;
+            label6.Text = "Số dư:";
+
+            label8.AutoSize = false;
+            label8.Location = new Point(valueX, firstRowY);
+            label8.Size = new Size(valueW, rowHeight);
+            label8.TextAlign = ContentAlignment.MiddleRight;
+            label8.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+
+            // Row 2: Chờ duyệt
+            int pendingY = firstRowY + rowHeight;
+            var lblPending = new System.Windows.Forms.Label
+            {
+                AutoSize = false,
+                BackColor = Color.Transparent,
+                Font = label6.Font,
+                ForeColor = Color.White,
+                Location = new Point(leftX, pendingY),
+                Size = new Size(labelColWidth, rowHeight),
+                Text = "Chờ duyệt:",
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            panel4.Controls.Add(lblPending);
+
+            _lblPendingValue = new System.Windows.Forms.Label
+            {
+                AutoSize = false,
+                BackColor = Color.Transparent,
+                Font = label8.Font,
+                ForeColor = Color.White,
+                Location = new Point(valueX, pendingY),
+                Size = new Size(valueW, rowHeight),
+                Text = "0 xu",
+                TextAlign = ContentAlignment.MiddleRight,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            panel4.Controls.Add(_lblPendingValue);
+            Globals.PendingLable = _lblPendingValue;
+
+            // Row 3: Email
+            int emailY = firstRowY + rowHeight * 2;
+            label7.AutoSize = false;
+            label7.Location = new Point(leftX, emailY);
+            label7.Size = new Size(labelColWidth, rowHeight);
+            label7.TextAlign = ContentAlignment.MiddleLeft;
+            label7.Text = "Email:";
+
+            label9.AutoSize = false;
+            label9.Location = new Point(valueX, emailY);
+            label9.Size = new Size(valueW, rowHeight);
+            label9.TextAlign = ContentAlignment.MiddleRight;
+            label9.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        }
+
+        // Rút gọn email: giữ 5 ký tự đầu + "***" + phần @domain. Nếu local-part <= 5 thì giữ nguyên.
+        private static string MaskEmail(string email)
+        {
+            if (string.IsNullOrEmpty(email)) return "";
+            int at = email.IndexOf('@');
+            string local = at > 0 ? email[..at] : email;
+            string domain = at > 0 ? email[at..] : "";
+            if (local.Length <= 5) return email;
+            return local[..5] + "***" + domain;
         }
 
         private async Task LoadData()
@@ -326,9 +471,21 @@ namespace LamToolAutoPhonePrime
                 // Chạy song song ADB init và Device models
                // var adbTask = Task.Run(() => ADBHelper.InitADB());
                 var deviceTask = Task.Run(() => DeviceServices.GetDeviceModels());
-
+                
                 await Task.WhenAll(deviceTask);
-
+                var key =  LamToolClient.GetLicenses(Globals.User.Token_Golike);
+                if (!key.success)
+                {
+                    var veri = LamToolClient.VerifyLicense(Globals.User.Token_Golike, Globals.NameApp, Globals.DeviceId, Globals.DeviceId);
+                    if (!veri.valid)
+                    {
+                        MessageBox.Show(veri.error);
+                        Program.SetStartup(false);
+                        TempLoginStorage.Clear();
+                        Application.Restart();
+                        Environment.Exit(0);
+                    }
+                }
                 // if (!File.Exists(@"C:\DTAHelper\sdk\platform-tools\adb.exe"))
                 // {
                 //     CommonMethod.ShowMessageWarning("Chưa cài thư viện DTAHelper, vui lòng cài đặt lại.");
@@ -383,7 +540,7 @@ namespace LamToolAutoPhonePrime
                         _lastHistoriesUpdate = now;
                     }
 
-                    if (_lastCheckUpdateTime == null || (now - _lastCheckUpdateTime.Value).TotalMinutes >= 30)
+                    if (_lastCheckUpdateTime == null || (now - _lastCheckUpdateTime.Value).TotalMinutes >= 15)
                     {
                        this.BeginInvoke(new Action(CheckUpdateVersion));
                         _lastCheckUpdateTime = now;
@@ -442,11 +599,11 @@ namespace LamToolAutoPhonePrime
             {
                 string title = "Thông báo";
                 string message = $"Đã có version [{vs}] mới nhất.";
-                fShowThongBao f = new fShowThongBao(title, message);
+                fShowThongBao f = new fShowThongBao(title, message) { TopMost = true };
                 if (f.ShowDialog() == DialogResult.OK)
                 {
                     this.Hide();
-                    using (var updateForm = new fUpdateAuto(url, version))
+                    using (var updateForm = new fUpdateAuto(url, version) { TopMost = true })
                     {
                         updateForm.ShowDialog(this);
                     }

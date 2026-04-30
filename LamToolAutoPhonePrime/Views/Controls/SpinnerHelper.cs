@@ -1,4 +1,5 @@
 ﻿using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using Sunny.Subdy.Common.Helper;
 using System.ComponentModel;
 using Timer = System.Windows.Forms.Timer;
@@ -93,7 +94,7 @@ public class SpinnerHelper : Control
         string displayMessage = string.Format(Message, elapsedTimeStr);
 
         // Draw the message and elapsed time
-        using (Font font = new Font(FontUtil._fontSemiBold, 11, FontStyle.Bold))
+        using (Font font = new Font(FontScale.FamilyName, 11, FontStyle.Bold))
         {
             SizeF messageSize = e.Graphics.MeasureString(displayMessage, font);
             PointF messageLocation = new PointF((Width - messageSize.Width) / 2, (Height - messageSize.Height) / 2);

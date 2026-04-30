@@ -63,7 +63,7 @@
             windowBar.Size = new Size(411, 36);
             windowBar.SubText = "";
             windowBar.TabIndex = 9;
-            windowBar.Text = "LamTool Auto Phone Farm";
+            windowBar.Text = "Thông báo";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
             // 

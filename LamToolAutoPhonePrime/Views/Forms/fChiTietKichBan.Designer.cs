@@ -1,4 +1,4 @@
-namespace LamToolAutoPhonePrime.Views.Forms
+﻿namespace LamToolAutoPhonePrime.Views.Forms
 {
     partial class fChiTietKichBan
     {
@@ -65,11 +65,11 @@ namespace LamToolAutoPhonePrime.Views.Forms
             windowBar.Padding = new Padding(20, 5, 20, 0);
             windowBar.ShowIcon = true;
             windowBar.Size = new Size(958, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", 6.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            windowBar.SubFont = new Font("Microsoft Sans Serif", LamToolAutoPhonePrime.Utils.Design.FontScale.Caption, FontStyle.Regular, GraphicsUnit.Point, 0);
             windowBar.SubGap = 1;
             windowBar.SubText = "";
             windowBar.TabIndex = 11;
-            windowBar.Text = "LamTool Auto Phone Farm";
+            windowBar.Text = "Chi tiết kịch bản";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
 

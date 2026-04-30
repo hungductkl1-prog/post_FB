@@ -87,6 +87,8 @@ namespace Sunny.Subdy.Common.Services
 
         /// <summary>
         /// Load device basic info (name, OS, port) WITHOUT connecting ATX/Appium.
+        /// Đồng thời force portrait NGAY để scrcpy stream không hiển thị landscape
+        /// trước rồi mới xoay lại — tránh "xoay ngang rồi xoay dọc" khó chịu.
         /// </summary>
         private static DeviceModel? LoadDeviceInfo(string serial)
         {
@@ -114,7 +116,24 @@ namespace Sunny.Subdy.Common.Services
             model.NameDevice = name;
             model.OS = version;
             model.TypeColor = 0;
+
+            ForcePortrait(serial);
             return model;
+        }
+
+        /// <summary>
+        /// Khoá màn hình về portrait. Best-effort: lệnh nào không hỗ trợ trên ROM
+        /// hiện tại sẽ silently fail, không ảnh hưởng các lệnh còn lại.
+        /// Gọi 1 lần khi detect device để stream scrcpy không bị flash landscape.
+        /// </summary>
+        private static void ForcePortrait(string serial)
+        {
+            try { ProcessHelper.RunAdbWithTimeout($"-s {serial} shell settings put system accelerometer_rotation 0", 5); } catch { }
+            try { ProcessHelper.RunAdbWithTimeout($"-s {serial} shell settings put system user_rotation 0", 5); } catch { }
+            try { ProcessHelper.RunAdbWithTimeout($"-s {serial} shell content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:0", 5); } catch { }
+            try { ProcessHelper.RunAdbWithTimeout($"-s {serial} shell content insert --uri content://settings/system --bind name:s:user_rotation --bind value:i:0", 5); } catch { }
+            try { ProcessHelper.RunAdbWithTimeout($"-s {serial} shell wm user-rotation lock 0", 5); } catch { }
+            try { ProcessHelper.RunAdbWithTimeout($"-s {serial} shell cmd window set-ignore-orientation-request true", 5); } catch { }
         }
 
         /// <summary>
@@ -280,6 +299,10 @@ namespace Sunny.Subdy.Common.Services
                             {
                                 dev.TypeColor = 0;
                             }
+
+                            // Device vừa online lại — re-force portrait phòng trường hợp
+                            // user xoay ngang khi đang offline hoặc cắm lại USB.
+                            try { ForcePortrait(dev.Serial); } catch { }
                         }
                     }));
                 }

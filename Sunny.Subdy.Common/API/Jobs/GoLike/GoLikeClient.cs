@@ -14,6 +14,16 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
 
         public string GetCoin(string token)
         {
+            var report = GetCoinReport(token);
+            return report.CurrentCoin >= 0 ? report.CurrentCoin.ToString() : "";
+        }
+
+        /// <summary>
+        /// Gọi /api/statistics/report và trả về số dư hiện tại + tổng pending_coin trên mọi nền tảng.
+        /// Trả CurrentCoin = -1 nếu gọi thất bại (caller phân biệt với 0 thực).
+        /// </summary>
+        public (long CurrentCoin, long PendingCoin) GetCoinReport(string token)
+        {
             string apiUrl = "https://gateway.golike.net/api/statistics/report";
             var headers = new Dictionary<string, string>
             {
@@ -24,34 +34,40 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             };
             string json = HttpRequestHelper.GET(apiUrl, headers: headers);
             if (string.IsNullOrWhiteSpace(json))
-                throw new Exception("Không lấy được kết quả từ server.");
+                return (-1, 0);
 
             try
             {
                 var responseObj = JsonNode.Parse(json)!.AsObject();
-
                 bool isSuccess = responseObj["success"]?.GetValue<bool>() == true;
-                if (isSuccess)
-                {
-                    var currentCoin = responseObj["current_coin"]?.GetValue<int>() ?? 0;
-                    return currentCoin.ToString();
-                }
+                if (!isSuccess) return (-1, 0);
 
-                return "";
+                long currentCoin = responseObj["current_coin"]?.GetValue<long>() ?? 0;
+
+                long pending = 0;
+                foreach (var kv in responseObj)
+                {
+                    if (kv.Value is JsonObject child && child["pending_coin"] != null)
+                    {
+                        pending += child["pending_coin"]!.GetValue<long>();
+                    }
+                }
+                return (currentCoin, pending);
             }
-            catch (JsonException ex)
+            catch (Exception)
             {
-                return "";
-            }
-            catch (Exception ex)
-            {
-                return "";
+                return (-1, 0);
             }
         }
 
-        public async Task<JsonNode?> GetFacebookJob(string uid, string token, string job_type = "")
+        public async Task<JsonNode?> GetFacebookJob(string uid, string token, string job_type = "", string fb_name = "")
         {
+            // Khớp subdy-phone-farm-tools: gắn fb_name + type vào query khi có
             string url = $"{UrlGetJob}{uid}";
+            if (!string.IsNullOrEmpty(fb_name))
+                url += $"&fb_name={Uri.EscapeDataString(fb_name)}";
+            if (!string.IsNullOrEmpty(job_type))
+                url += $"&type={Uri.EscapeDataString(job_type)}";
 
             var headers = new Dictionary<string, string>
             {
@@ -152,21 +168,22 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 ["dta"] = ""
             };
 
-            var body = new Dictionary<string, string>
+            // Khớp subdy-phone-farm-tools: success/post_private là bool, không phải string PascalCase
+            var body = new JsonObject
             {
                 ["job_id"] = job.JobId,
                 ["uid"] = uid,
-                ["success"] = job.Success.ToString(),
-                ["fb_name"] = fullname,
+                ["success"] = job.Success,
+                ["fb_name"] = fullname ?? "",
                 ["id_text"] = "",
-                ["post_private"] = job.IsView.ToString(),
-                ["note"] = job.Link
+                ["post_private"] = job.IsView,
+                ["note"] = job.Link ?? ""
             };
 
             if (job.Type == JobTypes.Comment && !string.IsNullOrEmpty(job.CommentId))
                 body["comment_id"] = job.CommentId;
 
-            string jsonBody = System.Text.Json.JsonSerializer.Serialize(body);
+            string jsonBody = body.ToJsonString();
             string json = HttpRequestHelper.POST_JSON(UrlReportJob, headers: headers, jsonBody: jsonBody);
 
             if (string.IsNullOrWhiteSpace(json))

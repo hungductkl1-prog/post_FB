@@ -111,7 +111,9 @@ namespace Sunny.Subdy.Common.Services
                     try
                     {
                         string key = kv[0];
-                        string value = part.Substring(part.IndexOf("=") + 1);
+                        int eqIdx = part.IndexOf("=");
+                        if (eqIdx < 0) continue;
+                        string value = part.Substring(eqIdx + 1);
                         Http.Cookies.Add(key, value);
                     }
                     catch

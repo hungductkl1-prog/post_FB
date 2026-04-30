@@ -8,7 +8,7 @@ namespace AutoAndroid
     public class ProcessHelper
     {
         public const int MaxConcurrentCmdProcesses = 20;
-        public static string ADBPath = "C:\\LTHelper\\sdk\\platform-tools\\";
+        public static string ADBPath = "C:\\GolikeHelper\\sdk\\platform-tools\\";
         private static readonly SemaphoreSlim CmdSemaphore = new SemaphoreSlim(MaxConcurrentCmdProcesses, MaxConcurrentCmdProcesses);
 
         public sealed class CommandExecutionResult
@@ -36,12 +36,19 @@ namespace AutoAndroid
 
         public static CommandExecutionResult RunAdbWithResult(string adbCommand, int timeoutSeconds = 10)
         {
-            return RunCmdWithResult($"/C \"{ADBPath}adb {adbCommand}\"", timeoutSeconds);
+            // Gọi adb.exe trực tiếp, không bọc trong cmd.exe /C.
+            // Lý do: cmd.exe + adb.exe là 2 process lồng nhau → khi timeout,
+            // Process.Kill(true) đôi khi bỏ sót adb.exe cháu → zombie tích tụ,
+            // port 5037 bị giữ → các lệnh adb sau đó treo vô hạn.
+            string exe = Path.Combine(ADBPath, "adb.exe");
+            return RunProcessWithResult(exe, adbCommand, timeoutSeconds);
         }
 
         public static CommandExecutionResult RunRawCmdWithResult(string cmd, int timeoutSeconds = 0)
         {
-            return RunCmdWithResult($"/C {cmd}", timeoutSeconds);
+            // Lệnh raw có thể chứa pipe (|), redirection hoặc built-in của cmd
+            // (findstr, dir, ...) nên vẫn phải đi qua cmd.exe /C.
+            return RunProcessWithResult("cmd.exe", $"/C {cmd}", timeoutSeconds);
         }
 
         /// <summary>
@@ -97,28 +104,27 @@ namespace AutoAndroid
                         timeoutsThisCall++;
                         retryCount++;
 
-                        // Nếu lệnh 'devices' bị timeout liên tục → ADB server chết, cần restart ngay
+                        // Lệnh 'devices' treo = ADB server đã chết. Không đợi 3 lần mới
+                        // restart, vì mỗi lần retry đã tiêu tốn `timeoutSeconds` giây UI bị block.
+                        // Kick restart ngay lần timeout đầu tiên (có throttle 60s để tránh bão restart).
                         if (adbCommand.Trim() == "devices")
                         {
-                            int total = Interlocked.Increment(ref _consecutiveDevicesTimeout);
-                            if (total >= 3)
+                            Interlocked.Increment(ref _consecutiveDevicesTimeout);
+                            bool shouldRestart = false;
+                            lock (_adbRestartLock)
                             {
-                                bool shouldRestart = false;
-                                lock (_adbRestartLock)
+                                if ((DateTime.Now - _lastAdbRestart).TotalSeconds > 60)
                                 {
-                                    if ((DateTime.Now - _lastAdbRestart).TotalSeconds > 60)
-                                    {
-                                        _lastAdbRestart = DateTime.Now;
-                                        shouldRestart = true;
-                                    }
+                                    _lastAdbRestart = DateTime.Now;
+                                    shouldRestart = true;
                                 }
-                                if (shouldRestart)
-                                {
-                                    LogError("[ADB] Server bị treo hoàn toàn, đang restart...");
-                                    Interlocked.Exchange(ref _consecutiveDevicesTimeout, 0);
-                                    ADBHelper.Restart();
-                                    Thread.Sleep(2000);
-                                }
+                            }
+                            if (shouldRestart)
+                            {
+                                LogError("[ADB] 'devices' timeout → server treo, đang restart sạch...");
+                                Interlocked.Exchange(ref _consecutiveDevicesTimeout, 0);
+                                ADBHelper.Restart();
+                                Thread.Sleep(1000);
                             }
                         }
 
@@ -201,7 +207,7 @@ namespace AutoAndroid
             return result.Output.Trim();
         }
 
-        private static CommandExecutionResult RunCmdWithResult(string cmdArguments, int timeoutSeconds)
+        private static CommandExecutionResult RunProcessWithResult(string fileName, string arguments, int timeoutSeconds)
         {
             CmdSemaphore.Wait();
             try
@@ -210,8 +216,8 @@ namespace AutoAndroid
                 {
                     StartInfo = new ProcessStartInfo
                     {
-                        FileName = "cmd.exe",
-                        Arguments = cmdArguments,
+                        FileName = fileName,
+                        Arguments = arguments,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -256,7 +262,11 @@ namespace AutoAndroid
                     };
                 }
 
-                process.WaitForExit();
+                // WaitForExit(timeout) chỉ báo process đã exit, nhưng async readers
+                // có thể chưa flush xong. Gọi WaitForExit(ms) có hard cap để flush
+                // nốt thay vì WaitForExit() không tham số — cái này có thể block vô hạn
+                // nếu child process có grandchild vẫn giữ pipe stdout.
+                process.WaitForExit(2000);
                 return new CommandExecutionResult
                 {
                     TimedOut = false,
@@ -278,7 +288,9 @@ namespace AutoAndroid
                 if (!process.HasExited)
                 {
                     process.Kill(true);
-                    process.WaitForExit();
+                    // Hard cap 2s để tránh block khi kill không thành công
+                    // (ví dụ: driver/handle bị treo ở kernel mode).
+                    process.WaitForExit(2000);
                 }
             }
             catch

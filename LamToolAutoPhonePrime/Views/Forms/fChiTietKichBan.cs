@@ -1,4 +1,4 @@
-﻿using AntdUI;
+using AntdUI;
 using LamToolAutoPhonePrime.Utils;
 using LamToolAutoPhonePrime.Views.Forms.Actions;
 using Sunny.Subdy.Common.Helper;
@@ -6,6 +6,7 @@ using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 using System.Reflection;
+using LamToolAutoPhonePrime.Utils.Design;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
@@ -29,13 +30,21 @@ namespace LamToolAutoPhonePrime.Views.Forms
             _scriptContext = new ScriptContext();
             _scriptActionContext = new ScriptActionContext();
             _script = _scriptContext.GetById(idScript);
-            if (_script == null) { this.Load += (s, e) => this.Close(); return; }
+            if (_script == null)
+            {
+                this.Load += (s, e) =>
+                {
+                    AntdHelper.NotifyWarn(this, "Cảnh báo", $"Không tìm thấy kịch bản (Id: {idScript}). Vui lòng tải lại danh sách.");
+                    this.Close();
+                };
+                return;
+            }
             textBox1.Text = _script.Name;
             bindingList = new SortableBindingList<ScriptAction>(_scriptAction);
             dataGridView1.MultiSelect = false;
             dataGridView1.DefaultCellStyle.BackColor = Color.White;
             dataGridView1.DefaultCellStyle.ForeColor = Color.DarkGray;
-            dataGridView1.DefaultCellStyle.Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold);
+            dataGridView1.DefaultCellStyle.Font = FontScale.Body9Bold;
             dataGridView1.DefaultCellStyle.SelectionBackColor = Color.FromArgb(0, 120, 215);
             dataGridView1.DefaultCellStyle.SelectionForeColor = Color.White;
             dataGridView1.DefaultCellStyle.ForeColor = ColorTranslator.FromHtml("#1A1A1A");
@@ -82,6 +91,10 @@ namespace LamToolAutoPhonePrime.Views.Forms
                 {
                     act.MieuTa = desc;
                 }
+                else if (InstagramFarmingType.DescriptionAction.TryGetValue(act.Type, out var igDesc))
+                {
+                    act.MieuTa = igDesc;
+                }
                 else
                 {
                     act.MieuTa = "Không có mô tả";
@@ -98,9 +111,11 @@ namespace LamToolAutoPhonePrime.Views.Forms
             this.Cursor = Cursors.WaitCursor;
             try
             {
-                fActions fActions = new fActions(_idScript.ToString());
+                Form actionsWindow = _script.Platform == PlatformModel.Instagram
+                    ? new fActionsInstagram(_idScript.ToString())
+                    : new fActions(_idScript.ToString());
                 this.Cursor = Cursors.Default;
-                fActions.ShowDialog();
+                actionsWindow.ShowDialog();
             }
             finally
             {
@@ -111,14 +126,33 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
         private void button4_Click(object sender, EventArgs e)
         {
+            if (ScriptNames.IsBuiltIn(_script.Name))
+            {
+                AntdHelper.NotifyWarn(this, "Cảnh báo", $"Không thể xóa kịch bản mặc định {_script.Name}.");
+                return;
+            }
             if (CommonMethod.ShowConfirmWarning("Bạn có chắc chắn muốn xóa kịch bản này không?"))
             {
                 if (_scriptContext.DeleteById(_script.Id))
                 {
                     _scriptActionContext.DeleteByScriptId(_script.Id);
+                    RemapAccountsToFarmXu(_script.Name);
                 }
 
                 this.Close();
+            }
+        }
+
+        private void RemapAccountsToFarmXu(string deletedScriptName)
+        {
+            if (string.IsNullOrEmpty(deletedScriptName)) return;
+            var accountContext = new AccountContext();
+            var all = accountContext.GetAll(new List<string>(), _script.Platform, true);
+            if (all == null || all.Count == 0) return;
+            foreach (var acc in all)
+            {
+                if (string.IsNullOrEmpty(acc.NameScript) || acc.NameScript == deletedScriptName)
+                    acc.NameScript = Sunny.Subdy.Data.Context.ScriptNames.FarmXuVip;
             }
         }
 
@@ -133,13 +167,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
         {
             var style = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold)
+                Font = FontScale.Body9Bold
 
             };
             style.ForeColor = Color.FromArgb(0, 120, 215);
             dataGridViewTextBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
+                Font = FontScale.Body9Bold,
                 ForeColor = Color.FromArgb(0, 120, 215),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
@@ -532,7 +566,40 @@ namespace LamToolAutoPhonePrime.Views.Forms
                 case FacebookFarmingType.HDBuffLikePage:
                     form = new fHDBuffLikePage(action.ScriptId.ToString(), action.Id.ToString());
                     break;
+
+                // Instagram
+                case InstagramFarmingType.IGXemReel:
+                    form = new fIGXemReel(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGXemStory:
+                    form = new fIGXemStory(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGTuongTacNewfeed:
+                    form = new fIGTuongTacNewfeed(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGDangBai:
+                    form = new fIGDangBai(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGDangReel:
+                    form = new fIGDangReel(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGDangStory:
+                    form = new fIGDangStory(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGFollow:
+                    form = new fIGFollow(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGUnfollow:
+                    form = new fIGUnfollow(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGNhanTin:
+                    form = new fIGNhanTin(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case InstagramFarmingType.IGCapNhatThongTin:
+                    form = new fIGCapNhatThongTin(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
             }
+            if (form == null) return;
             var result = form.ShowDialog();
         }
     }

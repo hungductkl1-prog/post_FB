@@ -6,6 +6,7 @@ using Sunny.Subdy.Data.Models;
 using System.ComponentModel;
 using System.Windows.Forms;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
+using LamToolAutoPhonePrime.Utils.Design;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
@@ -238,7 +239,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         {
             if (_rows.Count == 0)
             {
-                CommonMethod.ShowMessageWarning("Không có thiết bị nào.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Không có thiết bị nào.");
                 return;
             }
 
@@ -294,7 +295,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             if (selectedRows.Count == 0)
             {
-                CommonMethod.ShowMessageWarning("Vui lòng bôi đen ít nhất 1 thiết bị.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng bôi đen ít nhất 1 thiết bị.");
                 return;
             }
 
@@ -304,7 +305,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             var lines = input.Lines;
             if (lines.Count == 0)
             {
-                CommonMethod.ShowMessageWarning("Danh sách username|password trống.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Danh sách username|password trống.");
                 return;
             }
 
@@ -322,13 +323,25 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             if (pairs.Count == 0)
             {
-                CommonMethod.ShowMessageWarning("Không có dòng hợp lệ (định dạng: username|password).");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Không có dòng hợp lệ (định dạng: username|password).");
                 return;
             }
 
             Enabled = false;
             try
             {
+                await AntdUI.Spin.open(this, "Đang chuẩn bị APK...", async _ =>
+                {
+                    // Pre-fetch apk once for all devices to avoid N parallel downloads.
+                    bool apkOk = await AdbJoinWifiService.EnsureApkAvailableAsync();
+                    if (!apkOk)
+                    {
+                        foreach (var (row, _, _) in pairs)
+                            SetRowResult(row, false, "Thiếu APK adb-join-wifi (tải thất bại)");
+                        return;
+                    }
+                });
+
                 await AntdUI.Spin.open(this, "Đang kết nối Wifi...", async _ =>
                 {
                     var tasks = new List<Task>();
@@ -349,13 +362,27 @@ namespace LamToolAutoPhonePrime.Views.Forms
                                 var wifi = new AdbJoinWifiService(client);
 
                                 SetRowStatus(rCap, $"Đang kết nối: {u}");
-                                await wifi.ConnectToWifiNetwork(u, p);
+                                bool sent = await wifi.ConnectToWifiNetwork(u, p);
+                                if (!sent)
+                                {
+                                    SetRowResult(rCap, false, "Cài APK thất bại");
+                                    return;
+                                }
 
                                 rCap.UserName = u;
                                 rCap.Password = p;
                                 WifiCredentialsStore.Upsert(rCap.DeviceId, u, p);
 
-                                SetRowResult(rCap, true, "Đã gửi lệnh kết nối");
+                                // Verify: poll up to ~12s for internet to come up.
+                                SetRowStatus(rCap, "Đang xác minh kết nối...");
+                                bool online = false;
+                                for (int attempt = 0; attempt < 6; attempt++)
+                                {
+                                    await Task.Delay(2000);
+                                    if (QuickInternetCheck(device.Serial)) { online = true; break; }
+                                }
+                                SetRowResult(rCap, online,
+                                    online ? "Kết nối thành công" : "Không có internet (kiểm tra SSID/mật khẩu)");
                             }
                             catch (Exception ex)
                             {

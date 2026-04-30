@@ -1,4 +1,4 @@
-﻿using AntdUI;
+using AntdUI;
 using LamToolAutoPhonePrime.Utils;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Json;
@@ -76,7 +76,7 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
             string actionName = txtTenHanhDong.Text.Trim();
             if (actionName == "")
             {
-                CommonMethod.ShowMessageWarning("Vui lòng nhập tên hành động!");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng nhập tên hành động!");
                 return;
             }
             string configJson = jsonConfig.GetJsonString();
@@ -104,7 +104,7 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                     }
                     else
                     {
-                        CommonMethod.ShowMessageError("Thêm thất bại, vui lòng thử lại sau!");
+                        AntdHelper.NotifyError(this, "Thao tác thất bại", "Thêm thất bại, vui lòng thử lại sau!");
                     }
                 }
             }
@@ -124,7 +124,7 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                     }
                     else
                     {
-                        CommonMethod.ShowMessageError("Cập nhật thất bại, vui lòng thử lại sau!");
+                        AntdHelper.NotifyError(this, "Thao tác thất bại", "Cập nhật thất bại, vui lòng thử lại sau!");
                     }
                 }
             }

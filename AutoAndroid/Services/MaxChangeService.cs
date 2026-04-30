@@ -7,9 +7,9 @@ namespace AutoAndroid
     public class MaxChangeService
     {
         ADBClient service;
-        private readonly string path_MaxChange = Path.Combine(AppContext.BaseDirectory, "App", "LamToolChanger.apk");
+        private readonly string path_MaxChange = Path.Combine(AppContext.BaseDirectory, "App", "GolikeHelper.apk");
         private readonly string path_DeviceInfoHW = Path.Combine(AppContext.BaseDirectory, "App", "DeviceInfoHW.apk");
-        public static string package_MaxChange = "com.lamtool.changer";
+        public static string package_MaxChange = "com.golike.helper";
         private readonly string package_Deviceinfohw = "ru.andr7e.deviceinfohw";
         public MaxChangeService(ADBClient service)
         {
@@ -24,12 +24,12 @@ namespace AutoAndroid
         {
             for (int i = 0; i < 5; i++)
             {
-                service.LogHelper.SUCCESS("Đang mở ứng dụng LamToolChanger");
+                service.LogHelper.SUCCESS("Đang mở ứng dụng GolikeHelper");
                 service.AppStart(package_MaxChange, true, true, wait: true);
                 service.SetSize();
                 if (service.AppWait(package_MaxChange))
                 {
-                    service.LogHelper.SUCCESS("Đã mở ứng dụng LamToolChanger");
+                    service.LogHelper.SUCCESS("Đã mở ứng dụng GolikeHelper");
                     break;
                 }
             }
@@ -44,7 +44,7 @@ namespace AutoAndroid
                 {
                     break;
                 }
-                service.LogHelper.SUCCESS("Cài đặt LamToolChanger");
+                service.LogHelper.SUCCESS("Cài đặt GolikeHelper");
                 list = service.AppList();
                 if (!list.Contains(package_Deviceinfohw))
                 {
@@ -62,7 +62,7 @@ namespace AutoAndroid
                     {
                         string dirPath = Path.GetDirectoryName(path_MaxChange) ?? Path.GetDirectoryName(AppContext.BaseDirectory)!;
                         Directory.CreateDirectory(dirPath);
-                        InitHelper.GithubDown("https://raw.githubusercontent.com/LamLe2001/changer/main/LamToolChanger.apk", path_MaxChange);
+                        InitHelper.GithubDown("https://raw.githubusercontent.com/LamLe2001/changer/main/GolikeHelper.apk", path_MaxChange);
                     }
                     service.InstallApp(path_MaxChange);
                 }
@@ -71,6 +71,7 @@ namespace AutoAndroid
             service.Shell($"pm grant {package_MaxChange} android.permission.READ_EXTERNAL_STORAGE");
             service.Shell($"pm grant {package_MaxChange} android.permission.WRITE_EXTERNAL_STORAGE");
             SetEnableModule();
+            ResetWallpaperDefault();
             return true;
         }
         public async Task<bool> Change(string filePath, bool backup, string brand, string country)
@@ -346,6 +347,67 @@ namespace AutoAndroid
                 }
             }
             return ip;
+        }
+        public bool ChangeWallpaper(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            {
+                service.LogHelper.ERROR($"File hình nền không tồn tại: {filePath}");
+                return false;
+            }
+            try
+            {
+                string fileName = Path.GetFileName(filePath);
+                string remotePath = $"/sdcard/{fileName}";
+
+                service.LogHelper.SUCCESS($"Đổi hình nền: {fileName}");
+                service.Push(filePath, "/sdcard");
+
+                string command = $"am broadcast -a {package_MaxChange}.WALLPAPER -n {package_MaxChange}/.AdbCaller --es path {remotePath}";
+                string result = service.ADB.Shell(command);
+
+                bool success = result.Contains("Broadcast completed");
+                if (success)
+                {
+                    service.LogHelper.SUCCESS("Đã đổi hình nền thành công");
+                }
+                else
+                {
+                    service.LogHelper.ERROR($"Đổi hình nền thất bại: {result}");
+                }
+                return success;
+            }
+            catch (Exception ex)
+            {
+                service.LogHelper.ERROR("Lỗi khi đổi hình nền: " + ex.Message);
+                return false;
+            }
+        }
+        public bool ResetWallpaperDefault()
+        {
+            try
+            {
+                service.LogHelper.SUCCESS("Reset hình nền mặc định");
+
+                string command = $"am broadcast -a {package_MaxChange}.WALLPAPER_DEFAULT -n {package_MaxChange}/.AdbCaller";
+                string result = service.ADB.Shell(command);
+
+                bool success = result.Contains("Broadcast completed");
+                if (success)
+                {
+                    service.LogHelper.SUCCESS("Đã reset hình nền mặc định thành công");
+                }
+                else
+                {
+                    service.LogHelper.ERROR($"Reset hình nền thất bại: {result}");
+                }
+                return success;
+            }
+            catch (Exception ex)
+            {
+                service.LogHelper.ERROR("Lỗi khi reset hình nền: " + ex.Message);
+                return false;
+            }
         }
     }
     public class Modules

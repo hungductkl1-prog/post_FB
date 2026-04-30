@@ -1,5 +1,6 @@
-﻿using AntdUI;
+using AntdUI;
 using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using Sunny.Subd.Core.Facebook;
 using Sunny.Subd.Core.Proxies;
 using Sunny.Subd.Core.Telegram;
@@ -166,7 +167,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void button4_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Title = "LamTool.net Chọn file APK";
+            openFileDialog.Title = "Golike.net Chọn file APK";
             openFileDialog.Filter = "File APK (*.apk)|*.apk";
             openFileDialog.Multiselect = false;
 
@@ -333,7 +334,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void button11_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Title = "LamTool.net Chọn file Gmail";
+            openFileDialog.Title = "Golike.net Chọn file Gmail";
             openFileDialog.Filter = "File text (*.txt)|*.txt";
             openFileDialog.Multiselect = false;
 
@@ -362,13 +363,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
             try
             {
                 TelegramBotServices telegramBotServices = new TelegramBotServices(textBox7.Text.Trim());
-                message = await telegramBotServices.SendMessageAsync(Convert.ToInt64(textBox8.Text.Trim()), "LamTool.net gửi tin nhắn test message thông báo!");
+                message = await telegramBotServices.SendMessageAsync(Convert.ToInt64(textBox8.Text.Trim()), "Golike.net gửi tin nhắn test message thông báo!");
             }
             catch (Exception ex)
             {
                 message = ex.Message;
             }
-            CommonMethod.ShowMessageSuccess(message);
+            AntdHelper.NotifySuccess(this, "Thành công", message);
         }
 
         private void cbb_Email_SelectedIndexChanged(object sender, EventArgs e)

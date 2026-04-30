@@ -489,27 +489,47 @@ namespace Sunny.Subd.Core.Facebook
                     _account.Status = "Lỗi: " + subdyExtension.Message;
                     break;
                 case SubdyEnum.CP_282:
-                    _account.Status = "Lỗi CP_282: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị checkpoint 282."
+                        : (subdyExtension.Message.Contains("checkpoint", StringComparison.OrdinalIgnoreCase) || subdyExtension.Message.Contains("282")
+                            ? subdyExtension.Message
+                            : "Lỗi CP_282: " + subdyExtension.Message);
                     _account.State = "CP_282";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.CP_956:
-                    _account.Status = "Lỗi CP_956: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị checkpoint 956."
+                        : (subdyExtension.Message.Contains("checkpoint", StringComparison.OrdinalIgnoreCase) || subdyExtension.Message.Contains("956")
+                            ? subdyExtension.Message
+                            : "Lỗi CP_956: " + subdyExtension.Message);
                     _account.State = "CP_956";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.LogOut:
-                    _account.Status = "Đăng xuất: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị đăng xuất."
+                        : (subdyExtension.Message.Contains("đăng xuất", StringComparison.OrdinalIgnoreCase)
+                            ? subdyExtension.Message
+                            : "Đăng xuất: " + subdyExtension.Message);
                     _account.State = "Logout";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.Captcha:
-                    _account.Status = "Captcha: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị yêu cầu captcha."
+                        : (subdyExtension.Message.Contains("captcha", StringComparison.OrdinalIgnoreCase)
+                            ? subdyExtension.Message
+                            : "Captcha: " + subdyExtension.Message);
                     _account.State = "Captcha";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.Block:
-                    _account.Status = "Tài khoản bị chặn: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị chặn."
+                        : (subdyExtension.Message.Contains("bị chặn", StringComparison.OrdinalIgnoreCase)
+                            ? subdyExtension.Message
+                            : "Tài khoản bị chặn: " + subdyExtension.Message);
                     _account.State = "Block";
                     _account.ColorType = 1;
                     break;

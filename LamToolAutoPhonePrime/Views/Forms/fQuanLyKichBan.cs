@@ -25,6 +25,9 @@ namespace LamToolAutoPhonePrime.Views
             txt_search.PrefixClick += txt_search_PrefixClick;
             txt_search.TextChanged += txt_search_TextChanged;
             virtualPanel.ItemClick += ItemClick;
+            virtualPanel.MouseDoubleClick += virtualPanel_MouseDoubleClick;
+
+            AddCreateScriptBar();
 
             radioButton4.CheckedChanged += UpdateConfigPanels;
             checkBox2.CheckedChanged += UpdateConfigPanels;
@@ -35,45 +38,115 @@ namespace LamToolAutoPhonePrime.Views
                 UpdateConfigPanels(null, null);
 
             }), shouldExit: false);
-            EnsureDefaultScripts();
+            _scriptContext.FixMissingIds();
+            _scriptContext.PurgeFarmXu(); // Xoá sạch kịch bản FarmXu legacy.
+            _scriptContext.RemapLegacyFarmXuVipName(); // "Farm-Xu-VIP" → "Làm Job Golike"
+            RemapLegacyFarmXuAccounts();
+            if (_platform == Sunny.Subdy.Common.Models.PlatformModel.Facebook
+                || _platform == Sunny.Subdy.Common.Models.PlatformModel.Instagram)
+            {
+                _scriptContext.EnsureFarmXuVip(_platform);
+            }
             LoadList();
+
+            this.Load += (_, __) => LamToolAutoPhonePrime.Utils.Design.SsaTheme.ApplyFQuanLyKichBan(this);
         }
 
-        void EnsureDefaultScripts()
+        /// <summary>
+        /// Account legacy NameScript = "FarmXu" hoặc "Farm-Xu-VIP" → remap sang tên mới ("Làm Job Golike").
+        /// Idempotent.
+        /// </summary>
+        private void RemapLegacyFarmXuAccounts()
         {
-            if (_platform != "Facebook") return;
-            if (_scriptContext.GetByName("FarmXu", "Facebook") != null) return;
-
-            var script = new Script
+            try
             {
-                Id = Guid.NewGuid(),
-                Platform = "Facebook",
-                Name = "FarmXu",
-                DateCreate = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")
-            };
-            _scriptContext.Add(script);
-
-            var actions = new List<ScriptAction>
+                var ctx = new AccountContext();
+                var all = ctx.GetAll(new List<string>(), _platform, true) ?? new List<Account>();
+                var changed = all.Where(a =>
+                    string.Equals(a.NameScript, ScriptNames.FarmXu, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(a.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
+                ).ToList();
+                if (changed.Count == 0) return;
+                foreach (var a in changed) a.NameScript = ScriptNames.FarmXuVip;
+                ctx.Update(changed);
+            }
+            catch (Exception ex)
             {
-                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
-                    Name = "Đọc thông báo", Type = FacebookFarmingType.HDDocThongBao, ByOrder = 1, Json = "{}" },
-                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
-                    Name = "Xem Watch", Type = FacebookFarmingType.HDXemWatch, ByOrder = 2, Json = "{}" },
-                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
-                    Name = "Tương tác newfeed", Type = FacebookFarmingType.HDTuongTacNewfeed, ByOrder = 3, Json = "{}" },
-                new ScriptAction { Id = Guid.NewGuid(), ScriptId = script.Id, Platform = "Facebook",
-                    Name = "Nghỉ giải lao", Type = FacebookFarmingType.HDNghiGiaiLao, ByOrder = 4, Json = "{}" },
-            };
-            _scriptActionContext.AddRange(actions);
+                Sunny.Subdy.Common.Logs.LogManager.Error(ex);
+            }
         }
 
         
 
         public void OpenPage(string id)
         {
-            fChiTietKichBan form = new fChiTietKichBan(Guid.Parse(id));
-            form.ShowDialog();
-            LoadList();
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                AntdUI.Message.warn(this, "Không xác định được kịch bản (id rỗng).", autoClose: 3);
+                return;
+            }
+            if (!Guid.TryParse(id, out var guid))
+            {
+                AntdUI.Message.error(this, $"Id kịch bản không hợp lệ: {id}", autoClose: 3);
+                return;
+            }
+            try
+            {
+                var script = _scriptContext.GetById(guid);
+                if (script != null && string.Equals(script.Name, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase))
+                {
+                    // "Làm Job Golike" không còn popup token riêng — token lấy từ phiên login Golike.
+                    AntdUI.Message.info(this, "\"Làm Job Golike\" dùng token đăng nhập Golike, không cần cấu hình thêm.", autoClose: 3);
+                    return;
+                }
+                fChiTietKichBan form = new fChiTietKichBan(guid);
+                form.ShowDialog();
+                LoadList();
+            }
+            catch (Exception ex)
+            {
+                AntdUI.Message.error(this, "Mở chi tiết kịch bản lỗi: " + ex.Message, autoClose: 5);
+            }
+        }
+
+        private void AddCreateScriptBar()
+        {
+            var bar = new System.Windows.Forms.Panel
+            {
+                Height = 48,
+                Dock = DockStyle.Top,
+                BackColor = Color.FromArgb(236, 240, 241)
+            };
+            var btnCreate = new AntdUI.Button
+            {
+                Text = "  + Tạo kịch bản mới",
+                Type = AntdUI.TTypeMini.Primary,
+                Size = new Size(190, 36),
+                Location = new Point(12, 6),
+                Font = new Font("Microsoft YaHei UI", 10F, FontStyle.Bold),
+                Radius = 8
+            };
+            btnCreate.Click += (s, e) => button1_Click(s, e);
+            bar.Controls.Add(btnCreate);
+
+            virtualPanel.Parent.Controls.Add(bar);
+            bar.BringToFront();
+            virtualPanel.BringToFront();
+            // ensure bar is above virtualPanel in docking order
+            Controls.SetChildIndex(bar, Controls.IndexOf(virtualPanel));
+        }
+
+        private void virtualPanel_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            int x = e.X, y = e.Y + virtualPanel.ScrollBar.Value;
+            foreach (var it in virtualPanel.Items)
+            {
+                if (it is VItem vi && it.SHOW && it.RECT.Contains(x, y))
+                {
+                    OpenPage(vi.Tag.ToString());
+                    return;
+                }
+            }
         }
         private void txt_search_PrefixClick(object sender, MouseEventArgs e) => LoadSearchList();
 
@@ -138,6 +211,9 @@ namespace LamToolAutoPhonePrime.Views
             var scripts = _scriptContext.GetByPlatform(_platform);
             foreach (var script in scripts)
             {
+                // FarmXu: ẩn hoàn toàn (mặc định Subdy, không cấu hình)
+                if (string.Equals(script.Name, ScriptNames.FarmXu, StringComparison.OrdinalIgnoreCase))
+                    continue;
                 dir_General = dir_General.Append(new IList(script.Id.ToString(), script.Name, Properties.Resources.IconDocThongBao)).ToArray();
             }
 

@@ -1,12 +1,14 @@
 using AntdUI;
-using Sunny.Subdy.Common.API;
 using System;
+using System.Diagnostics;
 using System.Windows.Forms;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
     public partial class fRegister : AntdUI.Window
     {
+        private const string GolikeRegisterUrl = "https://app.golike.net/register";
+
         public fRegister()
         {
             InitializeComponent();
@@ -14,37 +16,24 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
         private void btnRegister_Click(object sender, EventArgs e)
         {
-            string fullName = txtFullName.Text.Trim();
-            string username = txtUsername.Text.Trim();
-            string email = txtEmail.Text.Trim();
-            string password = txtPassword.Text.Trim();
-            string confirmPassword = txtConfirmPassword.Text.Trim();
-
-            if (string.IsNullOrEmpty(fullName) || string.IsNullOrEmpty(username) ||
-                string.IsNullOrEmpty(email) || string.IsNullOrEmpty(password))
-            {
-                AntdUI.Notification.warn(this, "Subdy Thông Báo", "Vui lòng điền đầy đủ thông tin.", TAlignFrom.TR, Font);
-                return;
-            }
-
-            if (password != confirmPassword)
-            {
-                AntdUI.Notification.warn(this, "Subdy Thông Báo", "Mật khẩu xác nhận không khớp.", TAlignFrom.TR, Font);
-                return;
-            }
-
-            btnRegister.Enabled = false;
+            // Đăng ký được chuyển sang Golike: mở trình duyệt tới trang đăng ký chính thức.
             try
             {
-                SubdyClient.Register(username, email, password, fullName);
-                AntdUI.Notification.success(this, "Subdy Thông Báo", "Đăng ký thành công! Vui lòng đăng nhập.", TAlignFrom.TR, Font);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = GolikeRegisterUrl,
+                    UseShellExecute = true
+                });
+                AntdUI.Notification.success(this, "Golike Thông Báo",
+                    "Đã mở trang đăng ký Golike trên trình duyệt. Sau khi có tài khoản, hãy quay lại đăng nhập.",
+                    TAlignFrom.TR, Font);
                 DialogResult = DialogResult.OK;
                 Close();
             }
             catch (Exception ex)
             {
-                AntdUI.Notification.error(this, "Subdy Thông Báo", ex.Message, TAlignFrom.TR, Font);
-                btnRegister.Enabled = true;
+                AntdUI.Notification.error(this, "Golike Thông Báo",
+                    "Không thể mở trang đăng ký Golike: " + ex.Message, TAlignFrom.TR, Font);
             }
         }
 

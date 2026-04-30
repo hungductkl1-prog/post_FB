@@ -1,6 +1,7 @@
 ﻿using AntdUI;
 using AutoAndroid;
 using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using LamToolAutoPhonePrime.Views.Forms;
 using Sunny.Subd.Core.Facebook;
 using Sunny.Subd.Core.Utils;
@@ -52,21 +53,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
             bindingList = new SortableBindingList<Account>(_accounts);
             _jobHistoryContext = new JobHistoryContext();
 
-            // Visual setup
-            dataGridView1.EnableHeadersVisualStyles = false;
-            dataGridView1.BorderStyle = BorderStyle.None;
+            // Visual setup (style chung do GridStyleHelper + SsaTheme quản lý)
             dataGridView1.AutoGenerateColumns = false;
-            dataGridView1.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
-
-            var defaultFont = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold);
-            dataGridView1.DefaultCellStyle = new DataGridViewCellStyle
-            {
-                BackColor = Color.White,
-                ForeColor = ColorTranslator.FromHtml("#1A1A1A"),
-                SelectionBackColor = Color.FromArgb(0, 120, 215),
-                SelectionForeColor = Color.White,
-                Font = defaultFont
-            };
             dataGridViewCheckBoxColumn1.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dataGridViewCheckBoxColumn1.DataPropertyName = nameof(Account.Checked);
 
@@ -105,35 +93,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             dataGridViewTextBoxColumn1.Resizable = DataGridViewTriState.False;
             tableLayoutPanel1.Resize += tableLayoutPanel1_Resize;
 
-            // Empty state: hiển thị hướng dẫn khi chưa có tài khoản
-            dataGridView1.Paint += (s, e) =>
-            {
-                if (dataGridView1.Rows.Count == 0)
-                {
-                    var rect = dataGridView1.ClientRectangle;
-                    using var iconFont = new Font("Segoe UI", 32F);
-                    using var titleFont = new Font("Segoe UI", 13F, FontStyle.Bold);
-                    using var hintFont = new Font("Segoe UI", 10F);
-                    var gray = Color.FromArgb(160, 160, 160);
-
-                    string icon = "👤";
-                    string title = "Chưa có tài khoản nào";
-                    string hint = "Nhấn \"Thêm tài khoản\" để bắt đầu";
-
-                    var iconSize = e.Graphics.MeasureString(icon, iconFont);
-                    var titleSize = e.Graphics.MeasureString(title, titleFont);
-                    var hintSize = e.Graphics.MeasureString(hint, hintFont);
-
-                    float totalH = iconSize.Height + titleSize.Height + hintSize.Height + 16;
-                    float startY = (rect.Height - totalH) / 2;
-
-                    using var grayBrush = new SolidBrush(gray);
-                    using var darkBrush = new SolidBrush(Color.FromArgb(100, 100, 100));
-                    e.Graphics.DrawString(icon, iconFont, grayBrush, (rect.Width - iconSize.Width) / 2, startY);
-                    e.Graphics.DrawString(title, titleFont, darkBrush, (rect.Width - titleSize.Width) / 2, startY + iconSize.Height + 8);
-                    e.Graphics.DrawString(hint, hintFont, grayBrush, (rect.Width - hintSize.Width) / 2, startY + iconSize.Height + titleSize.Height + 16);
-                }
-            };
+            // Empty state: delegated to SsaTheme.ApplyUcAccount (SSA styled)
 
             // Update checked/running counts via timer instead of CellFormatting
             _countsTimer = new System.Windows.Forms.Timer { Interval = 1000 };
@@ -146,7 +106,31 @@ namespace LamToolAutoPhonePrime.Views.Controls
             };
             _countsTimer.Start();
 
-            ControlHelper.LoadConfigColums(dataGridView1, new List<string> { nameof(Account.Id), nameof(Account.ColorType), nameof(Account.Running) });
+            // Nếu config cột chưa tồn tại (first run) → apply "Hiển thị tối ưu" làm mặc định:
+            // chỉ show core (UID, Họ tên, Nhóm, Kịch bản, Trạng thái) + 5 cột tối ưu
+            // (TOTAL, HÔM NAY, LẦN TƯƠNG TÁC CUỐI, XU, TÌNH TRẠNG). Sau khi user chọn qua
+            // dialog "Hiển thị", config file sẽ override list này.
+            // Include cả original-case lẫn UPPERCASE vì LoadConfigColums được gọi 2 lần:
+            // trước SsaTheme.ApplyUcAccount (header còn original) và sau (header đã uppercase).
+            var colConfigFile = $"configs\\{dataGridView1.Name}.txt";
+            var hideList = new List<string> { nameof(Account.Id), nameof(Account.ColorType), nameof(Account.Running) };
+            if (!System.IO.File.Exists(colConfigFile))
+            {
+                var hideHeaders = new[]
+                {
+                    "Mật khẩu", "2FA", "Cookie", "Token", "Giới tính", "Bio",
+                    "Bạn bè", "Following", "Bạn bè/Following", "Page profile", "Số nhóm", "Follow",
+                    "Ngày sinh", "Ngày tạo", "Avatar", "Số điện thoại", "Email", "Mật khẩu email",
+                    "Mail client id", "Mail refresh token", "Email khôi phục", "User Agent",
+                    "Mail Recover Pass", "Thông tin thiết bị", "Proxy", "Ghi chú",
+                    "Job success", "Job fail",
+                    "Thiết bị", "Token Job"
+                };
+                hideList.AddRange(hideHeaders);
+                hideList.AddRange(hideHeaders.Select(h => h.ToUpperInvariant()));
+            }
+            ControlHelper.LoadConfigColums(dataGridView1, hideList);
+            ForceHideInternalColumns(dataGridView1);
 
             // Tooltip cho các icon button quản lý nhóm
             var toolTip = new ToolTip { AutoPopDelay = 3000, InitialDelay = 300, ReshowDelay = 200 };
@@ -168,7 +152,26 @@ namespace LamToolAutoPhonePrime.Views.Controls
             });
             cboFilterAccount.SelectedValueChanged += CboFilterAccount_SelectedValueChanged;
 
+            GridStyleHelper.Apply(dataGridView1);
+
             FontUtil.ApplyFontToAllControls(this);
+
+            // SSA visual redesign — chỉ đụng UI, không đổi business logic
+            SsaTheme.ApplyUcAccount(this);
+
+            // SsaTheme đã uppercase headers → LoadConfigColums gọi ở dòng ~127 match sai
+            // (config file chứa "UID" nhưng lúc đó header còn "Uid"). Re-apply config sau
+            // khi headers đã final để visibility đúng theo lựa chọn của user.
+            ControlHelper.LoadConfigColums(dataGridView1, hideList);
+            ForceHideInternalColumns(dataGridView1);
+
+            // Re-apply column visibility sau khi ConfigHelper restore (Load fire sau ctor)
+            // → đảm bảo grid paint lần đầu đã có đúng cấu hình cột.
+            this.Load += (_, __) =>
+            {
+                ControlHelper.LoadConfigColums(dataGridView1, hideList);
+                ForceHideInternalColumns(dataGridView1);
+            };
         }
 
         private void tableLayoutPanel1_Resize(object sender, EventArgs e)
@@ -180,20 +183,20 @@ namespace LamToolAutoPhonePrime.Views.Controls
         {
             var style = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(0, 120, 215)
+                Font = FontScale.Body9Bold,
+                ForeColor = ColorPalette.Primary
             };
 
             dataGridViewCheckBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(0, 120, 215),
+                Font = FontScale.Body9Bold,
+                ForeColor = ColorPalette.Primary,
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
             dataGridViewTextBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(0, 120, 215),
+                Font = FontScale.Body9Bold,
+                ForeColor = ColorPalette.Primary,
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
             dataGridViewTextBoxColumn1.ToolTipText = "Số thứ tự trong bảng";
@@ -297,6 +300,20 @@ namespace LamToolAutoPhonePrime.Views.Controls
             return -1;
         }
 
+        /// <summary>
+        /// Force ẩn các cột nội bộ (Id / ColorType / Running) — chạy SAU LoadConfigColums
+        /// vì helper đó dùng HeaderText để match, không bền khi header bị uppercase.
+        /// </summary>
+        private static void ForceHideInternalColumns(DataGridView dgv)
+        {
+            string[] hiddenNames = { "col_Id", "col_ColorType", "col_Running" };
+            foreach (var name in hiddenNames)
+            {
+                var col = dgv.Columns[name];
+                if (col != null) col.Visible = false;
+            }
+        }
+
         private DataGridViewColumn CreateColumnsDataGridView(string dataPropertyName, string header, string toolTip, bool visible, int miniWith, DataGridViewAutoSizeColumnMode size, DataGridViewCellStyle style)
         {
             DataGridViewTextBoxColumn column = new DataGridViewTextBoxColumn();
@@ -367,6 +384,14 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private static readonly Color _defaultForeColor = ColorTranslator.FromHtml("#1A1A1A");
         private static readonly Color _selectionBackColor = Color.FromArgb(0, 120, 215);
+        private static readonly Color _logoutForeColor = Color.FromArgb(139, 92, 246); // violet-500
+
+        private static bool IsLogoutStatus(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            string u = s.ToUpperInvariant();
+            return u.Contains("LOGOUT") || u.Contains("ĐĂNG XUẤT");
+        }
 
         // Use RowPrePaint to style a whole row once per draw pass (much faster than per-cell)
         private void DataGridView1_RowPrePaint(object? sender, DataGridViewRowPrePaintEventArgs e)
@@ -384,12 +409,16 @@ namespace LamToolAutoPhonePrime.Views.Controls
                     if (style.BackColor != expectedBack)
                         style.BackColor = expectedBack;
 
-                    var expectedFore = acc.ColorType switch
-                    {
-                        1 => Color.Red,
-                        2 => Color.Green,
-                        _ => _defaultForeColor
-                    };
+                    // Logout → tím; ColorType ưu tiên sau (Logout hiếm khi trùng ColorType)
+                    bool isLogout = IsLogoutStatus(acc.State) || IsLogoutStatus(acc.Status);
+                    var expectedFore = isLogout
+                        ? _logoutForeColor
+                        : acc.ColorType switch
+                        {
+                            1 => Color.Red,
+                            2 => Color.Green,
+                            _ => _defaultForeColor
+                        };
                     if (style.ForeColor != expectedFore)
                         style.ForeColor = expectedFore;
 
@@ -638,6 +667,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
                                 else if (acc.State == "DIE" || acc.State == "CP_282" || acc.State == "CP_956") acc.ColorType = 1;
                                 acc.STT = index++;
 
+                                if (string.IsNullOrEmpty(acc.NameScript)) acc.NameScript = ScriptNames.FarmXuVip;
+
                                 if (!string.IsNullOrEmpty(acc.Uid) && todayCounts.TryGetValue(acc.Uid, out var counts))
                                 {
                                     acc.JobToday = $"{counts.success}/{counts.fail}";
@@ -722,24 +753,27 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private void button17_Click(object sender, EventArgs e)
         {
-            var excludedHeaders = new HashSet<string> {
-                                                                                                                                                                                                                                                                                        dataGridViewCheckBoxColumn1.HeaderText,
-                                                                                                                                                                                                                                                                                        dataGridViewTextBoxColumn1.HeaderText,
-                                                                                                                                                                                                                                                                                        nameof(Account.Uid),
-                                                                                                                                                                                                                                                                                        "Trạng thái",
-                                                                                                                                                                                                                                                                                        nameof(Account.Id),
-                                                                                                                                                                                                                                                                                        nameof(Account.ColorType),
-                                                                                                                                                                                                                                                                                        nameof(Account.Running)
-                                                                                                                                                                                                                                                                                    };
+            // Exclude list dựa trên column Name ("col_<Property>") — bền với việc HeaderText bị
+            // transform (uppercase / i18n). CheckBox + STT column không có pattern col_ nên check riêng.
+            var excludedNames = new HashSet<string>
+            {
+                "col_" + nameof(Account.Uid),
+                "col_" + nameof(Account.Status),
+                "col_" + nameof(Account.Id),
+                "col_" + nameof(Account.ColorType),
+                "col_" + nameof(Account.Running)
+            };
 
             var remainingHeaders = dataGridView1.Columns
                 .Cast<DataGridViewColumn>()
-                .Where(c => !excludedHeaders.Contains(c.HeaderText))
+                .Where(c => c != dataGridViewCheckBoxColumn1 && c != dataGridViewTextBoxColumn1)
+                .Where(c => !excludedNames.Contains(c.Name))
                 .Select(c => c.HeaderText)
                 .ToList();
             fViewDataGridView f = new fViewDataGridView(remainingHeaders, dataGridView1.Name);
             f.ShowDialog();
             ControlHelper.LoadConfigColums(dataGridView1, new List<string> { nameof(Account.Id), nameof(Account.ColorType), nameof(Account.Running) });
+            ForceHideInternalColumns(dataGridView1);
         }
 
         private CancellationTokenSource _searchCts;
@@ -896,10 +930,25 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button7.Visible = enable;
             button8.Visible = !enable;
             button8.Enabled = !enable;
+            button8.Text    = "Dừng"; // reset lại sau khi stop completed
             button9.Enabled = enable;
             panel2.Enabled = enable;
             panel3.Enabled = enable;
             button16.Enabled = enable;
+
+            // Disable thêm các control SSA khi đang chạy:
+            // cboScript / select1 (Nhóm) / ssaBtnFolderMgr / cboFilterAccount / Cài đặt jobs / chung / Tương tác
+            var panel4 = this.Controls.Find("panel4", true).FirstOrDefault() as AntdUI.Panel;
+            if (panel4 != null)
+            {
+                foreach (var name in new[] { "ssaCboScript", "select1", "ssaBtnFolderMgr", "button4", "button5", "button6" })
+                {
+                    var c = panel4.Controls.Find(name, true).FirstOrDefault();
+                    if (c != null) c.Enabled = enable;
+                }
+            }
+            var cboFilter = this.Controls.Find("cboFilterAccount", true).FirstOrDefault();
+            if (cboFilter != null) cboFilter.Enabled = enable;
         }
 
         private async void button7_Click(object sender, EventArgs e)
@@ -924,6 +973,9 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
                
 
+                // Clear registry clients cũ trước khi start batch mới
+                while (_activeClients.TryTake(out _)) { }
+
                 FacebookFarming._data.Clear();
                 Globals.ToolStripDropDownButton1 = toolStripDropDownButton1;
                 Globals.JobTotal_toolStripMenuItem = JobTotal_toolStripMenuItem;
@@ -937,16 +989,33 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 int indexRunning = 0;
                 {
                     while (_accounts.Any(x => x.Checked))
-                    { 
+                    {
+                        if (ct.IsCancellationRequested) break;
                         await XpathManagerFacebook.LoadFromApiAsync();
                         foreach (var device in DeviceServices.DeviceModels.Where(x => x.Checked))
                         {
+                            if (ct.IsCancellationRequested) break;
                             tasks.Add(Task.Run(async () =>
                             {
                                 await RunningThread(ct, device, model);
                             }));
                         }
-                        await Task.WhenAll(tasks);
+
+                        // Chờ tất cả task — nhưng khi cancel, chỉ chờ tối đa 10s rồi abandon
+                        // (các task con không respect ct sẽ tiếp tục chạy ngầm, nhưng UI không bị block)
+                        try
+                        {
+                            var whenAll = Task.WhenAll(tasks);
+                            var tcs = new TaskCompletionSource<bool>();
+                            using var reg = ct.Register(() =>
+                            {
+                                Task.Delay(10000).ContinueWith(_ => tcs.TrySetResult(true));
+                            });
+                            await Task.WhenAny(whenAll, tcs.Task);
+                        }
+                        catch { }
+
+                        if (ct.IsCancellationRequested) break;
                         if (model.SettingGeneral.GetBooleanValue("radioButton1", true))
                         {
                             break;
@@ -1050,9 +1119,13 @@ namespace LamToolAutoPhonePrime.Views.Controls
             return model;
         }
 
+        // Registry các ADBClient đang chạy để có thể force-stop từ button Dừng
+        private readonly System.Collections.Concurrent.ConcurrentBag<ADBClient> _activeClients = new();
+
         private async Task RunningThread(CancellationToken ct, DeviceModel device, ConfigModel model)
         {
             ADBClient client = new ADBClient(device);
+            _activeClients.Add(client);
             try
             {
                 ChangeLanguageService changeLanguage = new ChangeLanguageService(client);
@@ -1063,7 +1136,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
             }
             finally
             {
-                client.AppClear(FacebookHander.Package(_platform));
+                try { client.AppClear(FacebookHander.Package(_platform)); } catch { }
+                client.Running = false;
             }
         }
 
@@ -1073,11 +1147,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
             // Save original state
             bool panelRightCollapsed = uc.splitContainer1.Panel2Collapsed;
-            var btn2Location = uc.button2.Location;
 
             // Hide panelRight (thanh công cụ bên phải), chỉ hiện nút Bắt đầu sát lề phải
             uc.splitContainer1.Panel2Collapsed = true;
             uc.button2.Visible = true;
+            uc.button2.Enabled = true;
+            uc.button2.BringToFront();
 
             // Refresh DataGridView để load đúng trạng thái checkbox
             uc.dataGridView1.Refresh();
@@ -1085,13 +1160,16 @@ namespace LamToolAutoPhonePrime.Views.Controls
             fAddUsercontrol f = new fAddUsercontrol("SelectDevices", _platform, uc);
             f.ShowDialog();
 
-            // Restore original state
+            // Restore original state (không restore button2.Location: fAddUsercontrol
+            // sẽ tự re-anchor về mép phải panel6 mỗi lần Shown, tránh lần mở thứ 2
+            // button bị đẩy ngoài bounds do container có width khác).
             uc.splitContainer1.Panel2Collapsed = panelRightCollapsed;
-            uc.button2.Location = btn2Location;
             uc.button2.Visible = false;
 
             uc.Dock = DockStyle.Fill;
             _form.pContent.Controls.Add(uc);
+            // Đưa tab Facebook (this) lên front để user không thấy tab Thiết bị đè lên
+            this.BringToFront();
             if (f.DialogResult != DialogResult.OK)
             {
                 return false;
@@ -1274,10 +1352,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private void Control_MouseClick(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Right && menulist != null)
+            if (e.Button == MouseButtons.Right)
             {
+                CreateMenuStrip();
+                if (menulist == null) return;
                 AntdUI.ContextMenuStrip.Config config = new AntdUI.ContextMenuStrip.Config(this, RightKey, menulist);
-                config.Font = new Font(FontUtil._fontSemiBold, 8f, FontStyle.Bold);
+                config.Font = FontScale.Body9Bold;
                 AntdUI.ContextMenuStrip.open(config);
             }
         }
@@ -1651,8 +1731,19 @@ namespace LamToolAutoPhonePrime.Views.Controls
                     string folderName = matchFolder.Name ?? "";
                     var toUpdate = new List<Account>();
                     foreach (DataGridViewRow row in dataGridView1.SelectedRows)
-                        if (row.DataBoundItem is Account a) { a.NameFolder = folderName; toUpdate.Add(a); }
-                    if (toUpdate.Any()) { _accountContext.Update(toUpdate); _ = LoadAccounts(); }
+                        if (row.DataBoundItem is Account a) toUpdate.Add(a);
+                    if (!toUpdate.Any())
+                    {
+                        AntdHelper.MsgWarn(_form, "Vui lòng bôi đen tài khoản cần chuyển nhóm.");
+                        return;
+                    }
+                    if (!AntdHelper.Confirm(_form, "Xác nhận chuyển nhóm",
+                        $"Bạn có chắc chắn muốn chuyển {toUpdate.Count} tài khoản bôi đen sang nhóm [{folderName}]?"))
+                        return;
+                    foreach (var a in toUpdate) a.NameFolder = folderName;
+                    _accountContext.Update(toUpdate);
+                    AntdHelper.MsgSuccess(_form, $"Đã chuyển {toUpdate.Count} tài khoản sang nhóm [{folderName}].");
+                    _ = LoadAccounts();
                     return;
                 }
 
@@ -1662,6 +1753,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 if (matchScript != null)
                 {
                     string scriptName = matchScript.Name ?? "";
+                    // "Làm Job Golike" giờ dùng token login Golike — bỏ popup nhập token.
                     var toUpdate = new List<Account>();
                     foreach (DataGridViewRow row in dataGridView1.SelectedRows)
                         if (row.DataBoundItem is Account a) { a.NameScript = scriptName; toUpdate.Add(a); }
@@ -1783,8 +1875,19 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private void button8_Click(object sender, EventArgs e)
         {
-            Globals.CancellationTokenSource.Cancel();
+            try { Globals.CancellationTokenSource?.Cancel(); } catch { }
+
+            // Force stop tất cả ADBClient đang chạy: set Running=false để ThrowIfStopped()
+            // throw ở vòng lặp tiếp theo trong ADB sync calls → script bubble up và thoát ngay.
+            foreach (var c in _activeClients)
+            {
+                try { c.Running = false; } catch { }
+            }
+
             button8.Enabled = false;
+            button8.Text    = "Đang dừng…";
+
+            AntdHelper.MsgInfo(_form, "Đang dừng các tác vụ đang chạy…");
         }
 
         private void select2_SelectedIndexChanged(object sender, IntEventArgs e)
@@ -1855,7 +1958,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                     "Tương tác hôm qua" => result.Where(x => GetInteractionDate(x.RecentInteraction) == DateTime.Today.AddDays(-1)),
                     "Chưa tương tác" => result.Where(x => string.IsNullOrEmpty(x.RecentInteraction)),
                     // Nhóm tài khoản
-                    _ when filter.StartsWith("Nhóm: ") => result.Where(x => x.NameFolder == filter.Substring(6)),
+                    _ when filter.StartsWith("Nhóm: ") && filter.Length >= 6 => result.Where(x => x.NameFolder == filter.Substring(6)),
                     _ => result
                 };
             }
@@ -2119,7 +2222,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         private bool VerifySubdyPassword()
         {
             var user = Globals.User;
-            if (user == null) { AntdHelper.MsgWarn(_form, "Chưa đăng nhập tài khoản Subdy."); return false; }
+            if (user == null) { AntdHelper.MsgWarn(_form, "Chưa đăng nhập tài khoản Golike."); return false; }
 
             const int W = 370, H = 200;
             const int PAD = 20;
@@ -2264,11 +2367,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private async void button6_Click(object sender, EventArgs e)
         {
-            if (_platform == PlatformModel.Facebook)
-            {
-                new fQuanLyKichBan(PlatformModel.Facebook).ShowDialog();
-                await LoadJobService();
-            }
+            new fQuanLyKichBan(_platform).ShowDialog();
+            await LoadJobService();
         }
         public async void fMain_KeyDown(object sender, KeyEventArgs e)
         {
@@ -2840,6 +2940,45 @@ namespace LamToolAutoPhonePrime.Views.Controls
             }
             else AntdHelper.MsgError(_form, "Đã xảy ra lỗi khi xóa.");
         }
-    }
 
+        // Dropdown kịch bản (toolbar): mass-apply NameScript cho tất cả account trong bindingList hiện tại.
+        public void ApplyScriptToAll(string scriptName)
+        {
+            if (string.IsNullOrEmpty(scriptName) || bindingList == null) return;
+            var toUpdate = new List<Account>();
+            foreach (var acc in bindingList)
+            {
+                if (acc == null) continue;
+                if (acc.NameScript == scriptName) continue;
+                acc.NameScript = scriptName;
+                toUpdate.Add(acc);
+            }
+            if (toUpdate.Any()) _accountContext.Update(toUpdate);
+            dataGridView1.Refresh();
+        }
+
+        // Dropdown "Tùy chọn": reload bindingList từ DB để restore NameScript gốc.
+        public void RestoreScriptsFromDb() => _ = LoadAccounts();
+
+        #region ==== Tour targets ====
+        // Nhóm (folder): nút quản lý nhóm là AntdUI.Button được tạo động bởi SsaTheme
+        public Control TourBtnFolderManager => this.Controls.Find("ssaBtnFolderMgr", true).FirstOrDefault();
+        public Control TourCboGroup => select1;                 // Dropdown chọn nhóm
+        // Kịch bản & cài đặt
+        public Control TourBtnJobSettings => button4;           // Cài đặt jobs
+        public Control TourBtnGeneralSettings => button5;       // Cài đặt chung
+        public Control TourBtnInteract => button6;              // Tương tác
+        // Chạy / thêm tài khoản / tìm kiếm
+        public Control TourBtnRun => button7;                   // Chạy
+        public Control TourBtnStop => button8;                  // Dừng
+        public Control TourBtnImportAccount => button16;        // + Thêm tài khoản
+        public Control TourInputSearch => input6;               // Tìm kiếm
+        // Danh sách
+        public Control TourCboFilter => cboFilterAccount;       // Lọc tài khoản
+        public Control TourBtnReload => button9;                // Tải lại
+        public Control TourBtnToggleCols => this.Controls.Find("ssaBtnColumns", true).FirstOrDefault(); // "Hiển thị" (tạo động)
+        public Control TourDataGrid => dataGridView1;           // Bảng tài khoản
+        public ToolStrip TourToolStripStats => toolStrip1;      // Thanh thống kê
+        #endregion
+    }
 }

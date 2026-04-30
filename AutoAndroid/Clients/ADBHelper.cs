@@ -15,10 +15,12 @@ namespace AutoAndroid
         public static void StartServer()
         {
             ProcessHelper.RunAdbWithTimeout($"start-server", 5);
+            _serverStarted = true;
         }
         public static void KillServer()
         {
             ProcessHelper.RunAdbWithTimeout($"kill-server", 5);
+            _serverStarted = false;
         }
 
         /// <summary>
@@ -43,9 +45,11 @@ namespace AutoAndroid
         /// </summary>
         public static void Restart()
         {
-            KillAllAdbProcesses();
-            Thread.Sleep(500);
-            ProcessHelper.RunAdbWithTimeout($"start-server", 10);
+            // KillAllAdbProcesses();
+            //   _serverStarted = false;
+            //  Thread.Sleep(500);
+            // ProcessHelper.RunAdbWithTimeout($"start-server", 10);
+            //_serverStarted = true;
         }
 
         private static int _lastLeakCount = 0;
@@ -89,19 +93,55 @@ namespace AutoAndroid
         }
         public static List<string> GetDevices()
         {
-            // Dùng RunAdbNoRetry để tránh block lâu khi ADB server chết.
-            // Nếu rỗng (ADB chết), trả về list rỗng ngay, không retry 3 lần × 20s.
-            var devicesOutput = ProcessHelper.RunAdbNoRetry("devices", 10);
+            // Cold start: nếu chưa từng start-server trong process này, gọi start-server trước.
+            // Bảo đảm daemon đã sẵn sàng nhận connection khi chạy 'adb devices'.
+            EnsureServerStarted();
 
-            // Chia kết quả theo dòng
-            var lines = devicesOutput.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            // Retry ngắn khi output rỗng: lần đầu sau start-server, daemon có thể còn
+            // đang enumerate thiết bị USB (1-2s). Thử tối đa 3 lần × 5s.
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                var devicesOutput = ProcessHelper.RunAdbNoRetry("devices", 5);
+                var lines = devicesOutput.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
-            // Bỏ dòng đầu tiên vì đó là tiêu đề "List of devices attached"
-            return lines
-                .Skip(1) // Bỏ qua dòng đầu tiên
-                .Where(line => line.Contains("\tdevice")) // Chỉ chọn các dòng chứa "device"
-                .Select(line => line.Split('\t')[0]) // Lấy ID thiết bị (phần trước "\t")
-                .ToList();
+                var result = lines
+                    .Skip(1)
+                    .Where(line => line.Contains("\tdevice"))
+                    .Select(line => line.Split('\t')[0])
+                    .ToList();
+
+                if (result.Count > 0) return result;
+
+                // Rỗng có thể do: (a) thật sự không có thiết bị, (b) daemon chưa enumerate xong.
+                // Chỉ retry nếu output hoàn toàn rỗng (timeout / server chưa up).
+                // Nếu output có tiêu đề "List of devices attached" nhưng không có dòng device
+                // thì coi như không có thiết bị thật, không retry.
+                if (!string.IsNullOrWhiteSpace(devicesOutput) && lines.Length >= 1)
+                    return result;
+
+                if (attempt < 2) Thread.Sleep(800);
+            }
+            return new List<string>();
+        }
+
+        private static volatile bool _serverStarted = false;
+        private static readonly object _serverStartLock = new object();
+
+        /// <summary>
+        /// Đảm bảo adb server đã start ít nhất 1 lần trong process này.
+        /// Idempotent: các lần gọi sau no-op. Dùng trước GetDevices() để tránh
+        /// cold-start trả rỗng vì daemon chưa up.
+        /// </summary>
+        public static void EnsureServerStarted()
+        {
+            if (_serverStarted) return;
+            lock (_serverStartLock)
+            {
+                if (_serverStarted) return;
+                try { ProcessHelper.RunAdbWithTimeout("start-server", 10); }
+                catch { }
+                _serverStarted = true;
+            }
         }
         public static void InitADB()
         {

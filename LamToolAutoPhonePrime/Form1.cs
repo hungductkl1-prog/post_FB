@@ -1,6 +1,7 @@
 ﻿using AntdUI;
 using AutoAndroid;
 using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using ScrcpyNet;
 using SharpAdbClient;
 using Sunny.Subdy.Common.Helper;
@@ -24,7 +25,7 @@ namespace LamToolAutoPhonePrime
         public Form1(List<DeviceModel> devices)
         {
             AdbServer.Instance.StartServer(Path.Combine(ProcessHelper.ADBPath, "adb.exe"), false);
-            FFmpeg.AutoGen.ffmpeg.RootPath = Path.Combine(AppContext.BaseDirectory, "ScrcpyNet");
+            FFmpeg.AutoGen.ffmpeg.RootPath = ScrcpyNetFolderEnsurer.EnsureScrcpyNetFolder();
             InitializeComponent();
             ucThongBao = new ucThongBaoDeviceView();
             childFormDevice = new fShowDevice(this);
@@ -302,7 +303,7 @@ namespace LamToolAutoPhonePrime
             var spin = new AntdUI.Spin
             {
                 Dock = DockStyle.Fill,
-                Font = new Font(FontUtil._fontSemiBold, 16f),
+                Font = new Font(FontScale.FamilyName, 16f, FontStyle.Bold),
                 Text = "Đang khởi động...",
                 ForeColor = Color.FromArgb(70, 70, 70)
             };
@@ -311,7 +312,7 @@ namespace LamToolAutoPhonePrime
             Controls.Add(_loadingOverlay);
             _loadingOverlay.BringToFront();
 
-            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Subdy Phone Farm xin chào!" };
+            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Golike Phone Farm xin chào!" };
 
             _loadingCts = new CancellationTokenSource();
             var token = _loadingCts.Token;

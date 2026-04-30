@@ -55,7 +55,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             label1.Name = "label1";
             label1.Size = new Size(213, 47);
             label1.TabIndex = 0;
-            label1.Text = "Subdy.net";
+            label1.Text = "Golike.net";
             //
             // label2
             //

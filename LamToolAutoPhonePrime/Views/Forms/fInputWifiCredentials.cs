@@ -3,6 +3,7 @@ using LamToolAutoPhonePrime.Utils;
 using Sunny.Subdy.Common.Helper;
 using System.Windows.Forms;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
+using LamToolAutoPhonePrime.Utils.Design;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
@@ -123,7 +124,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             if (lines.Count == 0)
             {
-                CommonMethod.ShowMessageWarning("Vui lòng nhập ít nhất 1 dòng theo định dạng username|password.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng nhập ít nhất 1 dòng theo định dạng username|password.");
                 return;
             }
 

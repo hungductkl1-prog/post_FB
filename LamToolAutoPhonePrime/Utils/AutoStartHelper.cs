@@ -10,7 +10,7 @@ namespace LamToolAutoPhonePrime.Utils
 {
     public static class AutoStartHelper
     {
-        private const string AppName = "LamToolAutoPhoneFarm"; // tên tuỳ chọn
+        private const string AppName = "GolikeAutoPhoneFarm"; // tên tuỳ chọn
         private static readonly string AppPath = Application.ExecutablePath;
         public static void Auto()
         {
@@ -37,7 +37,7 @@ namespace LamToolAutoPhonePrime.Utils
         public static void RegisterAppInControlPanel()
         {
             string appName = AppName;
-            string publisher = "LamTool.net";
+            string publisher = "Golike.net";
             string version = Application.ProductVersion;
             string exePath = Application.ExecutablePath;
             string uninstallKeyPath = $@"Software\Microsoft\Windows\CurrentVersion\Uninstall\{appName}";
@@ -117,7 +117,7 @@ if errorlevel 1 (
             catch (Exception ex)
             {
                 MessageBox.Show("Không thể đăng ký tự động khởi động lại ứng dụng:\n" + ex.Message,
-                    "LamToolAutoPhonePrime", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    "GolikePhoneFarm", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         public static void DisableAutoStart()

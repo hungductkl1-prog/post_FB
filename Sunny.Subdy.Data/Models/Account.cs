@@ -75,7 +75,6 @@ public class Account : INotifyPropertyChanged, IThrottledNotify
     [NotMapped]
     public string XuToday { get => _xuToday; set => SetField(ref _xuToday, value); }
 
-    [NotMapped]
     public string NameScript  { get => _nameScript; set => SetField(ref _nameScript, value); }
 
     [NotMapped]

@@ -9,14 +9,14 @@ namespace Sunny.Subdy.Common.API.Jobs
 
     public class JobClient
     {
-        public static async Task<List<JobModel>> GetFacebookJob(string jobService, string uid, string token, string job_type = "", string prefix = "")
+        public static async Task<List<JobModel>> GetFacebookJob(string jobService, string uid, string token, string job_type = "", string prefix = "", string fb_name = "")
         {
             switch (jobService)
             {
                 case "https://app.golike.net/":
                     {
                         var golikeClient = new GoLikeClient();
-                        JsonNode? jGolike = await golikeClient.GetFacebookJob(uid, token, job_type);
+                        JsonNode? jGolike = await golikeClient.GetFacebookJob(uid, token, job_type, fb_name);
 
                         if (jGolike == null)
                         {

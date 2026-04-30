@@ -84,6 +84,8 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             // Ensure initial selected tab
             tabs3.SelectedIndex = 0;
+
+            this.Load += (_, __) => LamToolAutoPhonePrime.Utils.Design.SsaTheme.ApplyFSettingDefault(this);
         }
 
         private void LoadForm()
@@ -235,7 +237,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void button4_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Title = "LamTool.net Chọn file APK";
+            openFileDialog.Title = "Golike.net Chọn file APK";
             openFileDialog.Filter = "File APK (*.apk)|*.apk";
             openFileDialog.Multiselect = false;
 

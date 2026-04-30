@@ -1,4 +1,4 @@
-﻿using Sunny.Subdy.Common.ControlMethod;
+using Sunny.Subdy.Common.ControlMethod;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Json;
 using Sunny.Subdy.Common.Logs;
@@ -11,6 +11,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
@@ -106,7 +108,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             SaveSetting();
             if (string.IsNullOrEmpty(txtLines.Text))
             {
-                CommonMethod.ShowMessageWarning($"Vui lòng nhập {TypeForm}");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", $"Vui lòng nhập {TypeForm}");
                 return;
             }
             string message = string.Empty;
@@ -137,7 +139,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             btn_Close.Enabled = true;
             btn_Ok.Enabled = true;
-            CommonMethod.ShowMessageWarning(message);
+            AntdHelper.NotifyWarn(this, "Cảnh báo", message);
             Close();
         }
         private async Task<string> UpdateProxy()

@@ -1,8 +1,9 @@
-﻿using AntdUI;
+using AntdUI;
 using LamToolAutoPhonePrime.Utils;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
+using LamToolAutoPhonePrime.Utils.Design;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
@@ -79,13 +80,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     {
                         if (string.IsNullOrEmpty(textBox1.Text))
                         {
-                            CommonMethod.ShowMessageWarning("Tên nhóm không được bỏ trống!"); return;
+                            AntdHelper.NotifyWarn(this, "Cảnh báo", "Tên nhóm không được bỏ trống!"); return;
                         }
                         _folderContext = new FolderContext();
                         var folder = _folderContext.GetByName(textBox1.Text.Trim(), _platform);
                         if (folder != null)
                         {
-                            CommonMethod.ShowMessageWarning("Tên nhóm đã tồn tại!"); return;
+                            AntdHelper.NotifyWarn(this, "Cảnh báo", "Tên nhóm đã tồn tại!"); return;
                         }
                         var newFolder = new Folder
                         {
@@ -98,12 +99,12 @@ namespace LamToolAutoPhonePrime.Views.Forms
                         };
                         if (_folderContext.Add(newFolder))
                         {
-                            CommonMethod.ShowMessageSuccess($"Tạo nhóm {textBox1.Text.Trim()} thành công"); this.Close();
+                            AntdHelper.NotifySuccess(this, "Thành công", $"Tạo nhóm {textBox1.Text.Trim()} thành công"); this.Close();
 
                         }
                         else
                         {
-                            CommonMethod.ShowMessageError($"Tạo nhóm {textBox1.Text.Trim()} thất bại");
+                            AntdHelper.NotifyError(this, "Thao tác thất bại", $"Tạo nhóm {textBox1.Text.Trim()} thất bại");
                             return;
                         }
 
@@ -115,18 +116,18 @@ namespace LamToolAutoPhonePrime.Views.Forms
                         var folder = _folderContext.GetByName(textBox2.Text.Trim(), _platform);
                         if (folder != null)
                         {
-                            CommonMethod.ShowMessageWarning("Tên nhóm đã tồn tại!"); return;
+                            AntdHelper.NotifyWarn(this, "Cảnh báo", "Tên nhóm đã tồn tại!"); return;
                         }
                         folder = _folderContext.GetByName(textBox1.Text.Trim(), _platform);
                         folder.Name = textBox2.Text.Trim();
                         if (_folderContext.Update(folder))
                         {
-                            CommonMethod.ShowMessageSuccess($"Đổi tên nhóm thành công"); this.Close();
+                            AntdHelper.NotifySuccess(this, "Thành công", $"Đổi tên nhóm thành công"); this.Close();
 
                         }
                         else
                         {
-                            CommonMethod.ShowMessageError($"Đổi tên nhóm thất bại");
+                            AntdHelper.NotifyError(this, "Thao tác thất bại", $"Đổi tên nhóm thất bại");
                             return;
                         }
                         break;
@@ -135,13 +136,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     {
                         if (string.IsNullOrEmpty(textBox1.Text))
                         {
-                            CommonMethod.ShowMessageWarning("Tên kịch bản không được bỏ trống!"); return;
+                            AntdHelper.NotifyWarn(this, "Cảnh báo", "Tên kịch bản không được bỏ trống!"); return;
                         }
                         _scriptContext = new ScriptContext();
                         var folder = _scriptContext.GetByName(textBox1.Text.Trim(), _platform);
                         if (folder != null)
                         {
-                            CommonMethod.ShowMessageWarning("Tên kịch bản đã tồn tại!"); return;
+                            AntdHelper.NotifyWarn(this, "Cảnh báo", "Tên kịch bản đã tồn tại!"); return;
                         }
                         var newFolder = new Script
                         {
@@ -153,12 +154,12 @@ namespace LamToolAutoPhonePrime.Views.Forms
                         };
                         if (_scriptContext.Add(newFolder))
                         {
-                            CommonMethod.ShowMessageSuccess($"Tạo kịch bản {textBox1.Text.Trim()} thành công"); this.Close();
+                            AntdHelper.NotifySuccess(this, "Thành công", $"Tạo kịch bản {textBox1.Text.Trim()} thành công"); this.Close();
 
                         }
                         else
                         {
-                            CommonMethod.ShowMessageError($"Tạo kịch bản {textBox1.Text.Trim()} thất bại");
+                            AntdHelper.NotifyError(this, "Thao tác thất bại", $"Tạo kịch bản {textBox1.Text.Trim()} thất bại");
                             return;
                         }
 
@@ -170,18 +171,18 @@ namespace LamToolAutoPhonePrime.Views.Forms
                         var folder = _scriptContext.GetByName(textBox2.Text.Trim(), _platform);
                         if (folder != null)
                         {
-                            CommonMethod.ShowMessageWarning("Tên kịch bản đã tồn tại!"); return;
+                            AntdHelper.NotifyWarn(this, "Cảnh báo", "Tên kịch bản đã tồn tại!"); return;
                         }
                         folder = _scriptContext.GetByName(textBox1.Text.Trim(), _platform);
                         folder.Name = textBox2.Text.Trim();
                         if (_scriptContext.Update(folder))
                         {
-                            CommonMethod.ShowMessageSuccess($"Đổi tên kịch bản thành công"); this.Close();
+                            AntdHelper.NotifySuccess(this, "Thành công", $"Đổi tên kịch bản thành công"); this.Close();
 
                         }
                         else
                         {
-                            CommonMethod.ShowMessageError($"Đổi tên kịch bản thất bại");
+                            AntdHelper.NotifyError(this, "Thao tác thất bại", $"Đổi tên kịch bản thất bại");
                             return;
                         }
                         break;

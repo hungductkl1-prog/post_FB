@@ -93,7 +93,7 @@ namespace LamToolAutoPhonePrime
             windowBar.SubGap = 1;
             windowBar.SubText = "v18.12.08.2025";
             windowBar.TabIndex = 7;
-            windowBar.Text = "Subdy Phone Farm";
+            windowBar.Text = "Golike Phone Farm";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
             // 
@@ -355,7 +355,7 @@ namespace LamToolAutoPhonePrime
             label4.Name = "label4";
             label4.Size = new Size(91, 23);
             label4.TabIndex = 10;
-            label4.Text = "Subdy.net";
+            label4.Text = "Golike.net";
             // 
             // pictureBox2
             // 
@@ -380,7 +380,7 @@ namespace LamToolAutoPhonePrime
             // fMain
             // 
             BackColor = Color.FromArgb(245, 247, 250);
-            ClientSize = new Size(1300, 745);
+            ClientSize = new Size(1500, 800);
             Controls.Add(pContent);
             Controls.Add(panel1);
             Controls.Add(windowBar);
@@ -388,7 +388,7 @@ namespace LamToolAutoPhonePrime
             Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             ForeColor = Color.Black;
             FormBorderStyle = FormBorderStyle.None;
-            MinimumSize = new Size(1300, 700);
+            MinimumSize = new Size(1500, 750);
             Mode = TAMode.Dark;
             Name = "fMain";
             ShowIcon = false;
@@ -418,6 +418,7 @@ namespace LamToolAutoPhonePrime
         private ToolStripLabel toolStripLabel5;
 
         private ucdgvAccount _ucFacebook;
+        private ucdgvAccount _ucInstagram;
         private ucHistoriesJob _ucHistoriesJob;
         public ucManagerDevices _ucDevices;
         private System.Windows.Forms.Panel panel1;

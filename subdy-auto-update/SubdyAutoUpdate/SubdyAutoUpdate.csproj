@@ -25,12 +25,12 @@
     <AssemblyVersion>$(CurrentTime)</AssemblyVersion>
     <FileVersion>$(CurrentTime)</FileVersion>
 
-    <AssemblyName>SubdyAutoUpdate</AssemblyName>
-    <Product>SubdyAutoUpdate</Product>
-    <Company>Subdy</Company>
-    <Copyright>Subdy</Copyright>
-    <Title>Subdy Auto Update</Title>
-    <PackageProjectUrl>https://subdy.net/</PackageProjectUrl>
+    <AssemblyName>GolikeAutoUpdate</AssemblyName>
+    <Product>GolikeAutoUpdate</Product>
+    <Company>Golike</Company>
+    <Copyright>Golike</Copyright>
+    <Title>Golike Auto Update</Title>
+    <PackageProjectUrl>https://golike.net/</PackageProjectUrl>
     <ApplicationIcon>Resources\logo.ico</ApplicationIcon>
   </PropertyGroup>
 

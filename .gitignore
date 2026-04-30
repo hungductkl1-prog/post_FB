@@ -365,3 +365,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Metech Work Manager skill credentials (local only — contains JWT token)
+.env.metech-wm
+
+# Auto-generated build counter (yy.MM.dd|N) — local only
+.build-counter

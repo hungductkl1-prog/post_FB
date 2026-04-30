@@ -3,6 +3,7 @@ using AutoAndroid;
 using Emgu.CV.Structure;
 using LamToolAutoPhonePrime;
 using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.Common.Services;
@@ -61,20 +62,10 @@ namespace Sunny.Subdy.UI.View.Pages
             InitializeComponent();
 
             button2.Click += button2_Click;
-            // Visual setup
-            dataGridView1.EnableHeadersVisualStyles = false;
-            dataGridView1.BorderStyle = BorderStyle.None;
+            GridStyleHelper.Apply(dataGridView1);
             dataGridView1.AutoGenerateColumns = false;
-            dataGridView1.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
-            var defaultFont = new Font(Common.Helper.FontUtil._fontSemiBold, 9F, FontStyle.Bold);
-            dataGridView1.DefaultCellStyle = new DataGridViewCellStyle
-            {
-                BackColor = Color.White,
-                ForeColor = ColorTranslator.FromHtml("#1A1A1A"),
-                SelectionBackColor = Color.FromArgb(0, 120, 215),
-                SelectionForeColor = Color.White,
-                Font = defaultFont
-            };
+            // Font cho dòng dữ liệu: semi-bold cho dễ đọc trên list dài
+            dataGridView1.DefaultCellStyle.Font = FontScale.Body9Bold;
             dataGridViewCheckBoxColumn1.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dataGridViewCheckBoxColumn1.DataPropertyName = nameof(DeviceModel.Checked);
             // Events
@@ -171,6 +162,7 @@ namespace Sunny.Subdy.UI.View.Pages
                 _deviceBindingSource?.Dispose();
             };
             Common.Helper.FontUtil.ApplyFontToAllControls(this);
+           button1.Click += button1_Click;
         }
 
         private void Button2_Click(object? sender, EventArgs e)
@@ -238,9 +230,8 @@ namespace Sunny.Subdy.UI.View.Pages
         private void SetupRightPanel()
         {
             panelRight.Controls.Clear();
-            var f = FontUtil._fontSemiBold;
-            var boldFont = new Font(f, 9F, FontStyle.Bold);
-            var normalFont = new Font(f, 8.5F);
+            var boldFont = FontScale.Body9Bold;
+            var normalFont = FontScale.Body9;
             int W = 320; // usable width inside padding
 
             var main = new System.Windows.Forms.Panel
@@ -261,8 +252,8 @@ namespace Sunny.Subdy.UI.View.Pages
                 ("Cài đặt ban đầu", "Chinh sáng"),
                 ("Tắt âm thanh", "Set % pin"),
                 ("Cài ngôn ngữ English", "Tắt GPS"),
-                ("Cài app Facebook", "Cài LT Helper"),
-                ("Khởi động lại máy", "Cấp quyền LT Helper"),
+                ("Cài app Facebook", "Cài GolikeHelper"),
+                ("Khởi động lại máy", "Cấp quyền GolikeHelper"),
             };
 
             // Row 0: Cài đặt ban đầu | Chinh sáng [100] %
@@ -299,17 +290,17 @@ namespace Sunny.Subdy.UI.View.Pages
             main.Controls.Add(_chkTatGPS);
             y += 28;
 
-            // Row 3: Cài app Facebook | Cài LT Helper
+            // Row 3: Cài app Facebook | Cài GolikeHelper
             _chkCaiFacebook = MkCheckboxAt("Cài app Facebook", normalFont, 10, y);
             main.Controls.Add(_chkCaiFacebook);
-            _chkCaiTLC = MkCheckboxAt("Cài LT Helper", normalFont, 170, y);
+            _chkCaiTLC = MkCheckboxAt("Cài GolikeHelper", normalFont, 170, y);
             main.Controls.Add(_chkCaiTLC);
             y += 28;
 
-            // Row 4: Khởi động lại máy | Cấp quyền LT Helper
+            // Row 4: Khởi động lại máy | Cấp quyền GolikeHelper
             _chkKhoiDong = MkCheckboxAt("Khởi động lại máy", normalFont, 10, y);
             main.Controls.Add(_chkKhoiDong);
-            _chkCapQuyenTLC = MkCheckboxAt("Cấp quyền LT Helper", normalFont, 170, y);
+            _chkCapQuyenTLC = MkCheckboxAt("Cấp quyền GolikeHelper", normalFont, 170, y);
             main.Controls.Add(_chkCapQuyenTLC);
             y += 35;
 
@@ -321,27 +312,39 @@ namespace Sunny.Subdy.UI.View.Pages
             };
             btnStart.Click += async (s, e) =>
             {
-                var targets = GetSelectedOrCheckedDevices();
+                // Chỉ lấy các device đang bị bôi đen (highlighted) trong grid
+                var targets = GetSelectedDevices();
                 if (targets.Count == 0)
                 {
-                    CommonMethod.ShowMessageWarning("Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị để bắt đầu");
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng bôi đen ít nhất 1 thiết bị để bắt đầu.");
                     return;
                 }
 
-                bool caiTLC      = _chkCaiTLC?.Checked == true;
-                bool capQuyenTLC = _chkCapQuyenTLC?.Checked == true;
+                bool caiDatBanDau   = _chkCaiDatBanDau?.Checked == true;
+                bool tatAmThanh     = _chkTatAmThanh?.Checked == true;
+                bool ngonNguEng     = _chkNgonNguEng?.Checked == true;
+                bool caiFacebook    = _chkCaiFacebook?.Checked == true;
+                bool khoiDong       = _chkKhoiDong?.Checked == true;
+                bool tatGPS         = _chkTatGPS?.Checked == true;
+                bool caiTLC         = _chkCaiTLC?.Checked == true;
+                bool capQuyenTLC    = _chkCapQuyenTLC?.Checked == true;
+
+                if (!caiDatBanDau && !tatAmThanh && !ngonNguEng && !caiFacebook
+                    && !khoiDong && !tatGPS && !caiTLC && !capQuyenTLC)
+                {
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thao tác", "Vui lòng tick ít nhất 1 mục trong 'Cài đặt phone'.");
+                    return;
+                }
 
                 SetRightPanelEnabled(false);
+                // Auto re-enable panel sau 60s — tránh kẹt UI nếu 1 device treo lâu
+                _ = Task.Delay(TimeSpan.FromSeconds(60)).ContinueWith(_ =>
+                {
+                    if (IsDisposed || Disposing) return;
+                    try { BeginInvoke(new Action(() => SetRightPanelEnabled(true))); } catch { }
+                }, TaskScheduler.Default);
                 try
                 {
-                    if (!caiTLC && !capQuyenTLC)
-                    {
-                        foreach (var d in targets) d.Checked = true;
-                        await DeviceServices.Connect();
-                        ApplyFilter();
-                        return;
-                    }
-
                     var tasks = new List<Task>();
                     foreach (var device in targets)
                     {
@@ -351,14 +354,82 @@ namespace Sunny.Subdy.UI.View.Pages
                             var client = new ADBClient(dev);
                             try
                             {
+                                // 1. Cài đặt ban đầu: setup ATX + cài GolikeHelper + cấp quyền
+                                //    + reset wallpaper + cài DeviceInfoHW + cài Facebook
+                                if (caiDatBanDau)
+                                {
+                                    dev.Status = "Cài đặt ban đầu...";
+                                    dev.TypeColor = 0;
+
+                                    // auto setup và connect atx
+                                    client.Connect();
+
+                                    // cài đặt apk com.golike.helper (+ DeviceInfoHW) và cấp quyền cơ bản
+                                    await client.maxChange.Install();
+
+                                    // cài đặt hình nền điện thoại
+                                    client.maxChange.ResetWallpaperDefault();
+
+                                    // cài đặt apk facebook
+                                    await InstallFacebookApk(client);
+                                }
+
+                                // 2. Tắt âm thanh: dùng lệnh adb
+                                if (tatAmThanh)
+                                {
+                                    dev.Status = "Tắt âm thanh...";
+                                    client.Shell("media volume --stream 3 --set 0");
+                                    client.Shell("media volume --stream 1 --set 0");
+                                    client.Shell("media volume --stream 5 --set 0");
+                                    client.Shell("media volume --stream 2 --set 0");
+                                    client.Shell("media volume --stream 4 --set 0");
+                                    client.LogHelper.SUCCESS("Đã tắt âm thanh");
+                                }
+
+                                // 3. Cài đặt ngôn ngữ English
+                                if (ngonNguEng)
+                                {
+                                    dev.Status = "Cài ngôn ngữ English...";
+                                    var lang = new ChangeLanguageService(client);
+                                    await lang.Change("en", "US");
+                                    client.LogHelper.SUCCESS("Đã chuyển ngôn ngữ English");
+                                }
+
+                                // 4. Cài đặt app Facebook
+                                if (caiFacebook)
+                                {
+                                    dev.Status = "Cài Facebook...";
+                                    await InstallFacebookApk(client);
+                                }
+
+                                // 5. Khởi động lại máy
+                                if (khoiDong)
+                                {
+                                    dev.Status = "Khởi động lại...";
+                                    client.RebootAndWaitForDeviceReady();
+                                }
+
+                                // 6. Tắt GPS
+                                if (tatGPS)
+                                {
+                                    dev.Status = "Tắt GPS...";
+                                    client.Shell("settings put secure location_providers_allowed -gps,-network");
+                                    client.LogHelper.SUCCESS("Đã tắt GPS");
+                                }
+
+                                // 7. Cài GolikeHelper
                                 if (caiTLC)
                                 {
+                                    dev.Status = "Cài GolikeHelper...";
                                     await client.maxChange.Install();
                                 }
-                                else if (capQuyenTLC)
+
+                                // 8. Cấp quyền GolikeHelper
+                                if (capQuyenTLC)
                                 {
-                                    client.Shell("pm grant com.lamtool.changer android.permission.READ_EXTERNAL_STORAGE");
-                                    client.Shell("pm grant com.lamtool.changer android.permission.WRITE_EXTERNAL_STORAGE");
+                                    dev.Status = "Cấp quyền GolikeHelper...";
+                                    client.SetEnableModuleMaxChange();
+                                    client.LogHelper.SUCCESS("Đã cấp quyền GolikeHelper");
                                 }
 
                                 dev.Status = "Hoàn thành";
@@ -368,6 +439,7 @@ namespace Sunny.Subdy.UI.View.Pages
                             {
                                 dev.Status = $"Lỗi: {ex.Message}";
                                 dev.TypeColor = 1;
+                                LogManager.Error(ex);
                             }
                         }));
                     }
@@ -392,7 +464,7 @@ namespace Sunny.Subdy.UI.View.Pages
                 var targets = GetSelectedOrCheckedDevices();
                 if (targets.Count == 0)
                 {
-                    CommonMethod.ShowMessageWarning("Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị");
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị.");
                     return;
                 }
                 // Temporarily check them so Connect() picks them up
@@ -428,40 +500,17 @@ namespace Sunny.Subdy.UI.View.Pages
                 Text = "Auto Index", Shape = AntdUI.TShape.Round, Size = new Size(145, 34),
                 Location = new Point(10, y), Font = normalFont
             };
-            btnAutoIndex.Click += async (s, e) =>
+            btnAutoIndex.Click += (s, e) =>
             {
                 var selected = GetSelectedOrCheckedDevices();
                 if (selected.Count == 0)
                 {
-                    CommonMethod.ShowMessageWarning("Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị");
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị.");
                     return;
                 }
-                string baseName = _txtDeviceName?.Text ?? "";
+                string baseName = (_txtDeviceName?.Text ?? "").Trim();
                 for (int i = 0; i < selected.Count; i++)
-                    selected[i].NameDevice = $"{baseName}{i + 1}";
-                dataGridView1.Refresh();
-
-                var tasks = new List<Task>();
-                foreach (var device in selected)
-                {
-                    var dev = device;
-                    tasks.Add(Task.Run(() =>
-                    {
-                        try
-                        {
-                            var client = new ADBClient(dev);
-                            client.Shell($"settings put global device_name \"{dev.NameDevice}\"");
-                            dev.Status = "Đổi tên thành công";
-                            dev.TypeColor = 2;
-                        }
-                        catch (Exception ex)
-                        {
-                            dev.Status = $"Lỗi: {ex.Message}";
-                            dev.TypeColor = 1;
-                        }
-                    }));
-                }
-                await Task.WhenAll(tasks);
+                    selected[i].NameDevice = string.IsNullOrEmpty(baseName) ? $"{i + 1}" : $"{baseName} {i + 1}";
                 dataGridView1.Refresh();
             };
             main.Controls.Add(btnAutoIndex);
@@ -475,9 +524,18 @@ namespace Sunny.Subdy.UI.View.Pages
                 var selected = GetSelectedOrCheckedDevices();
                 if (selected.Count == 0)
                 {
-                    CommonMethod.ShowMessageWarning("Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị");
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị.");
                     return;
                 }
+                string newName = (_txtDeviceName?.Text ?? "").Trim();
+                if (string.IsNullOrEmpty(newName))
+                {
+                    AntdHelper.NotifyWarn(this.FindForm(), "Thiếu tên", "Vui lòng nhập Name trước khi Update.");
+                    return;
+                }
+                foreach (var dev in selected) dev.NameDevice = newName;
+                dataGridView1.Refresh();
+
                 var tasks = new List<Task>();
                 foreach (var device in selected)
                 {
@@ -675,10 +733,10 @@ namespace Sunny.Subdy.UI.View.Pages
         {
             try
             {
-                string exePath = Path.Combine(AppContext.BaseDirectory, "ViewControl.exe");
+                string exePath = Path.Combine(AppContext.BaseDirectory, "Golike-Android-View.exe");
                 if (!File.Exists(exePath))
                 {
-                    MessageBox.Show($"Không tìm thấy ViewControl.exe tại:\n{exePath}", "ViewControl", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"Không tìm thấy Golike-Android-View.exe tại:\n{exePath}", "Golike Android View", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -690,7 +748,7 @@ namespace Sunny.Subdy.UI.View.Pages
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi khởi chạy ViewControl:\n{ex.Message}", "ViewControl", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Lỗi khi khởi chạy Golike Android View:\n{ex.Message}", "Golike Android View", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -744,26 +802,26 @@ namespace Sunny.Subdy.UI.View.Pages
         {
             var centerStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
+                Font = FontScale.Body9Bold,
                 ForeColor = Color.FromArgb(0, 120, 215),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
             var leftStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
+                Font = FontScale.Body9Bold,
                 ForeColor = Color.FromArgb(0, 120, 215),
                 Alignment = DataGridViewContentAlignment.MiddleLeft
             };
             dataGridViewCheckBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
+                Font = FontScale.Body9Bold,
                 ForeColor = Color.FromArgb(0, 120, 215),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
             dataGridViewCheckBoxColumn1.DataPropertyName = nameof(DeviceModel.Checked);
             dataGridViewTextBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
+                Font = FontScale.Body9Bold,
                 ForeColor = Color.FromArgb(0, 120, 215),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
@@ -883,7 +941,8 @@ namespace Sunny.Subdy.UI.View.Pages
                     _ => Color.FromArgb(0, 120, 215)
                 };
             }
-            e.CellStyle.SelectionForeColor = Color.White;
+            // Giữ cùng ForeColor khi row được "bôi đen" để đọc được trên nền pale blue
+            e.CellStyle.SelectionForeColor = e.CellStyle.ForeColor;
         }
 
         private void UpdateStatusBar()
@@ -999,6 +1058,10 @@ namespace Sunny.Subdy.UI.View.Pages
                 dataGridView1.DataSource = _deviceBindingSource;
 
                 Enable(false);
+                // Lần đầu mở form: phải query ADB lấy danh sách device rồi mới bind UI.
+                // Nếu chỉ gọi LoadDevices() thì DeviceServices.DeviceModels còn rỗng → bảng trống.
+                // GetDeviceModels đã gọi ADBHelper.GetDevices (đã EnsureServerStarted + retry).
+                await DeviceServices.GetDeviceModels();
                 await LoadDevices();
                 Enable(true);
 
@@ -1174,7 +1237,7 @@ namespace Sunny.Subdy.UI.View.Pages
             {
 
                 AntdUI.ContextMenuStrip.Config config = new AntdUI.ContextMenuStrip.Config(this, RightKey, menulist);
-                config.Font = new Font(FontUtil._fontSemiBold, 8f, FontStyle.Bold);
+                config.Font = FontScale.Body9Bold;
 
                 AntdUI.ContextMenuStrip.open(config);
             }
@@ -1185,6 +1248,46 @@ namespace Sunny.Subdy.UI.View.Pages
             foreach (DataGridViewRow row in dataGridView1.SelectedRows)
                 if (row.DataBoundItem is DeviceModel d) list.Add(d);
             return list;
+        }
+
+        private static Task InstallFacebookApk(ADBClient client)
+            => InstallAppApk(client, Sunny.Subdy.Common.Models.PlatformModel.Facebook);
+
+        /// <summary>
+        /// Tải + cài APK theo platform. URL/package được lấy từ FacebookHander.
+        /// Lưu ý: link Instagram hiện đang dùng softonic post-download (HTML),
+        /// có thể không trả APK trực tiếp; nếu fail nên thay bằng direct CDN link.
+        /// </summary>
+        private static async Task InstallAppApk(ADBClient client, string platform)
+        {
+            string package = Sunny.Subd.Core.Facebook.FacebookHander.Package(platform);
+            string url = Sunny.Subd.Core.Facebook.FacebookHander.DownloadUrl(platform);
+            string apkPath = Path.Combine(AppContext.BaseDirectory, "App", $"{platform}.apk");
+
+            for (int i = 1; i <= 5; i++)
+            {
+                if (!File.Exists(apkPath))
+                {
+                    string dir = Path.GetDirectoryName(apkPath) ?? AppContext.BaseDirectory;
+                    Directory.CreateDirectory(dir);
+                    client.LogHelper.SUCCESS($"[{i}/5] Đang tải APK {platform}...");
+                    InitHelper.GithubDown(url, apkPath);
+                }
+                if (!File.Exists(apkPath))
+                {
+                    client.LogHelper.ERROR($"Không tải được APK {platform}");
+                    continue;
+                }
+                client.LogHelper.SUCCESS($"[{i}/5] Cài {platform}...");
+                client.InstallApp(apkPath);
+                if (client.AppList().Contains(package))
+                {
+                    client.LogHelper.SUCCESS($"Đã cài {platform}");
+                    return;
+                }
+            }
+            client.LogHelper.ERROR($"Cài {platform} thất bại sau 5 lần thử");
+            await Task.CompletedTask;
         }
 
         private async Task RunOnSelected(Func<ADBClient, Task> action)
@@ -1203,11 +1306,13 @@ namespace Sunny.Subdy.UI.View.Pages
             await Task.WhenAll(tasks);
         }
 
+        private bool _rightKeyBusy;
         private async void RightKey(AntdUI.ContextMenuStripItem it)
         {
+            if (_rightKeyBusy) return;
+            _rightKeyBusy = true;
             try
             {
-                dataGridView1.Enabled = false;
                 var text = it.Text;
 
                 // ── Chọn ──────────────────────────────────────────────────────
@@ -1225,9 +1330,44 @@ namespace Sunny.Subdy.UI.View.Pages
 
                 // ── Connect / Disconnect ───────────────────────────────────────
                 else if (text == "Connect")
-                    await RunOnSelected(async c => { c.Connect(); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã kết nối."); });
+                {
+                    var targets = GetSelectedOrCheckedDevices();
+                    if (targets.Count == 0)
+                    {
+                        AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị.");
+                        return;
+                    }
+                    foreach (var d in targets) d.Checked = true;
+                    await DeviceServices.Connect();
+                    ApplyFilter();
+                }
                 else if (text == "Disconnect")
-                    await RunOnSelected(async c => { c.Shell("adb disconnect"); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã ngắt kết nối."); });
+                {
+                    SetRightPanelEnabled(false);
+                    try
+                    {
+                        await RunOnSelected(async c =>
+                        {
+                            try
+                            {
+                                int port = c.Device.Port;
+                                if (port > 0)
+                                {
+                                    ProcessHelper.RunAdbWithTimeout(
+                                        $"-s {c.Device.Serial} forward --remove tcp:{port}", 5);
+                                }
+                            }
+                            catch (Exception ex) { c.LogHelper.ERROR($"Kill forward lỗi: {ex.Message}"); }
+
+                            c.Device.IsLive = false;
+                            c.Device.TypeColor = 1;
+                            c.LogHelper.SUCCESS("Đã ngắt kết nối ATX.");
+                            await Task.CompletedTask;
+                        });
+                        ApplyFilter();
+                    }
+                    finally { SetRightPanelEnabled(true); }
+                }
 
                 // ── Màn hình (top-level shortcut) ──────────────────────────────
                 else if (text == "Vẽ màn hình chính")
@@ -1391,13 +1531,65 @@ namespace Sunny.Subdy.UI.View.Pages
                 else if (text == "Get uid")
                     await RunOnSelected(async c => { string r = c.Shell("pm list packages -U com.facebook.katana"); await Task.CompletedTask; c.LogHelper.SUCCESS(r); });
                 else if (text == "Get cookie")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Get cookie - chưa implement."); await Task.CompletedTask; });
+                    await RunOnSelected(async c =>
+                    {
+                        const string pkg = "com.facebook.katana";
+                        string remote = $"/data/data/{pkg}/app_webview/Default/Cookies";
+                        string copy = c.Shell($"su -c 'cat {remote} 2>/dev/null | base64'");
+                        if (string.IsNullOrWhiteSpace(copy) || copy.Contains("No such"))
+                        {
+                            c.LogHelper.ERROR("Không tìm thấy file cookies (cần root).");
+                            return;
+                        }
+                        string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                        string outPath = Path.Combine(desktop, $"fb_cookies_{c.Device.Serial}_{DateTime.Now:HHmmss}.bin");
+                        try
+                        {
+                            File.WriteAllBytes(outPath, Convert.FromBase64String(copy.Trim()));
+                            c.LogHelper.SUCCESS($"Đã lưu cookie: {outPath}");
+                        }
+                        catch (Exception ex) { c.LogHelper.ERROR($"Decode cookie lỗi: {ex.Message}"); }
+                        await Task.CompletedTask;
+                    });
                 else if (text == "Get token")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Get token - chưa implement."); await Task.CompletedTask; });
+                    await RunOnSelected(async c =>
+                    {
+                        const string pkg = "com.facebook.katana";
+                        string xml = c.Shell($"su -c 'cat /data/data/{pkg}/shared_prefs/com.facebook.katana_preferences.xml 2>/dev/null'");
+                        if (string.IsNullOrWhiteSpace(xml))
+                        {
+                            c.LogHelper.ERROR("Không đọc được prefs Facebook (cần root).");
+                            return;
+                        }
+                        var match = System.Text.RegularExpressions.Regex.Match(xml, @"access_token[^>]*>([^<]+)<");
+                        if (match.Success)
+                            c.LogHelper.SUCCESS($"Token: {match.Groups[1].Value}");
+                        else
+                            c.LogHelper.ERROR("Không tìm thấy access_token trong prefs.");
+                        await Task.CompletedTask;
+                    });
                 else if (text == "Get device info")
                     await RunOnSelected(async c => { string r = c.Shell("getprop"); await Task.CompletedTask; c.LogHelper.SUCCESS(r.Length > 500 ? r[..500] : r); });
                 else if (text == "Get info account")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Get info account - chưa implement."); await Task.CompletedTask; });
+                    await RunOnSelected(async c =>
+                    {
+                        const string pkg = "com.facebook.katana";
+                        string xml = c.Shell($"su -c 'cat /data/data/{pkg}/shared_prefs/com.facebook.katana_preferences.xml 2>/dev/null'");
+                        var token = System.Text.RegularExpressions.Regex.Match(xml ?? "", @"access_token[^>]*>([^<]+)<");
+                        if (!token.Success)
+                        {
+                            c.LogHelper.ERROR("Chưa có token để lấy info (cần root).");
+                            return;
+                        }
+                        try
+                        {
+                            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+                            string url = $"https://graph.facebook.com/me?fields=id,name,email&access_token={token.Groups[1].Value}";
+                            string body = await http.GetStringAsync(url);
+                            c.LogHelper.SUCCESS($"Account info: {body}");
+                        }
+                        catch (Exception ex) { c.LogHelper.ERROR($"Graph API lỗi: {ex.Message}"); }
+                    });
                 else if (text == "Gỡ app facebook")
                     await RunOnSelected(async c => { c.UninstallApp("com.facebook.katana"); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã gỡ Facebook."); });
                 else if (text == "Xóa dữ liệu app")
@@ -1428,15 +1620,50 @@ namespace Sunny.Subdy.UI.View.Pages
 
                 // ── LSPosed ───────────────────────────────────────────────────
                 else if (text == "Cài app lsposed")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Cài lsposed - chưa implement."); await Task.CompletedTask; });
+                {
+                    var apkPaths = PromptApkFiles("Chọn APK LSPosed", multi: false);
+                    if (apkPaths.Length == 0) return;
+                    string apk = apkPaths[0];
+                    await RunOnSelected(async c =>
+                    {
+                        c.LogHelper.SUCCESS($"Đang cài LSPosed: {Path.GetFileName(apk)}...");
+                        bool ok = c.InstallApp(apk);
+                        if (ok) c.LogHelper.SUCCESS("Đã cài LSPosed.");
+                        else c.LogHelper.ERROR("Cài LSPosed thất bại.");
+                        await Task.CompletedTask;
+                    });
+                }
                 else if (text == "Cài module lsposed")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Cài module lsposed - chưa implement."); await Task.CompletedTask; });
+                {
+                    var apkPaths = PromptApkFiles("Chọn APK module LSPosed", multi: true);
+                    if (apkPaths.Length == 0) return;
+                    await RunOnSelected(async c =>
+                    {
+                        foreach (var apk in apkPaths)
+                        {
+                            c.LogHelper.SUCCESS($"Đang cài module: {Path.GetFileName(apk)}...");
+                            bool ok = c.InstallApp(apk);
+                            if (ok) c.LogHelper.SUCCESS($"Đã cài module: {Path.GetFileName(apk)}.");
+                            else c.LogHelper.ERROR($"Cài thất bại: {Path.GetFileName(apk)}");
+                        }
+                        await Task.CompletedTask;
+                    });
+                }
                 else if (text == "Mở module lsposed")
                     await RunOnSelected(async c => { c.AppStart("org.lsposed.manager"); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã mở LSPosed Manager."); });
                 else if (text == "Cấp quyền tlc helper")
                     await RunOnSelected(async c => { c.SetEnableModuleMaxChange(); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã cấp quyền TLC Helper."); });
                 else if (text == "Tắt quyền tlc helper")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Tắt quyền tlc helper - chưa implement."); await Task.CompletedTask; });
+                    await RunOnSelected(async c =>
+                    {
+                        string pkg = MaxChangeService.package_MaxChange;
+                        string disable = $"su -c \"sqlite3 /data/adb/lspd/config/modules_config.db 'UPDATE modules SET enabled = 0 WHERE module_pkg_name = \\\"{pkg}\\\";'\"";
+                        c.Shell(disable);
+                        string clearScope = $"su -c \"sqlite3 /data/adb/lspd/config/modules_config.db 'DELETE FROM scope WHERE app_pkg_name IN (\\\"{pkg}\\\", \\\"com.facebook.katana\\\", \\\"com.instagram.android\\\", \\\"ru.andr7e.deviceinfohw\\\");'\"";
+                        c.Shell(clearScope);
+                        c.LogHelper.SUCCESS("Đã tắt quyền TLC Helper.");
+                        await Task.CompletedTask;
+                    });
 
                 // ── TCP/IP ────────────────────────────────────────────────────
                 else if (text == "Connect TCP/IP")
@@ -1444,9 +1671,42 @@ namespace Sunny.Subdy.UI.View.Pages
                 else if (text == "Disconnect TCP/IP")
                     await RunOnSelected(async c => { c.Shell($"adb disconnect {c.Device.Serial}"); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã disconnect TCP/IP."); });
                 else if (text == "Scan Wifi Adb TCP/IP")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Scan Wifi ADB TCP/IP - chưa implement."); await Task.CompletedTask; });
+                    await RunOnSelected(async c =>
+                    {
+                        const int port = 5555;
+                        c.LogHelper.SUCCESS("Đang bật chế độ TCP/IP...");
+                        ProcessHelper.RunAdbWithTimeout($"-s {c.Device.Serial} tcpip {port}", 10);
+                        await Task.Delay(1500);
+
+                        string ip = await c.GetIp();
+                        if (string.IsNullOrWhiteSpace(ip))
+                        {
+                            c.LogHelper.ERROR("Không lấy được IP wifi của thiết bị.");
+                            return;
+                        }
+                        string target = $"{ip}:{port}";
+                        var result = ProcessHelper.RunAdbWithTimeout($"connect {target}", 10);
+                        if (!string.IsNullOrEmpty(result) && (result.Contains("connected") || result.Contains("already")))
+                            c.LogHelper.SUCCESS($"Đã connect ADB qua wifi: {target}");
+                        else
+                            c.LogHelper.ERROR($"Connect TCP/IP thất bại: {result}");
+                    });
                 else if (text == "Remove Save Adb TCP/IP")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Remove Save ADB TCP/IP - chưa implement."); await Task.CompletedTask; });
+                    await RunOnSelected(async c =>
+                    {
+                        string serial = c.Device.Serial;
+                        if (serial.Contains(":"))
+                        {
+                            ProcessHelper.RunAdbWithTimeout($"disconnect {serial}", 5);
+                            c.LogHelper.SUCCESS($"Đã disconnect {serial}.");
+                        }
+                        else
+                        {
+                            ProcessHelper.RunAdbWithTimeout("disconnect", 5);
+                            c.LogHelper.SUCCESS("Đã disconnect tất cả TCP/IP đã lưu.");
+                        }
+                        await Task.CompletedTask;
+                    });
 
                 // ── Chức năng khác ────────────────────────────────────────────
                 else if (text == "Copy xml")
@@ -1458,23 +1718,107 @@ namespace Sunny.Subdy.UI.View.Pages
                         c.LogHelper.SUCCESS("Đã copy XML.");
                     });
                 else if (text == "Test goto link")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Test goto link - chưa implement."); await Task.CompletedTask; });
+                {
+                    string? url = PromptText("Test goto link", "Nhập URL", "https://www.facebook.com");
+                    if (string.IsNullOrWhiteSpace(url)) return;
+                    await RunOnSelected(async c =>
+                    {
+                        c.Shell($"am start -a android.intent.action.VIEW -d \"{url}\"");
+                        c.LogHelper.SUCCESS($"Đã mở link: {url}");
+                        await Task.CompletedTask;
+                    });
+                }
                 else if (text == "Test click xpath")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Test click xpath - chưa implement."); await Task.CompletedTask; });
+                {
+                    string? xpath = PromptText("Test click xpath", "Nhập XPath", "//*[@text='OK']");
+                    if (string.IsNullOrWhiteSpace(xpath)) return;
+                    await RunOnSelected(async c =>
+                    {
+                        bool ok = c.ElementWithAttributes(xpath, timeoutInSeconds: 5, click: true);
+                        if (ok) c.LogHelper.SUCCESS($"Đã click XPath: {xpath}");
+                        else c.LogHelper.ERROR($"Không tìm thấy XPath: {xpath}");
+                        await Task.CompletedTask;
+                    });
+                }
                 else if (text == "Test change info")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Test change info - chưa implement."); await Task.CompletedTask; });
+                {
+                    string? brand = PromptText("Test change info", "Nhập brand (vd: samsung)", "samsung");
+                    if (string.IsNullOrWhiteSpace(brand)) return;
+                    string? country = PromptText("Test change info", "Nhập country code (vd: VN)", "VN");
+                    if (string.IsNullOrWhiteSpace(country)) return;
+                    await RunOnSelected(async c =>
+                    {
+                        bool ok = c.maxChange.ChangeDeviceName(brand!, country!);
+                        if (ok) c.LogHelper.SUCCESS($"Đã đổi info: {brand}/{country}");
+                        else c.LogHelper.ERROR("Đổi info thất bại.");
+                        await Task.CompletedTask;
+                    });
+                }
 
                 // ── Nâng cao ──────────────────────────────────────────────────
                 else if (text == "Cài đặt apk")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Cài APK - chưa implement."); await Task.CompletedTask; });
+                {
+                    var apkPaths = PromptApkFiles("Chọn APK để cài", multi: true);
+                    if (apkPaths.Length == 0) return;
+                    await RunOnSelected(async c =>
+                    {
+                        foreach (var apk in apkPaths)
+                        {
+                            c.LogHelper.SUCCESS($"Đang cài {Path.GetFileName(apk)}...");
+                            bool ok = c.InstallApp(apk);
+                            if (ok) c.LogHelper.SUCCESS($"Đã cài {Path.GetFileName(apk)}.");
+                            else c.LogHelper.ERROR($"Cài thất bại: {Path.GetFileName(apk)}");
+                        }
+                        await Task.CompletedTask;
+                    });
+                }
                 else if (text == "Tắt âm thanh")
                     await RunOnSelected(async c => { c.Shell("media volume --stream 3 --set 0"); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã tắt âm thanh."); });
                 else if (text == "Tắt blutooth")
                     await RunOnSelected(async c => { c.Shell("service call bluetooth_manager 8"); await Task.CompletedTask; c.LogHelper.SUCCESS("Đã tắt Bluetooth."); });
                 else if (text == "Push file to sdcard")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Push file to sdcard - chưa implement."); await Task.CompletedTask; });
+                {
+                    var files = PromptFiles("Chọn file đẩy vào /sdcard/Download/", multi: true);
+                    if (files.Length == 0) return;
+                    await RunOnSelected(async c =>
+                    {
+                        foreach (var f in files)
+                        {
+                            string remote = $"/sdcard/Download/{Path.GetFileName(f)}";
+                            bool ok = c.Push(f, remote);
+                            if (ok) c.LogHelper.SUCCESS($"Đã push: {remote}");
+                            else c.LogHelper.ERROR($"Push thất bại: {f}");
+                        }
+                        await Task.CompletedTask;
+                    });
+                }
                 else if (text == "Cài package cần thiết")
-                    await RunOnSelected(async c => { c.LogHelper.Log("Cài package cần thiết - chưa implement."); await Task.CompletedTask; });
+                {
+                    string appDir = Path.Combine(AppContext.BaseDirectory, "App");
+                    if (!Directory.Exists(appDir))
+                    {
+                        AntdHelper.NotifyWarn(this.FindForm(), "Không tìm thấy thư mục", $"Thiếu thư mục: {appDir}");
+                        return;
+                    }
+                    var apks = Directory.GetFiles(appDir, "*.apk");
+                    if (apks.Length == 0)
+                    {
+                        AntdHelper.NotifyWarn(this.FindForm(), "Không có APK", $"Thư mục {appDir} không có file .apk nào.");
+                        return;
+                    }
+                    await RunOnSelected(async c =>
+                    {
+                        var installed = c.AppList();
+                        foreach (var apk in apks)
+                        {
+                            c.LogHelper.SUCCESS($"Đang cài {Path.GetFileName(apk)}...");
+                            bool ok = c.InstallApp(apk);
+                            if (ok) c.LogHelper.SUCCESS($"Đã cài {Path.GetFileName(apk)}.");
+                            else c.LogHelper.ERROR($"Cài thất bại: {Path.GetFileName(apk)}");
+                        }
+                        await Task.CompletedTask;
+                    });
+                }
                 else if (text == "Cài ngôn ngữ tiếng việt")
                 {
                     await RunOnSelected(async c =>
@@ -1601,12 +1945,14 @@ namespace Sunny.Subdy.UI.View.Pages
                 }
 
                 DeviceServices.SaveCheckedState();
-                dataGridView1.Enabled = true;
             }
             catch (Exception ex)
             {
-                dataGridView1.Enabled = true;
                 System.Diagnostics.Debug.WriteLine($"[RightKey] {ex}");
+            }
+            finally
+            {
+                _rightKeyBusy = false;
             }
         }
 
@@ -1614,7 +1960,7 @@ namespace Sunny.Subdy.UI.View.Pages
         {
             if (!DeviceServices.DeviceModels.Any(x => x.Checked))
             {
-                CommonMethod.ShowMessageWarning("Vui lòng chọn ít nhất 1 thiết bị để bắt đầu");
+                AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng chọn ít nhất 1 thiết bị để bắt đầu.");
                 return;
             }
             Form parentForm = this.FindForm();
@@ -1636,5 +1982,64 @@ namespace Sunny.Subdy.UI.View.Pages
                 parentForm.Close();
             }
         }
+
+        #region ==== Tour targets ====
+        public Control TourBtnScan => button1;
+        public Control TourCboFilter => cboFilter;
+        public Control TourBtnStart => button2;
+        #endregion
+
+        #region ==== RightKey input helpers ====
+        private string[] PromptApkFiles(string title, bool multi)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Title = title,
+                Filter = "Android Package (*.apk)|*.apk|Tất cả file (*.*)|*.*",
+                Multiselect = multi,
+                CheckFileExists = true
+            };
+            return dlg.ShowDialog(this.FindForm()) == DialogResult.OK ? dlg.FileNames : Array.Empty<string>();
+        }
+
+        private string[] PromptFiles(string title, bool multi)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Title = title,
+                Filter = "Tất cả file (*.*)|*.*",
+                Multiselect = multi,
+                CheckFileExists = true
+            };
+            return dlg.ShowDialog(this.FindForm()) == DialogResult.OK ? dlg.FileNames : Array.Empty<string>();
+        }
+
+        private string? PromptText(string title, string label, string defaultValue = "")
+        {
+            string? result = null;
+            var form = this.FindForm();
+            if (form == null) return null;
+
+            using var dlg = new Form
+            {
+                Text = title,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ClientSize = new Size(420, 130)
+            };
+            var lbl = new System.Windows.Forms.Label { Text = label, Left = 12, Top = 12, AutoSize = true };
+            var txt = new System.Windows.Forms.TextBox { Left = 12, Top = 38, Width = 396, Text = defaultValue };
+            var ok = new System.Windows.Forms.Button { Text = "Xác nhận", Left = 232, Top = 80, Width = 80, DialogResult = DialogResult.OK };
+            var cancel = new System.Windows.Forms.Button { Text = "Hủy", Left = 322, Top = 80, Width = 80, DialogResult = DialogResult.Cancel };
+            dlg.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
+            dlg.AcceptButton = ok;
+            dlg.CancelButton = cancel;
+            if (dlg.ShowDialog(form) == DialogResult.OK)
+                result = txt.Text;
+            return result;
+        }
+        #endregion
     }
 }

@@ -1,5 +1,6 @@
 ﻿using AntdUI;
 using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using Sunny.Subd.Core.Services;
 using Sunny.Subdy.Common.API;
 using Sunny.Subdy.Common.Helper;
@@ -8,6 +9,7 @@ using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 using System.Drawing.Drawing2D;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -30,22 +32,15 @@ namespace LamToolAutoPhonePrime.Views.Controls
             LoadColumnsDataGridView();
             select4.Items.Clear();
             select4.Items.Add(PlatformModel.Facebook);
+            select4.Items.Add(PlatformModel.Instagram);
             select4.SelectedIndex = 0;
             selectDateRange.Items.Clear();
             selectDateRange.Items.AddRange(new object[] { "Tất cả", "3 tháng", "1 tháng", "7 ngày", "Hôm nay" });
             selectDateRange.SelectedIndex = 3; // mặc định 7 ngày
             FontUtil.ApplyFontToAllControls(this);
 
-            dataGridView1.DefaultCellStyle.BackColor = Color.White;
-            dataGridView1.DefaultCellStyle.ForeColor = Color.DarkGray;
-            dataGridView1.DefaultCellStyle.Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold);
-            dataGridView1.DefaultCellStyle.SelectionBackColor = Color.FromArgb(0, 120, 215);
-            dataGridView1.DefaultCellStyle.SelectionForeColor = Color.White;
-            dataGridView1.DefaultCellStyle.ForeColor = ColorTranslator.FromHtml("#1A1A1A");
-            dataGridView1.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
+            GridStyleHelper.Apply(dataGridView1);
             dataGridView1.AutoGenerateColumns = false;
-
-            dataGridView1.BorderStyle = BorderStyle.None;
 
             // Row coloring: Success = green, Fail = red
             dataGridView1.CellFormatting += DataGridView1_CellFormatting;
@@ -53,33 +48,32 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // Bar chart paint
             panelChartArea.Paint += PanelChartArea_Paint;
 
-            // Empty state: hiển thị hướng dẫn khi chưa có lịch sử
+            // Empty state: hiển thị hướng dẫn khi chưa có lịch sử (dùng token Design)
             dataGridView1.Paint += (s, e) =>
             {
                 if (dataGridView1.Rows.Count == 0)
                 {
                     var rect = dataGridView1.ClientRectangle;
-                    using var iconFont = new Font("Segoe UI", 32F);
-                    using var titleFont = new Font("Segoe UI", 13F, FontStyle.Bold);
-                    using var hintFont = new Font("Segoe UI", 10F);
-                    var gray = Color.FromArgb(160, 160, 160);
+                    using var iconFont  = new Font("Segoe UI", 32F);
+                    using var titleFont = FontScale.HeadingBold;
+                    using var hintFont  = FontScale.Body9;
 
-                    string icon = "📋";
+                    string icon  = "📋";
                     string title = "Chưa có lịch sử hoạt động";
-                    string hint = "Lịch sử sẽ tự động cập nhật khi có tác vụ được thực thi";
+                    string hint  = "Lịch sử sẽ tự động cập nhật khi có tác vụ được thực thi";
 
-                    var iconSize = e.Graphics.MeasureString(icon, iconFont);
+                    var iconSize  = e.Graphics.MeasureString(icon,  iconFont);
                     var titleSize = e.Graphics.MeasureString(title, titleFont);
-                    var hintSize = e.Graphics.MeasureString(hint, hintFont);
+                    var hintSize  = e.Graphics.MeasureString(hint,  hintFont);
 
                     float totalH = iconSize.Height + titleSize.Height + hintSize.Height + 16;
                     float startY = (rect.Height - totalH) / 2;
 
-                    using var grayBrush = new SolidBrush(gray);
-                    using var darkBrush = new SolidBrush(Color.FromArgb(100, 100, 100));
-                    e.Graphics.DrawString(icon, iconFont, grayBrush, (rect.Width - iconSize.Width) / 2, startY);
+                    using var grayBrush = new SolidBrush(ColorPalette.TextTertiary);
+                    using var darkBrush = new SolidBrush(ColorPalette.TextSecondary);
+                    e.Graphics.DrawString(icon,  iconFont,  grayBrush, (rect.Width - iconSize.Width)  / 2, startY);
                     e.Graphics.DrawString(title, titleFont, darkBrush, (rect.Width - titleSize.Width) / 2, startY + iconSize.Height + 8);
-                    e.Graphics.DrawString(hint, hintFont, grayBrush, (rect.Width - hintSize.Width) / 2, startY + iconSize.Height + titleSize.Height + 16);
+                    e.Graphics.DrawString(hint,  hintFont,  grayBrush, (rect.Width - hintSize.Width)  / 2, startY + iconSize.Height + titleSize.Height + 16);
                 }
             };
         }
@@ -99,11 +93,42 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private void DataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            if (e.RowIndex < 0 || e.RowIndex >= dataGridView1.Rows.Count) return;
-            var statusCell = dataGridView1.Rows[e.RowIndex].Cells[$"col_{nameof(JobHistory.Status)}"];
-            string status = statusCell.Value?.ToString() ?? "";
-            e.CellStyle.ForeColor = status == "Success" ? Color.Green : Color.Red;
-            e.CellStyle.SelectionForeColor = Color.White;
+            try
+            {
+                if (e.RowIndex < 0 || e.RowIndex >= dataGridView1.Rows.Count) return;
+                var statusCell = dataGridView1.Rows[e.RowIndex].Cells[$"col_{nameof(JobHistory.Status)}"];
+                string status = statusCell?.Value?.ToString() ?? "";
+                e.CellStyle.ForeColor = status == "Success" ? Color.Green : Color.Red;
+                e.CellStyle.SelectionForeColor = Color.White;
+
+                var col = dataGridView1.Columns[e.ColumnIndex];
+                if (col != null && col.Name == $"col_{nameof(JobHistory.Description)}" && e.Value is string s && !string.IsNullOrEmpty(s))
+                {
+                    e.Value = SanitizeDescription(s);
+                    e.FormattingApplied = true;
+                }
+            }
+            catch
+            {
+                // Không để exception vỡ paint pipeline của DataGridView
+            }
+        }
+
+        private static string SanitizeDescription(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return string.Empty;
+            int max = Math.Min(input.Length, 500);
+            var sb = new StringBuilder(max);
+            for (int i = 0; i < max; i++)
+            {
+                char c = input[i];
+                if (c == '\r' || c == '\n' || c == '\t') { sb.Append(' '); continue; }
+                if (c < 0x20) continue;
+                if (c == '{' || c == '}') { sb.Append(' '); continue; }
+                sb.Append(c);
+            }
+            if (input.Length > max) sb.Append("...");
+            return sb.ToString();
         }
 
         private DataGridViewColumn CreateColumnsDataGridView(string dataPropertyName, string header, string toolTip, bool visible, int miniWith, DataGridViewAutoSizeColumnMode size, DataGridViewCellStyle style)
@@ -124,13 +149,13 @@ namespace LamToolAutoPhonePrime.Views.Controls
         {
             var style = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold)
+                Font = FontScale.Body9Bold
 
             };
             style.ForeColor = Color.FromArgb(0, 120, 215);
             dataGridViewTextBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold),
+                Font = FontScale.Body9Bold,
                 ForeColor = Color.FromArgb(0, 120, 215),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             };
@@ -367,11 +392,14 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
             foreach (var kv in _methodStats.OrderByDescending(x => x.Value.success + x.Value.fail))
             {
-                string method = kv.Key;
+                string method = kv.Key ?? string.Empty;
                 int success = kv.Value.success;
                 int fail = kv.Value.fail;
                 int total = success + fail;
                 float ratio = total > 0 ? (float)success / total : 0f;
+                string methodDisplay = string.IsNullOrEmpty(method)
+                    ? "(unknown)"
+                    : char.ToUpper(method[0]) + method.Substring(1);
 
                 // Container card
                 var card = new AntdUI.Panel
@@ -394,8 +422,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
                 var lblMethod = new System.Windows.Forms.Label
                 {
-                    Text = char.ToUpper(method[0]) + method.Substring(1),
-                    Font = new Font(FontUtil._fontSemiBold, 8.5F, FontStyle.Bold),
+                    Text = methodDisplay,
+                    Font = FontScale.Body9Bold,
                     ForeColor = Color.FromArgb(30, 30, 30),
                     AutoSize = false,
                     Dock = DockStyle.Left,
@@ -407,7 +435,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 var lblCounts = new System.Windows.Forms.Label
                 {
                     Text = $"✓ {success.ToMoneyString()}  ✗ {fail.ToMoneyString()}",
-                    Font = new Font("Segoe UI", 7.5F),
+                    Font = new Font("Segoe UI", FontScale.Body),
                     ForeColor = Color.DarkGray,
                     AutoSize = false,
                     Dock = DockStyle.Fill,
@@ -480,10 +508,10 @@ namespace LamToolAutoPhonePrime.Views.Controls
             if (barW < 2) barW = 2;
 
             // Fonts dùng chung
-            using var gridFont    = new Font("Segoe UI", 6.5F);
-            using var labelFont   = new Font("Segoe UI", 6.5F);
-            using var dateLabelFont = new Font("Segoe UI", 7F, FontStyle.Bold);
-            using var metaFont    = new Font("Segoe UI", 6F);
+            using var gridFont    = new Font("Segoe UI", FontScale.Caption);
+            using var labelFont   = new Font("Segoe UI", FontScale.Caption);
+            using var dateLabelFont = new Font("Segoe UI", FontScale.Caption, FontStyle.Bold);
+            using var metaFont    = new Font("Segoe UI", FontScale.Caption);
             using var gridBrush   = new SolidBrush(Color.FromArgb(150, 150, 150));
             using var coinBrush   = new SolidBrush(Color.FromArgb(0, 90, 180));
             using var hourBrush   = new SolidBrush(Color.FromArgb(30, 144, 255));

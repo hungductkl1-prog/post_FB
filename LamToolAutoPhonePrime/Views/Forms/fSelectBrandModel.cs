@@ -1,10 +1,11 @@
-﻿using AntdUI;
+using AntdUI;
 using LamToolAutoPhonePrime.Utils;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Services;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 using System.Windows.Forms;
+using LamToolAutoPhonePrime.Utils.Design;
 
 namespace LamToolAutoPhonePrime.Views.Forms
 {
@@ -93,7 +94,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             if (string.IsNullOrEmpty(Brands))
             {
-                CommonMethod.ShowMessageWarning("Vui lòng chọn ít nhất một brand.");
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng chọn ít nhất một brand.");
                 return;
             }
             Brands = Brands.TrimEnd('|');

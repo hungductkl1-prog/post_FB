@@ -34,7 +34,6 @@ namespace Sunny.Subd.Core.Services
         public string _sate = string.Empty; // Trạng thái hiện tại của quá trình
         public Stopwatch _swTotal = new Stopwatch();
         private BackupRestoreHelper _backupRestoreHelper;
-        private SpamXuHandler _farmxu;
         // Constructor khởi tạo dịch vụ
         public MainService(string platform, ADBClient device, ConfigModel config, CancellationToken ct)
         {
@@ -133,7 +132,7 @@ namespace Sunny.Subd.Core.Services
         {
             if (string.IsNullOrEmpty(_account.FullName))
             {
-                _account.FullName = _client.GetFacebookFullName(_account.Uid);
+                _account.FullName = _client.GetFacebookFullName(_account.Uid); 
             }
             if (!_client.IsRoot()) return;
             _sate = "Lấy thông tin xác thực";
@@ -148,10 +147,16 @@ namespace Sunny.Subd.Core.Services
                     var parts = value.Split('|');
                     if (parts.Length < 3)
                         throw new Exception("Chuỗi xác thực không hợp lệ.");
-
-                    _account.Uid = parts[0];
-                    _account.Cookie = parts[2];
-                    _account.Token = parts[1];
+                    if (!string.IsNullOrEmpty(parts[0]))
+                    {
+                        _account.Uid = parts[0];
+                        _account.Cookie = parts[2];
+                        _account.Token = parts[1];
+                    }
+                    else
+                    {
+                        throw new Exception("Chuỗi xác thực không hợp lệ.");
+                    }
                 }
                 catch 
                 {
@@ -479,7 +484,7 @@ namespace Sunny.Subd.Core.Services
                 if (!File.Exists(fileAPK))
                 {
                     SetStatus($"[{i}/10] Đang tải APK...", 2);
-                    InitHelper.GithubDown(FacebookHander.DOWNLOAD_FACEBOOK, fileAPK);
+                    InitHelper.GithubDown(FacebookHander.DownloadUrl(_platform), fileAPK);
                 }
                 if (!File.Exists(fileAPK))
                 {
@@ -666,33 +671,76 @@ namespace Sunny.Subd.Core.Services
                     _account.Status = "Lỗi: " + subdyExtension.Message;
                     break;
                 case SubdyEnum.CP_282:
-                    _account.Status = "Lỗi CP_282: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị checkpoint 282."
+                        : (subdyExtension.Message.Contains("checkpoint", StringComparison.OrdinalIgnoreCase) || subdyExtension.Message.Contains("282")
+                            ? subdyExtension.Message
+                            : "Lỗi CP_282: " + subdyExtension.Message);
                     _account.State = "CP_282";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.CP_956:
-                    _account.Status = "Lỗi CP_956: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị checkpoint 956."
+                        : (subdyExtension.Message.Contains("checkpoint", StringComparison.OrdinalIgnoreCase) || subdyExtension.Message.Contains("956")
+                            ? subdyExtension.Message
+                            : "Lỗi CP_956: " + subdyExtension.Message);
                     _account.State = "CP_956";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.LogOut:
-                    _account.Status = "Đăng xuất: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị đăng xuất."
+                        : (subdyExtension.Message.Contains("đăng xuất", StringComparison.OrdinalIgnoreCase)
+                            ? subdyExtension.Message
+                            : "Đăng xuất: " + subdyExtension.Message);
                     _account.State = "Logout";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.Captcha:
-                    _account.Status = "Captcha: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị yêu cầu captcha."
+                        : (subdyExtension.Message.Contains("captcha", StringComparison.OrdinalIgnoreCase)
+                            ? subdyExtension.Message
+                            : "Captcha: " + subdyExtension.Message);
                     _account.State = "Captcha";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.Block:
-                    _account.Status = "Tài khoản bị chặn: " + subdyExtension.Message;
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Tài khoản bị chặn."
+                        : (subdyExtension.Message.Contains("bị chặn", StringComparison.OrdinalIgnoreCase)
+                            ? subdyExtension.Message
+                            : "Tài khoản bị chặn: " + subdyExtension.Message);
                     _account.State = "Block";
                     _account.ColorType = 1;
                     break;
                 case SubdyEnum.DIE:
                     _account.Status = subdyExtension.Message;
                     _account.State = "DIE";
+                    _account.ColorType = 1;
+                    break;
+                case SubdyEnum.No_Internet:
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Thiết bị mất kết nối internet."
+                        : (subdyExtension.Message.Contains("internet", StringComparison.OrdinalIgnoreCase)
+                            ? subdyExtension.Message
+                            : "Mất internet: " + subdyExtension.Message);
+                    _account.State = "No_Internet";
+                    _account.ColorType = 1;
+                    break;
+                case SubdyEnum.Success:
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Thành công."
+                        : subdyExtension.Message;
+                    _account.ColorType = 2;
+                    break;
+                case SubdyEnum.JobFail:
+                    _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
+                        ? "Thực hiện hành động thất bại."
+                        : (subdyExtension.Message.Contains("thất bại", StringComparison.OrdinalIgnoreCase) || subdyExtension.Message.StartsWith("Không tìm thấy"))
+                            ? subdyExtension.Message
+                            : "Thất bại: " + subdyExtension.Message;
                     _account.ColorType = 1;
                     break;
             }
@@ -717,7 +765,6 @@ namespace Sunny.Subd.Core.Services
 
         public async Task RunAsync()
         {
-            _config.JobService = "Subdy";
             _swTotal.Start();
             while (!_ct.IsCancellationRequested)
             {
@@ -765,16 +812,44 @@ namespace Sunny.Subd.Core.Services
                     _sate = "Lấy thông tin xác thực";
                     await ExtractAndUpdateAuthenticationInfoAsync();
                     _sate = "Thực hiện kịch bản";
-                    //if (SubdyHelper.JobServiceByPlatform(_platform).Contains(_config.JobService.Trim()))
-                    //{
-                    //_farmxu = new SpamXuHandler(_platform, _client, _config, _ct, _config.SettingJob, _account);
-                    //await _farmxu.ExecuteAsync();
-                    //}
-                    //else
-                    //{
-                    //    FacebookFarming farming = new FacebookFarming(this);
-                    //    await farming.ExecuteAsync();
-                    //}
+                    if (_platform == PlatformModel.Facebook)
+                    {
+                        // Legacy ("FarmXu", "Farm-Xu-VIP") đã đổi tên hiển thị → "Làm Job Golike".
+                        // Match cả tên cũ để account legacy chưa migrate vẫn chạy được.
+                        if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(_account.NameScript, "FarmXu", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _config.JobService = "https://app.golike.net/";
+                            var farmxuVip = new SpamXuHandler(_platform, _client, _config, _ct, _config.SettingJob, _account);
+                            await farmxuVip.ExecuteAsync();
+                        }
+                        else
+                        {
+                            _config.JobService = "https://app.golike.net/";
+                            FacebookFarming farming = new FacebookFarming(this);
+                            await farming.ExecuteAsync();
+                        }
+                    }
+                    else if (_platform == PlatformModel.Instagram)
+                    {
+                        // Mirror Facebook flow: script "Làm Job Golike" → SpamXuHandler (Golike API).
+                        // Các kịch bản custom IG → InstagramFarming.
+                        if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(_account.NameScript, "FarmXu", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _config.JobService = "https://app.golike.net/";
+                            var farmxuVip = new SpamXuHandler(_platform, _client, _config, _ct, _config.SettingJob, _account);
+                            await farmxuVip.ExecuteAsync();
+                        }
+                        else
+                        {
+                            _config.JobService = "https://app.golike.net/";
+                            var farming = new Instagram.InstagramFarming(this);
+                            await farming.ExecuteAsync();
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {

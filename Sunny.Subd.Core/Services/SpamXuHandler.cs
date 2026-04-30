@@ -1,6 +1,4 @@
-﻿using AntdUI;
-using AutoAndroid;
-using Org.BouncyCastle.Asn1.Utilities;
+﻿using AutoAndroid;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Services;
 using Sunny.Subd.Core.Utils;
@@ -18,12 +16,7 @@ using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.Xml.Linq;
-using static System.ComponentModel.Design.ObjectSelectorEditor;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ListView;
 
 namespace Sunny.Subd.Core.Facebook.ScriptActions
 {
@@ -100,11 +93,12 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                         else if (_jobService == "Subdy")
                         {
-                            jobs = SubdyClient.GetJobs(_tokenJobService, _account.Uid);
+                            // FarmJob Subdy đã được thay thế bằng Golike Private API (gateway.golike.net)
+                            jobs = GoLikePrivateClient.GetJobs(_tokenJobService, _account.Uid);
                         }
                         else
                         {
-                            jobs = await JobClient.GetFacebookJob(_jobService, _account.Uid, _tokenJobService, _typeJob, _jobPrefix);
+                            jobs = await JobClient.GetFacebookJob(_jobService, _account.Uid, _tokenJobService, _typeJob, _jobPrefix, _account.FullName ?? "");
                         }
 
                     }
@@ -226,6 +220,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
 
                 }
 
+                _countJob = 0;
                 waitForDoJobStart.Set();
             }
         }
@@ -293,20 +288,13 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             {
                 _sate = "Khởi tạo dịch vụ job";
                 await InitSettings();
-                if (string.IsNullOrEmpty(Globals.User.ApiKey))
+                // FarmJob Subdy đã thay bằng Golike Private API: token lấy từ Login (Globals.User.Token).
+                if (_jobService == "Subdy")
                 {
-                    var reponesapiKey = SubdyClient.GetApiKey(Globals.User.Token);
-                    if (reponesapiKey == null || string.IsNullOrEmpty(reponesapiKey.ApiKey))
-                    {
-                        var reponesapi = SubdyClient.CreateApiKey(Globals.User.Token);
-                        Globals.User.ApiKey = reponesapi.ApiKey;
-                    }
-                    else
-                    {
-                        Globals.User.ApiKey = reponesapiKey.ApiKey;
-                    }
+                    if (string.IsNullOrEmpty(Globals.User.Token))
+                        throw new Exception("Chưa đăng nhập Golike. Vui lòng đăng nhập lại.");
+                    _tokenJobService = Globals.User.Token;
                 }
-                _tokenJobService = Globals.User.ApiKey;
                 //SubdyClient.AddPlatformAccount(Globals.User.Token, 1, _account.Uid, _account.FullName);
 
                 _client.AppStart(FacebookHander.Package(_platform), true, true, true);
@@ -400,8 +388,12 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                 }
                                 else
                                 {
-                                    string messsage = subdy.Message;
-                                    messsage = messsage + " - " + SubdyClient.SkipJob(_tokenJobService, Convert.ToInt32(job.JobId), _account.Uid, subdy.Message);
+                                    if (_jobService == "Subdy")
+                                    {
+                                        string messsage = subdy.Message;
+                                        messsage = messsage + " - " + GoLikePrivateClient.SkipJob(_tokenJobService, job.JobId, _account.Uid, subdy.Message);
+                                    }
+
                                 }
                                 HanderJob(subdy, job);
                             }
@@ -496,9 +488,15 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             loadJobTotals();
             if (subdy.SubdyEnum == SubdyEnum.Success)
             {
-                var balance = SubdyClient.GetProfile(Globals.User.Token);
-                Globals.User.Balance = balance;
-                ControlHelper.SetLabelTextSafe(Globals.CoinLable, ((int)balance).ToMoneyString() + " xu");
+                // Lấy coin + pending coin từ Golike /statistics/report (thay cho SubdyClient.GetProfile).
+                var report = new GoLikeClient().GetCoinReport(Globals.User.Token);
+                if (report.CurrentCoin >= 0)
+                {
+                    Globals.User.Balance = report.CurrentCoin;
+                    Globals.User.PendingBalance = report.PendingCoin;
+                    ControlHelper.SetLabelTextSafe(Globals.CoinLable, $"{((int)report.CurrentCoin).ToMoneyString()} xu");
+                    ControlHelper.SetLabelTextSafe(Globals.PendingLable, $"{((int)report.PendingCoin).ToMoneyString()} xu");
+                }
             }
             if (_platform == PlatformModel.Facebook)
             {
@@ -517,7 +515,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     case "https://app.golike.net/":
                         {
                             var client = new GoLikeClient();
-                            var coin = client.GetCoin(_account.TokenJob);
+                            var coin = client.GetCoin(_tokenJobService);
                             if (!string.IsNullOrEmpty(coin))
                             {
                                 _account.Result = coin;
@@ -720,7 +718,20 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                     case "https://app.golike.net/":
                         {
-                            _tokenJobService = _account.TokenJob;
+                            if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Ưu tiên token phiên login Golike; fallback token cấu hình cũ nếu có.
+                                _tokenJobService = Globals.User?.Token;
+                                if (string.IsNullOrWhiteSpace(_tokenJobService))
+                                    _tokenJobService = FarmXuVipHelper.GetToken();
+                                if (string.IsNullOrWhiteSpace(_tokenJobService))
+                                    throw new Exception("Chưa đăng nhập Golike — không có token cho \"Làm Job Golike\".");
+                            }
+                            else
+                            {
+                                _tokenJobService = _account.TokenJob;
+                            }
                             break;
                         }
                 }
@@ -1048,15 +1059,16 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                         continue;
                                     }
                                     dump = dump.ToLower();
-                                    if (!_client.ElementWithAttributes(new List<string> { "//*[contains(@text,\"Share\")]", "//*[contains(@content-desc,\"Share\")]" }, 5, dump, false) || !dump.Contains("share", StringComparison.OrdinalIgnoreCase) && !dump.Contains("like", StringComparison.OrdinalIgnoreCase))
+                                    if (!_client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"Share\"]", "//*[@content-desc=\"Share button. Double tap to share the post.\"]" }, 5, dump, false))
                                     {
                                         _client.SwipeUp(1, SubdyHelper.RandomValue(500, 2000), SubdyHelper.RandomValue(500, 2000));
+                                        //  _client.SwipeByPercent(56, 82, 56, 16, 1000);
                                         continue;
                                     }
                                     break;
                                 }
                             }
-                           
+
                         }
 
                     }
@@ -1110,7 +1122,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                 subdy.Message = $"Chặn tương tác {job.Type}";
                             }
                         }
-                       
+
                     }
                     if (type == JobTypes.Follow)
                     {
@@ -1152,10 +1164,12 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         if (_config.JobService == "Subdy")
                         {
-                            var message = SubdyClient.ClaimJob(_tokenJobService, Convert.ToInt32(job.JobId), _account.Uid);
+                            string commentMsg = job.Contents != null && job.Contents.Count > 0 ? job.Contents[0] : string.Empty;
+                            var message = GoLikePrivateClient.CompleteJob(_tokenJobService, job.JobId, _account.Uid, success: true, commentId: job.CommentId, message: commentMsg);
+                            subdy.Message = message;
                             return subdy;
                         }
-
+                        job.Success = true;
                         subdy.Message = await JobClient.ReportFacebookJob(_jobService, _account.Uid, _account.FullName, _tokenJobService, job, _jobPrefix);
                     }
                     else if (_platform == "Instagram")
@@ -1189,6 +1203,13 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 {
                     subdy.SubdyEnum = SubdyEnum.JobFail;
                     subdy.Message = ex.Message;
+                }
+            }
+            else
+            {
+                if (_jobService == "https://app.golike.net/")
+                {
+                    subdy.Message = await JobClient.ReportFacebookJob(_jobService, _account.Uid, _account.FullName, _tokenJobService, job, _jobPrefix);
                 }
             }
 
@@ -1254,31 +1275,40 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 string url = "";
                 bool isLink = false;
                 List<string> urls = new List<string>();
-                //if (_config.JobService == "Subdy")
+                if (_config.JobService == "https://app.golike.net/")
+                {
+                    url = await FacebookHander.GetUrlByObjectId(job.ObjectId);
+                    if (string.IsNullOrEmpty(url))
+                    {
+                        //string charString = SubdyHelper.RandomString("abcdefghijklmnopqrstuvwxyz", SubdyHelper.RandomValue(3, 10));
+                        urls = new List<string>
+                {
+                    $"https://www.facebook.com/abc/posts/{job.ObjectId}",
+                    $"https://www.facebook.com/photo/?fbid={job.ObjectId}",
+                    $"https://www.facebook.com/permalink.php?story_fbid={job.ObjectId}"
+                };
+
+                    }
+                    else
+                    {
+                        urls.Add(url);
+                    }
+                    urls.Add($"fb://faceweb/f?href=https://www.facebook.com/{SubdyHelper.RandomString("0123456789", SubdyHelper.RandomValue(6, 20))}/posts/{job.ObjectId}");
+                }
+                else
+                {
+                    urls.Add(job.ObjectId);
+                }
+                //if (_jobService == "https://app.golike.net/")
                 //{
-                //    urls.Add(job.Link);
+                //    
                 //}
                 //else
                 //{
-                //    url = await FacebookHander.GetUrlByObjectId(job.ObjectId);
-                //    if (string.IsNullOrEmpty(url))
-                //    {
-                //        //string charString = SubdyHelper.RandomString("abcdefghijklmnopqrstuvwxyz", SubdyHelper.RandomValue(3, 10));
-                //        urls = new List<string>
-                //{
-                //    $"https://www.facebook.com/abc/posts/{job.ObjectId}",
-                //    $"https://www.facebook.com/photo/?fbid={job.ObjectId}",
-                //    $"https://www.facebook.com/permalink.php?story_fbid={job.ObjectId}"
-                //};
-
-                //    }
-                //    else
-                //    {
-                //        urls.Add(url);
-                //    }
+                //    
                 //}
-                urls.Add(job.ObjectId);
-                //   urls.Add($"fb://faceweb/f?href=https://www.facebook.com/{SubdyHelper.RandomString("0123456789", SubdyHelper.RandomValue(6, 20))}/posts/{job.ObjectId}");
+
+                //   
                 foreach (string link in urls)
                 {
                     isLink = await GotoUrl(link);
@@ -1302,7 +1332,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         continue;
                     }
-                    if (!_client.ElementWithAttributes(new List<string> { "//*[contains(@text,\"Share\")]", "//*[contains(@content-desc,\"Share\")]" }, 5, dump, false) || !dump.Contains("share", StringComparison.OrdinalIgnoreCase) && !dump.Contains("like", StringComparison.OrdinalIgnoreCase))
+                    if (!_client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"Share\"]", "//*[@content-desc=\"Share button. Double tap to share the post.\"]" }, 5, dump, false))
                     {
                         _client.SwipeUp(1, SubdyHelper.RandomValue(500, 2000), SubdyHelper.RandomValue(500, 2000));
                         //  _client.SwipeByPercent(56, 82, 56, 16, 1000);
@@ -1312,6 +1342,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Đã làm job đó trước.");
                     }
+
                     isLink = true;
                     break;
                 }
@@ -1324,7 +1355,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
                 if (_client.ElementWithAttributes("//*[@content-desc=\"Navigate to your Reels profile\"]", 5, click: false))
                 {
-                    var elementLike = _client.FindPoint("//*[contains(@text, \"reactions\")]", 15);
+                    var elementLike = _client.FindPoint("//*[contains(@content-desc, \"reactions\")]", 15);
                     string type = job.Type.ToLower();
                     if (elementLike != null && elementLike != System.Drawing.Point.Empty)
                     {
@@ -1335,10 +1366,25 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         {
                             num = char.ToUpper(type[0]) + type.Substring(1);
                         }
-                        if (_client.ElementWithAttributes($"//*[@content-desc='{num}']", 3))
+                        var attributeValues = _client.GetBoundsValues(3, "", $"//*[@content-desc='{num}']");
+                        if (attributeValues.Any())
                         {
-                            return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                            string attributeValue = attributeValues.FirstOrDefault();
+                            if (!string.IsNullOrEmpty(attributeValue))
+                            {
+                                var rectangleArea = new RectangleArea(attributeValue);
+                                var x = rectangleArea.Right -2;
+                                var y = ((rectangleArea.Top + rectangleArea.Bottom) / 2);
+                                if (_client.Click(x, y))
+                                {
+                                    return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                                }
+                            }
                         }
+                        //if (_client.ElementWithAttributes($"//*[@content-desc='{num}']", 3))
+                        //{
+
+                        //}
                     }
                 }
                 else

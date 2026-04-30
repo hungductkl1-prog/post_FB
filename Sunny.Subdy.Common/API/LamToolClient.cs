@@ -116,18 +116,104 @@ namespace Sunny.Subdy.Common.API
                 return ("error: " + ex.Message, "0");
             }
         }
+        public static (bool success, string error, JsonArray licenses) GetLicenses(string bearerToken)
+        {
+            try
+            {
+                string url = "https://auto.golike.net/api/tool/licenses";
+                var headers = new Dictionary<string, string>
+                {
+                    ["accept"] = "*/*",
+                    ["Authorization"] = $"Bearer {bearerToken}",
+                };
+                string resurl = HttpRequestHelper.GET(url, headers: headers);
+                if (string.IsNullOrEmpty(resurl))
+                {
+                    throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
+                }
+
+                var node = JsonNode.Parse(resurl);
+                var arr = node?.AsArray();
+                if (arr == null)
+                {
+                    var errObj = node?.AsObject();
+                    string err = errObj?["error"]?.ToString() ?? errObj?["message"]?.ToString() ?? "Phản hồi không hợp lệ.";
+                    return (false, err, null);
+                }
+                return (true, string.Empty, arr);
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                return (false, ex.Message, null);
+            }
+        }
+
+        public static (bool valid, string error, string plan, string licenseId, string expiresAt, string toolSlug) VerifyLicense(
+            string bearerToken,
+            string toolSlug,
+            string machineId,
+            string machineLabel,
+            string platform = "WINDOWS",
+            string toolUserAgent = "")
+        {
+            try
+            {
+                string url = "https://auto.golike.net/api/tool/verify";
+                var headers = new Dictionary<string, string>
+                {
+                    ["accept"] = "application/json",
+                    ["Authorization"] = $"Bearer {bearerToken}",
+                    ["Content-Type"] = "application/json",
+                };
+
+                string json = $"{{\"toolSlug\":\"{EscapeJsonString(toolSlug)}\"," +
+                              $"\"machineId\":\"{EscapeJsonString(machineId)}\"," +
+                              $"\"machineLabel\":\"{EscapeJsonString(machineLabel)}\"," +
+                              $"\"platform\":\"{EscapeJsonString(platform)}\"," +
+                              $"\"toolUserAgent\":\"{EscapeJsonString(toolUserAgent)}\"}}";
+
+                string resurl = HttpRequestHelper.POST_JSON(url, headers: headers, jsonBody: json);
+                if (string.IsNullOrEmpty(resurl))
+                {
+                    throw new Exception("Đã xảy ra lỗi server. Vui lòng thử lại hoặc liên hệ admin.");
+                }
+
+                var jObject = JsonNode.Parse(resurl)!.AsObject();
+                bool valid = Convert.ToBoolean(jObject["valid"]?.ToString() ?? "false");
+                if (!valid)
+                {
+                    string err = jObject["error"]?.ToString() ?? jObject["message"]?.ToString() ?? "License không hợp lệ.";
+                    return (false, err, string.Empty, string.Empty, string.Empty, string.Empty);
+                }
+
+                return (
+                    true,
+                    string.Empty,
+                    jObject["plan"]?.ToString() ?? string.Empty,
+                    jObject["licenseId"]?.ToString() ?? string.Empty,
+                    jObject["expiresAt"]?.ToString() ?? string.Empty,
+                    jObject["toolSlug"]?.ToString() ?? string.Empty);
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                return (false, ex.Message, string.Empty, string.Empty, string.Empty, string.Empty);
+            }
+        }
+
         public static (bool success, string newVersion, string urlUpdate) GetApiResponseAsync(string key, string nameApp, string version)
         {
             try
             {
-                string url = $"https://lamtool.net/api/license/check?tool_slug={nameApp}&device_code={key}";
+                string url = "https://auto.golike.net/api/public/tools/auto-phone-farm/latest?platform=WINDOWS";
                 string json = HttpRequestHelper.GET(url);
 
                 var obj = JsonNode.Parse(json)!.AsObject();
 
-                bool success = obj["success"]?.GetValue<bool>() ?? false;
-                string newVersion = obj["license"]?["tool"]?["version"]?.ToString() ?? "";
-                string updateUrl = obj["license"]?["tool"]?["updateUrl"]?.ToString() ?? "";
+                string newVersion = obj["version"]?.ToString() ?? "";
+                string updateUrl = obj["updateFile"]?["url"]?.ToString() ?? "";
+                bool success = !string.IsNullOrEmpty(newVersion) && !string.IsNullOrEmpty(updateUrl);
 
                 return (success, newVersion, updateUrl);
             }
@@ -137,28 +223,23 @@ namespace Sunny.Subdy.Common.API
                 return (false, string.Empty, string.Empty);
             }
         }
+        // Format: yy.MM.dd.build (vd 26.04.28.1) — so sánh trái→phải: year, month, day, build.
         public static bool IsNewerVersion(string oldVersion, string newVersion)
         {
             if (string.IsNullOrWhiteSpace(oldVersion) || string.IsNullOrWhiteSpace(newVersion))
                 return false;
 
-            string[] currentVersionParts = oldVersion.Split('.');
-            string[] newVersionParts = newVersion.Split('.');
-
-            Array.Reverse(currentVersionParts);
-            Array.Reverse(newVersionParts);
-
-            int len = Math.Max(currentVersionParts.Length, newVersionParts.Length);
+            string[] oldParts = oldVersion.Trim().Split('.');
+            string[] newParts = newVersion.Trim().Split('.');
+            int len = Math.Max(oldParts.Length, newParts.Length);
 
             for (int i = 0; i < len; i++)
             {
-                int currentPart = i < currentVersionParts.Length && int.TryParse(currentVersionParts[i], out var cp) ? cp : 0;
-                int newPart = i < newVersionParts.Length && int.TryParse(newVersionParts[i], out var np) ? np : 0;
+                int oldPart = i < oldParts.Length && int.TryParse(oldParts[i], out var op) ? op : 0;
+                int newPart = i < newParts.Length && int.TryParse(newParts[i], out var np) ? np : 0;
 
-                if (currentPart < newPart)
-                    return true;
-                if (currentPart > newPart)
-                    return false;
+                if (newPart > oldPart) return true;
+                if (newPart < oldPart) return false;
             }
 
             return false;

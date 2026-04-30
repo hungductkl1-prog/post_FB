@@ -75,6 +75,7 @@ namespace Sunny.Subdy.Data.Context
                 RecentInteraction = reader["RecentInteraction"]?.ToString() ?? string.Empty,
                 IsView = reader["IsView"] != DBNull.Value && Convert.ToBoolean(reader["IsView"]),
                 JobTotal = reader["JobTotal"] != DBNull.Value ? Convert.ToInt32(reader["JobTotal"]) : 0,
+                NameScript = HasColumn(reader, "NameScript") ? reader["NameScript"]?.ToString() ?? string.Empty : string.Empty,
             };
 
           //  account.JobHistory = _jobHistoryContext.GetByUid(account.Uid, DateTime.Now.ToString("dd/MM/yyyy")) ?? new JobHistory();

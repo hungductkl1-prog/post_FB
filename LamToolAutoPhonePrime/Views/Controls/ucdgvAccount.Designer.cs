@@ -272,7 +272,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button6.Size = new Size(130, 34);
             button6.TabIndex = 11;
             button6.Text = "Tương tác";
-            button6.Visible = false;
+            button6.Visible = true;
             button6.Click += button6_Click;
             // 
             // button5

@@ -27,19 +27,23 @@
 	  <TargetPlatformMinVersion>5.1</TargetPlatformMinVersion>
 	  <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		  <OptimizationPreference>Size</OptimizationPreference>
-	  <PublishLzmaCompressed>true</PublishLzmaCompressed>
-	  <!-- Auto Versioning -->
-	  <CurrentTime>$([System.DateTime]::Now.ToString("HH.dd.MM.yyyy"))</CurrentTime>
+	  <PublishLzmaCompressed>false</PublishLzmaCompressed>
+	  <!-- Auto Versioning: yy.MM.dd.<build> — build counter tăng dần trong ngày, reset khi sang ngày mới -->
+	  <BuildCounterFile>$(MSBuildProjectDirectory)\.build-counter</BuildCounterFile>
+	  <BuildDateToday>$([System.DateTime]::Now.ToString("yy.MM.dd"))</BuildDateToday>
+	  <!-- Default version dùng khi chưa resolve được counter (designer / IntelliSense / file đang lock) -->
+	  <BuildNumber>0</BuildNumber>
+	  <CurrentTime>$(BuildDateToday).$(BuildNumber)</CurrentTime>
 	  <Version>$(CurrentTime)</Version>
 	  <AssemblyVersion>$(CurrentTime)</AssemblyVersion>
 	  <FileVersion>$(CurrentTime)</FileVersion>
-	  <AssemblyName>SubdyPhoneFarm</AssemblyName>
-	  <Product>SubdyPhoneFarm</Product>
-	  <Company>Subdy</Company>
-	  <Copyright>Subdy</Copyright>
-	  <PackageId>SubdyPhoneFarm</PackageId>
-	  <Title>SubdyPhoneFarm</Title>
-	  <PackageProjectUrl>https://subdy.net/</PackageProjectUrl>
+	  <AssemblyName>GolikePhoneFarm</AssemblyName>
+	  <Product>GolikePhoneFarm</Product>
+	  <Company>Golike</Company>
+	  <Copyright>Golike</Copyright>
+	  <PackageId>GolikePhoneFarm</PackageId>
+	  <Title>GolikePhoneFarm</Title>
+	  <PackageProjectUrl>https://golike.net/</PackageProjectUrl>
 	  <ApplicationIcon>Resources\logo_lamtool_v3_dark_16.ico</ApplicationIcon>
 	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -197,21 +201,21 @@
 		<Warning Text="ScrcpyNet native DLLs not found. Build ScrcpyNet project first." Condition="'@(ScrcpyNativeDep)' == ''" />
 	</Target>
 
-	<!-- Build LTPhoneHelper (Python PyInstaller) và copy vào output -->
+	<!-- Build GolikeHelper (Python PyInstaller) và copy vào output -->
 	<PropertyGroup>
 		<LTPhoneHelperDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\LTPhoneHelper'))</LTPhoneHelperDir>
-		<LTPhoneHelperExe>$(LTPhoneHelperDir)\dist\LTPhoneHelper.exe</LTPhoneHelperExe>
+		<LTPhoneHelperExe>$(LTPhoneHelperDir)\dist\GolikeHelper.exe</LTPhoneHelperExe>
 	</PropertyGroup>
 
 	<Target Name="BuildLTPhoneHelper" BeforeTargets="Build">
-		<Message Text="Building LTPhoneHelper..." Importance="high" />
+		<Message Text="Building GolikeHelper..." Importance="high" />
 		<Exec Command="python build.py" WorkingDirectory="$(LTPhoneHelperDir)" IgnoreExitCode="true" Condition="Exists('$(LTPhoneHelperDir)\build.py')" />
-		<Warning Text="LTPhoneHelper.exe not found after build. Skipping copy." Condition="!Exists('$(LTPhoneHelperExe)')" />
+		<Warning Text="GolikeHelper.exe not found after build. Skipping copy." Condition="!Exists('$(LTPhoneHelperExe)')" />
 	</Target>
 
 	<Target Name="CopyLTPhoneHelper" AfterTargets="BuildLTPhoneHelper" BeforeTargets="Build" Condition="Exists('$(LTPhoneHelperExe)')">
 		<Copy SourceFiles="$(LTPhoneHelperExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-		<Message Text="Copied LTPhoneHelper.exe to $(OutDir)." Importance="high" />
+		<Message Text="Copied GolikeHelper.exe to $(OutDir)." Importance="high" />
 	</Target>
 
 	<!-- Build ORC-Helper-Python (PyInstaller onefile) và copy vào output -->
@@ -234,18 +238,61 @@
 	<!-- Build ViewControl (AOT standalone .exe) và copy vào output -->
 	<PropertyGroup>
 		<ViewControlProjectPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\ViewControl.csproj'))</ViewControlProjectPath>
-		<ViewControlExe>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish\ViewControl.exe'))</ViewControlExe>
+		<ViewControlExe>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish\Golike-Android-View.exe'))</ViewControlExe>
 	</PropertyGroup>
 
 	<Target Name="BuildViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlProjectPath)')">
 		<Message Text="Building ViewControl..." Importance="high" />
 		<Exec Command="dotnet publish &quot;$(ViewControlProjectPath)&quot; -r win-x64 -c Release --output &quot;$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish'))&quot; /p:PublishAot=false /p:PublishSingleFile=true /p:SelfContained=true /p:IncludeNativeLibrariesForSelfExtract=true /nologo" IgnoreExitCode="true" />
-		<Warning Text="ViewControl.exe not found after build. Skipping copy." Condition="!Exists('$(ViewControlExe)')" />
+		<Warning Text="Golike-Android-View.exe not found after build. Skipping copy." Condition="!Exists('$(ViewControlExe)')" />
 	</Target>
 
 	<Target Name="CopyViewControl" AfterTargets="BuildViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlExe)')">
 		<Copy SourceFiles="$(ViewControlExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-		<Message Text="Copied ViewControl.exe to $(OutDir)." Importance="high" />
+		<Message Text="Copied Golike-Android-View.exe to $(OutDir)." Importance="high" />
+	</Target>
+
+	<!--
+	  Đọc build counter và tính BuildNumber TRƯỚC khi MSBuild resolve assembly version.
+	  Đặt trong Target (không phải <PropertyGroup>) để tránh ReadAllText chạy ở
+	  evaluation-time (lúc VS load designer/IntelliSense → file có thể bị lock).
+	  ContinueOnError=true để designer/IntelliSense không fail nếu file đang bị giữ.
+	-->
+	<Target Name="ResolveBuildCounter"
+			BeforeTargets="GetAssemblyVersion;BeforeBuild;CoreCompile"
+			Condition="Exists('$(BuildCounterFile)')">
+		<ReadLinesFromFile File="$(BuildCounterFile)" ContinueOnError="true">
+			<Output TaskParameter="Lines" PropertyName="_BuildCounterRaw" />
+		</ReadLinesFromFile>
+		<PropertyGroup Condition="'$(_BuildCounterRaw)' != ''">
+			<_BuildCounterDate>$(_BuildCounterRaw.Split('|')[0])</_BuildCounterDate>
+			<_BuildCounterValue Condition="$(_BuildCounterRaw.Contains('|'))">$(_BuildCounterRaw.Split('|')[1])</_BuildCounterValue>
+			<BuildNumber Condition="'$(_BuildCounterDate)' == '$(BuildDateToday)' and '$(_BuildCounterValue)' != ''">$([MSBuild]::Add($(_BuildCounterValue), 1))</BuildNumber>
+			<BuildNumber Condition="'$(BuildNumber)' == '0' or '$(BuildNumber)' == ''">1</BuildNumber>
+			<CurrentTime>$(BuildDateToday).$(BuildNumber)</CurrentTime>
+			<Version>$(CurrentTime)</Version>
+			<AssemblyVersion>$(CurrentTime)</AssemblyVersion>
+			<FileVersion>$(CurrentTime)</FileVersion>
+		</PropertyGroup>
+	</Target>
+
+	<!-- Khi file chưa tồn tại, vẫn cần BuildNumber=1 cho lần build đầu -->
+	<Target Name="ResolveBuildCounterFirstRun"
+			BeforeTargets="GetAssemblyVersion;BeforeBuild;CoreCompile"
+			Condition="!Exists('$(BuildCounterFile)')">
+		<PropertyGroup>
+			<BuildNumber>1</BuildNumber>
+			<CurrentTime>$(BuildDateToday).$(BuildNumber)</CurrentTime>
+			<Version>$(CurrentTime)</Version>
+			<AssemblyVersion>$(CurrentTime)</AssemblyVersion>
+			<FileVersion>$(CurrentTime)</FileVersion>
+		</PropertyGroup>
+	</Target>
+
+	<!-- Lưu lại build counter sau khi build thành công để lần sau tăng tiếp -->
+	<Target Name="PersistBuildCounter" AfterTargets="Build">
+		<WriteLinesToFile File="$(BuildCounterFile)" Lines="$(BuildDateToday)|$(BuildNumber)" Overwrite="true" ContinueOnError="true" />
+		<Message Text="📌 Build version: $(CurrentTime)" Importance="high" />
 	</Target>
 
 	<Target Name="CleanObjWhenRun" AfterTargets="Build" Condition="'$(RunConfiguration)' != ''">

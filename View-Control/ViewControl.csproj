@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <!-- net10.0-windows để dùng ILCompiler 10.x — bản 9.0.14 có bug InvalidCastException trong ParallelSort khi project có nhiều COM interop (đã fix trong .NET 10). -->
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -14,19 +15,51 @@
     <TargetPlatformMinVersion>5.1</TargetPlatformMinVersion>
 
     <!-- Assembly info -->
-    <AssemblyName>ViewControl</AssemblyName>
-    <Product>ViewControl</Product>
-    <Company>Subdy</Company>
-    <Title>ViewControl - Android View</Title>
+    <AssemblyName>Golike-Android-View</AssemblyName>
+    <RootNamespace>ViewControl</RootNamespace>
+    <Product>Golike Android View</Product>
+    <Company>Golike</Company>
+    <Title>Golike Android View</Title>
+    <ApplicationIcon>Resources\golike_auto_phone.ico</ApplicationIcon>
 
     <CustomResourceTypesSupport>true</CustomResourceTypesSupport>
 
-    <!-- Publish as single file self-contained (no AOT — ScrcpyNet không hỗ trợ) -->
-    <PublishAot>false</PublishAot>
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <SelfContained>true</SelfContained>
+
+    <!-- Tắt warning AOT/Trim — đã có rd.xml + DynamicDependency để giữ type cần thiết -->
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <NoWarn>$(NoWarn);IL2026;IL2057;IL2070;IL2072;IL2075;IL2104;IL3050;IL3000;IL3001;IL3002;NETSDK1175</NoWarn>
+
+    <!--
+      WinForms chính thức "không khuyến nghị" với trimming/AOT, nhưng .NET 9 đã chạy được
+      với rd.xml + binding-support switch. Override block của SDK để cho phép.
+    -->
+    <_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>
+  </PropertyGroup>
+
+  <!--
+    Cấu hình NativeAOT (.NET 9). CHỈ kích hoạt khi `dotnet publish` (không phải build IDE)
+    để tránh trim làm chậm build phát triển và làm hỏng WinForms designer.
+    Cách dùng: dotnet publish View-Control/ViewControl.csproj -c Release -r win-x64
+    - PublishAot=true → biên dịch sang machine code, bỏ JIT.
+    - IlcOptimizationPreference=Speed → tối ưu hiệu năng (đổi thành Size để nhỏ exe).
+    - IlcGenerateStackTraceData=true → giữ stack trace đẹp khi crash (cần cho log).
+    - StripSymbols=true → tách .pdb riêng (giảm kích thước exe).
+    - InvariantGlobalization=false (default) → giữ tiếng Việt (UI có dấu).
+    - rd.xml giữ reflection metadata cho WinForms DataBinding + AntdUI dynamic icon.
+  -->
+  <PropertyGroup Condition=" '$(_IsPublishing)' == 'true' ">
+    <PublishAot>true</PublishAot>
+    <TrimMode>full</TrimMode>
+    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+    <IlcGenerateStackTraceData>true</IlcGenerateStackTraceData>
+    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+    <StripSymbols>true</StripSymbols>
+    <DebuggerSupport>true</DebuggerSupport>
+    <EventSourceSupport>false</EventSourceSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <UseSystemResourceKeys>false</UseSystemResourceKeys>
   </PropertyGroup>
 
   <!-- Packages -->
@@ -34,6 +67,53 @@
     <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
     <PackageReference Include="WinFormsComInterop" Version="0.5.0" />
   </ItemGroup>
+
+  <!--
+    Workaround cho bug NativeAOT .NET 10:
+    ILC emit unresolved external `RhIsGCBridgeActive` vào obj khi compile, nhưng
+    Runtime.WorkstationGC.lib trong runtime pack 10.0.4/10.0.5 KHÔNG export symbol đó
+    → link.exe fail "1 unresolved externals". Symbol thuộc tính năng GC Bridge mới
+    (cho Java/Obj-C interop) chưa hoàn thiện trong runtime pack Windows.
+    Cách khắc phục: tự compile stub C++ trả về 0 (bridge inactive) và inject vào link.
+
+    Khi Microsoft fix (runtime pack mới export symbol này), xóa target
+    `BuildGCBridgeStub` + file NativeAot/GCBridgeStub.cpp.
+  -->
+  <!--
+    Compile stub bằng cl.exe. Dùng vswhere.exe để tìm VS install path (an toàn khi
+    người khác build trên máy khác có version VS khác). Chạy trước SetupOSSpecificProps
+    để NativeLibrary item của ta được pickup vào LinkerArg.
+  -->
+  <Target Name="BuildGCBridgeStub"
+          Condition=" '$(PublishAot)' == 'true' "
+          BeforeTargets="SetupOSSpecificProps"
+          Inputs="$(MSBuildThisFileDirectory)NativeAot\GCBridgeStub.cpp"
+          Outputs="$(IntermediateOutputPath)native\GCBridgeStub.obj">
+    <PropertyGroup>
+      <_GCBridgeStubObj>$(IntermediateOutputPath)native\GCBridgeStub.obj</_GCBridgeStubObj>
+      <_GCBridgeStubSrc>$(MSBuildThisFileDirectory)NativeAot\GCBridgeStub.cpp</_GCBridgeStubSrc>
+      <_VsWhere>$(MSBuildProgramFiles32)\Microsoft Visual Studio\Installer\vswhere.exe</_VsWhere>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)native" />
+    <Error Condition="!Exists('$(_VsWhere)')" Text="vswhere.exe không tìm thấy ở '$(_VsWhere)'. Cần Visual Studio C++ build tools để compile GCBridgeStub." />
+    <Exec Command='&quot;$(_VsWhere)&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath'
+          ConsoleToMSBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_VsInstallDir" />
+    </Exec>
+    <Error Condition="'$(_VsInstallDir)' == ''" Text="Không tìm thấy VS installation có C++ build tools. Cài Workload 'Desktop development with C++'." />
+    <Exec Command='call "$(_VsInstallDir)\VC\Auxiliary\Build\vcvarsall.bat" x64 &gt; nul &amp;&amp; cl.exe /nologo /c /O2 /MT /Fo"$(_GCBridgeStubObj)" "$(_GCBridgeStubSrc)"'
+          ConsoleToMSBuild="true" />
+  </Target>
+
+  <!-- Đính obj vào NativeLibrary mỗi lần publish (kể cả khi BuildGCBridgeStub bị skip vì up-to-date) -->
+  <Target Name="IncludeGCBridgeStub"
+          Condition=" '$(PublishAot)' == 'true' "
+          BeforeTargets="SetupOSSpecificProps"
+          DependsOnTargets="BuildGCBridgeStub">
+    <ItemGroup>
+      <NativeLibrary Include="$(IntermediateOutputPath)native\GCBridgeStub.obj" />
+    </ItemGroup>
+  </Target>
 
   <!-- Project references -->
   <ItemGroup>
@@ -56,6 +136,19 @@
     <Compile Include="..\LamToolAutoPhonePrime\ucMenuscripDevice.Designer.cs" Link="ucMenuscripDevice.Designer.cs" />
     <EmbeddedResource Include="..\LamToolAutoPhonePrime\ucMenuscripDevice.resx" Link="ucMenuscripDevice.resx" />
     <Compile Include="..\LamToolAutoPhonePrime\Utils\AntdHelper.cs" Link="Utils\AntdHelper.cs" />
+    <Compile Include="..\LamToolAutoPhonePrime\Utils\ScrcpyNetFolderEnsurer.cs" Link="Utils\ScrcpyNetFolderEnsurer.cs" />
+  </ItemGroup>
+
+  <!-- Embed PNG logo để load runtime cho windowBar.Icon + Form.Icon -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\logo_golike_auto_phone.png">
+      <LogicalName>ViewControl.Resources.logo_golike_auto_phone.png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Runtime directives cho NativeAOT (giữ reflection metadata) -->
+  <ItemGroup>
+    <RdXmlFile Include="rd.xml" />
   </ItemGroup>
 
   <!-- WinForms binding support -->
@@ -72,7 +165,7 @@
     <Copy SourceFiles="@(ScrcpyNativeDep)" DestinationFolder="$(OutDir)ScrcpyNet" SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Copy ScrcpyNet native DLLs when publishing -->
+  <!-- Copy ScrcpyNet native DLLs when publishing (AOT cũng kích hoạt target này) -->
   <Target Name="CopyScrcpyNativeDepForPublish" AfterTargets="Publish">
     <ItemGroup>
       <ScrcpyNativeDepPub Include="$(MSBuildThisFileDirectory)..\ScrcpyNet\bin\$(Configuration)\netstandard2.1\ScrcpyNet\*.*" />

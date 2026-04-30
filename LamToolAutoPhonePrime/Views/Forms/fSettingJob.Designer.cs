@@ -498,14 +498,14 @@
             label49.Text = "lần";
             // 
             // numericUpDown48
-            // 
+            //
             numericUpDown48.Location = new Point(3, 3);
             numericUpDown48.Maximum = new decimal(new int[] { 10000, 0, 0, 0 });
             numericUpDown48.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             numericUpDown48.Name = "numericUpDown48";
             numericUpDown48.Size = new Size(59, 25);
             numericUpDown48.TabIndex = 133;
-            numericUpDown48.Value = new decimal(new int[] { 100, 0, 0, 0 });
+            numericUpDown48.Value = new decimal(new int[] { 20, 0, 0, 0 });
             // 
             // checkBox20
             // 
@@ -572,14 +572,14 @@
             label18.Text = "job/ngày";
             // 
             // numericUpDown24
-            // 
+            //
             numericUpDown24.Location = new Point(102, 4);
             numericUpDown24.Maximum = new decimal(new int[] { 100000, 0, 0, 0 });
             numericUpDown24.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             numericUpDown24.Name = "numericUpDown24";
             numericUpDown24.Size = new Size(59, 25);
             numericUpDown24.TabIndex = 181;
-            numericUpDown24.Value = new decimal(new int[] { 200, 0, 0, 0 });
+            numericUpDown24.Value = new decimal(new int[] { 100, 0, 0, 0 });
             // 
             // label19
             // 
@@ -591,14 +591,14 @@
             label19.Text = "đến";
             // 
             // numericUpDown25
-            // 
+            //
             numericUpDown25.Location = new Point(3, 3);
             numericUpDown25.Maximum = new decimal(new int[] { 10000, 0, 0, 0 });
             numericUpDown25.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             numericUpDown25.Name = "numericUpDown25";
             numericUpDown25.Size = new Size(59, 25);
             numericUpDown25.TabIndex = 133;
-            numericUpDown25.Value = new decimal(new int[] { 100, 0, 0, 0 });
+            numericUpDown25.Value = new decimal(new int[] { 50, 0, 0, 0 });
             // 
             // checkBox9
             // 
@@ -944,14 +944,14 @@
             label42.Text = "job";
             // 
             // numericUpDown13
-            // 
+            //
             numericUpDown13.Location = new Point(102, 4);
             numericUpDown13.Maximum = new decimal(new int[] { 100000, 0, 0, 0 });
             numericUpDown13.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             numericUpDown13.Name = "numericUpDown13";
             numericUpDown13.Size = new Size(59, 25);
             numericUpDown13.TabIndex = 181;
-            numericUpDown13.Value = new decimal(new int[] { 200, 0, 0, 0 });
+            numericUpDown13.Value = new decimal(new int[] { 100, 0, 0, 0 });
             // 
             // label43
             // 
@@ -963,14 +963,14 @@
             label43.Text = "đến";
             // 
             // numericUpDown14
-            // 
+            //
             numericUpDown14.Location = new Point(3, 3);
             numericUpDown14.Maximum = new decimal(new int[] { 10000, 0, 0, 0 });
             numericUpDown14.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             numericUpDown14.Name = "numericUpDown14";
             numericUpDown14.Size = new Size(59, 25);
             numericUpDown14.TabIndex = 133;
-            numericUpDown14.Value = new decimal(new int[] { 100, 0, 0, 0 });
+            numericUpDown14.Value = new decimal(new int[] { 50, 0, 0, 0 });
             // 
             // checkBox13
             // 

@@ -20,7 +20,8 @@ public partial class fSingleView : AntdUI.Window
 
     private void OnLoad(object? sender, EventArgs e)
     {
-        windowBar.Text = $"Android View - {device.Serial}";
+        AppBranding.ApplyTo(this, windowBar);
+        windowBar.Text = $"Golike Android View - {device.Serial}";
         labelStatus.Text = "Đang kết nối...";
         _ = ConnectAsync();
     }

@@ -49,26 +49,14 @@ namespace Sunny.Subd.Core.Utils
           });
             _xpathGroups.TryAdd(XpathType.Block, new List<string>
           {
-             $"//*[contains(@text, \"We limit how often you can post\")]",
              $"//*[contains(@text, \"Dismiss\")]",
+             $"//*[contains(@text, \"We limit how often you can post\")]",
              $"//*[contains(@text, \"Your account is restricted\")]",
              $"//*[contains(@text, \"we added restrictions to your account\")]",
           });
             _xpathGroups.TryAdd(XpathType.Success, new List<string>
           {
             "//*[contains(@content-desc, 'Go to profile')]",
-             $"//*[contains(@text, \"Allow Facebook to access\")]",
-             $"//*[contains(@text, \"Continue in English\")]",
-             $"//*[contains(@text, \"Find friends\")]",
-             $"//*[contains(@text, \"Save your login info\")]",
-             $"//*[contains(@text, \"Access to contacts\")]",
-             $"//*[contains(@text, \"Add number\")]",
-             $"//*[contains(@text, \"Allow Facebook to access your\")]",
-             $"//*[contains(@text, \"Is this your account\")]",
-             $"//*[contains(@text, \"Log in using another device\")]",
-             $"//*[contains(@text, \"Add number\")]",
-             $"//*[contains(@text, \"Allow Facebook to access your\")]",
-             $"//*[contains(@text, \"Is this your account\")]",
              "//*[@text=\"Add a profile picture\"]",
              "//*[@text=\"Add a mobile number to your account\"]"
           });
@@ -139,6 +127,7 @@ namespace Sunny.Subd.Core.Utils
       });
             _xpathGroups.TryAdd(XpathType.InputPassword, new List<string>
       {
+                 "//*[@content-desc=\"Password\"]",
           $"//*[contains(@text, \"Enter Password\")]",
       });
             _xpathGroups.TryAdd(XpathType.Regsiner_Facebook, new List<string>

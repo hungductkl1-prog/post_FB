@@ -57,7 +57,7 @@
             label1.Name = "label1";
             label1.Size = new Size(213, 47);
             label1.TabIndex = 0;
-            label1.Text = "Subdy.net";
+            label1.Text = "Golike.net";
             // 
             // label2
             // 
@@ -68,7 +68,7 @@
             label2.Name = "label2";
             label2.Size = new Size(107, 29);
             label2.TabIndex = 1;
-            label2.Text = "Giải pháp MMO";
+            label2.Text = "Golike Auto PhoneFarm";
             label2.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // button9

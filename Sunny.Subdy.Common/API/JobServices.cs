@@ -26,6 +26,15 @@ namespace Sunny.Subdy.Common.API
                         JobTypes.Comment
                     };
 
+                case PlatformModel.Instagram:
+                    return new List<string>
+                    {
+                        JobTypes.Follow,
+                        JobTypes.Like,
+                        JobTypes.Comment,
+                        JobTypes.Share
+                    };
+
                 default:
                     return new List<string>();
             }

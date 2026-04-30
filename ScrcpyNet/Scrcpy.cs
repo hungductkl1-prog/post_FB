@@ -66,49 +66,72 @@ namespace ScrcpyNet
             if (Connected)
                 throw new Exception("Already connected.");
 
-           // UpdatePort();
-            MobileServerSetup();
-
-            listener = new TcpListener(IPAddress.Loopback, this.port);
-            listener.Start();
-
-            MobileServerStart();
-
-            int waitTimeMs = 0;
-            while (!listener.Pending())
+            bool started = false;
+            try
             {
-                Thread.Sleep(10);
-                waitTimeMs += 10;
+                MobileServerSetup();
 
-                if (waitTimeMs > timeoutMs)
-                    throw new Exception("Timeout while waiting for server to connect.");
+                listener = new TcpListener(IPAddress.Loopback, this.port);
+                listener.Start();
+
+                MobileServerStart();
+
+                int waitTimeMs = 0;
+                while (!listener.Pending())
+                {
+                    Thread.Sleep(10);
+                    waitTimeMs += 10;
+
+                    if (waitTimeMs > timeoutMs)
+                        throw new Exception($"[{device.Serial}] Timeout while waiting for server to connect on port {this.port}.");
+                }
+
+                videoClient = listener.AcceptTcpClient();
+                log.Information("[{Serial}] Video socket connected (port {Port}).", device.Serial, this.port);
+
+                // Wait briefly for the second (control) socket — server opens them sequentially
+                int ctrlWait = 0;
+                while (!listener.Pending() && ctrlWait < 2000)
+                {
+                    Thread.Sleep(10);
+                    ctrlWait += 10;
+                }
+                if (!listener.Pending())
+                    throw new Exception($"[{device.Serial}] Server is not sending a second connection request. Is 'control' disabled?");
+
+                controlClient = listener.AcceptTcpClient();
+                log.Information("[{Serial}] Control socket connected.", device.Serial);
+
+                ReadDeviceInfo();
+
+                cts = new CancellationTokenSource();
+
+                bufferThread = new Thread(BufferMain) { Name = $"ScrcpyNet Buffer {device.Serial}", IsBackground = true };
+                bufferThread.Start();
+                videoThread = new Thread(VideoMain) { Name = $"ScrcpyNet Video {device.Serial}", IsBackground = true };
+                controlThread = new Thread(ControllerMain) { Name = $"ScrcpyNet Controller {device.Serial}", IsBackground = true };
+
+                videoThread.Start();
+                controlThread.Start();
+
+                Connected = true;
+                started = true;
             }
-
-            videoClient = listener.AcceptTcpClient();
-            log.Information("Video socket connected.");
-
-            if (!listener.Pending())
-                throw new Exception("Server is not sending a second connection request. Is 'control' disabled?");
-
-            controlClient = listener.AcceptTcpClient();
-            log.Information("Control socket connected.");
-
-            ReadDeviceInfo();
-
-            cts = new CancellationTokenSource();
-
-            bufferThread = new Thread(BufferMain);
-            bufferThread.Start();
-            videoThread = new Thread(VideoMain) { Name = "ScrcpyNet Video" };
-            controlThread = new Thread(ControllerMain) { Name = "ScrcpyNet Controller" };
-
-            videoThread.Start();
-            controlThread.Start();
-
-            Connected = true;
-
-            // ADB forward/reverse is not needed anymore.
-            MobileServerCleanup();
+            finally
+            {
+                // ADB reverse not needed once both TCP sockets are established.
+                // Also cleanup khi Start() fail giữa chừng để tránh leak reverse forward + listener.
+                try { MobileServerCleanup(); } catch { }
+                if (!started)
+                {
+                    try { listener?.Stop(); } catch { }
+                    try { videoClient?.Close(); } catch { }
+                    try { controlClient?.Close(); } catch { }
+                    listener = null;
+                    videoClient = null;
+                    controlClient = null;
+                }
+            }
         }
 
         private void UpdatePort()
@@ -159,14 +182,15 @@ namespace ScrcpyNet
             {
                 try { cts?.Cancel(); } catch { }
 
-                try { videoThread?.Join(); } catch { }
-                try { controlThread?.Join(); } catch { }
-                try { bufferThread?.Join(); } catch { }
-
-                try { listener?.Stop(); } catch { }
-
+                // Đóng socket trước để các Read/Write đang block bị wake-up
                 try { videoClient?.Close(); } catch { }
                 try { controlClient?.Close(); } catch { }
+                try { listener?.Stop(); } catch { }
+
+                // Join với timeout 1s — tránh treo UI khi đóng form
+                try { if (videoThread != null && !videoThread.Join(1000)) log.Warning("[{Serial}] Video thread did not exit in time.", device.Serial); } catch { }
+                try { if (controlThread != null && !controlThread.Join(1000)) log.Warning("[{Serial}] Control thread did not exit in time.", device.Serial); } catch { }
+                try { if (bufferThread != null && !bufferThread.Join(1000)) log.Warning("[{Serial}] Buffer thread did not exit in time.", device.Serial); } catch { }
 
                 videoThread = null;
                 controlThread = null;
@@ -373,6 +397,11 @@ namespace ScrcpyNet
             }
         }
 
+        // scrcpy-server v1.23 hard-code abstract socket name = "scrcpy"
+        // Mỗi device có namespace abstract socket riêng (theo serial) → không đè nhau giữa các device
+        // Chỉ cần đảm bảo reverse forward cũ được xoá đúng cách trước khi tạo lại
+        private const string AbstractSocket = "localabstract:scrcpy";
+
         private void MobileServerSetup()
         {
             MobileServerCleanup();
@@ -380,18 +409,17 @@ namespace ScrcpyNet
             // Push scrcpy-server.jar
             UploadMobileServer();
 
-            // Create port reverse rule
-            adb.CreateReverseForward(device, "localabstract:scrcpy", $"tcp:{this.port}", true);
+            // Create reverse: device's localabstract:scrcpy ↔ host tcp:{port}
+            adb.CreateReverseForward(device, AbstractSocket, $"tcp:{this.port}", true);
         }
 
         /// <summary>
-        /// Remove ADB forwards/reverses.
+        /// Xóa reverse forward của device này (chỉ tác động lên device hiện tại,
+        /// không ảnh hưởng các device khác đang chạy song song).
         /// </summary>
         private void MobileServerCleanup()
         {
-            // Chỉ xóa reverse forward của chính device này, không dùng RemoveAll
-            // vì RemoveAll sẽ xóa luôn forward của các device khác đang chạy song song
-            try { adb.CreateReverseForward(device, "localabstract:scrcpy", $"tcp:{this.port}", true); } catch { }
+            try { adb.RemoveReverseForward(device, AbstractSocket); } catch { }
         }
 
         /// <summary>
@@ -407,7 +435,10 @@ namespace ScrcpyNet
 
             string version = "1.23";
             int maxFramerate = 60;
-            ScrcpyLockVideoOrientation orientation = ScrcpyLockVideoOrientation.Unlocked; // -1 means allow rotate
+            // Khoá stream về portrait natural (0). Kể cả khi device chưa kịp xoay
+            // dọc theo settings ADB hoặc app FB tự request landscape, scrcpy server
+            // vẫn rotate frame về portrait → user không thấy frame landscape.
+            ScrcpyLockVideoOrientation orientation = ScrcpyLockVideoOrientation.Orientation0;
             bool control = true;
             bool showTouches = false;
             bool stayAwake = false;

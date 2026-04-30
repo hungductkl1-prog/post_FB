@@ -107,10 +107,9 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             break;
                         }
                     case var c when XpathManagerFacebook.Get(XpathType.CP282).Contains(c):
+                        return new SubdyExtension(SubdyEnum.CP_282, $"Tài khoản bị checkpoint 282 [{XpathHelper.ExtractReadable(c)}]");
                     case var x when XpathManagerFacebook.Get(XpathType.Captcha).Contains(x):
-                        {
-                            return new SubdyExtension(SubdyEnum.CP_282, $"Tài khoản bị. [{_case}]");
-                        }
+                        return new SubdyExtension(SubdyEnum.Captcha, $"Tài khoản bị yêu cầu captcha [{XpathHelper.ExtractReadable(x)}]");
                     case "//*[@text=\"Enter your confirmation code\"]":
                         {
                             string code = await GetCode();

@@ -116,7 +116,7 @@
             windowBar.Name = "windowBar";
             windowBar.ShowIcon = true;
             windowBar.Size = new Size(360, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", 6.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            windowBar.SubFont = new Font("Microsoft Sans Serif", LamToolAutoPhonePrime.Utils.Design.FontScale.Caption, FontStyle.Regular, GraphicsUnit.Point, 0);
             windowBar.SubGap = 1;
             windowBar.SubText = "";
             windowBar.TabIndex = 186;

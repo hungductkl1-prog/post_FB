@@ -167,7 +167,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             lblHint.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             lblHint.AutoSize = true;
             lblHint.BackColor = Color.Transparent;
-            lblHint.Font = new Font("Segoe UI", 8.5F);
+            lblHint.Font = new Font("Segoe UI", LamToolAutoPhonePrime.Utils.Design.FontScale.Body);
             lblHint.ForeColor = Color.FromArgb(0, 153, 51);
             lblHint.Location = new Point(15, 265);
             lblHint.Name = "lblHint";

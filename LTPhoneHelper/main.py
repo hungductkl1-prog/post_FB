@@ -1,9 +1,9 @@
 """
-LTPhoneHelper - Tự động cài đặt môi trường cho LamToolAutoPhonePrime
+GolikeHelper - Tự động cài đặt môi trường cho GolikePhoneFarm
 
 Thứ tự cài đặt:
   1. Visual C++ Redistributable (x64 + x86)
-  2. LTHelper (ADB)
+  2. GolikeHelper (ADB)
   3. Node.js
   4. Verify toàn bộ
 """
@@ -38,62 +38,28 @@ def is_admin():
         return False
 
 
-def request_admin():
-    """Re-launch script as administrator. Copies to local temp if on network/shared drive."""
-    if is_admin():
-        return False
-
-    print("  Yeu cau quyen Administrator...")
-    try:
-        exe_path = os.path.abspath(sys.argv[0])
-        args = " ".join(sys.argv[1:])
-
-        # If running from network/shared drive, copy to local temp first
-        drive = os.path.splitdrive(exe_path)[0].upper()
-        is_network = exe_path.startswith("\\\\") or (drive and drive not in ("C:", "D:", "E:"))
-        if is_network:
-            import shutil
-            local_copy = os.path.join(os.environ.get("TEMP", "C:\\Temp"), os.path.basename(exe_path))
-            print(f"  Copy to local: {local_copy}")
-            shutil.copy2(exe_path, local_copy)
-            exe_path = local_copy
-
-        ret = ctypes.windll.shell32.ShellExecuteW(
-            None, "runas", exe_path, args, None, 1
-        )
-        # ShellExecuteW returns >32 on success
-        if ret > 32:
-            sys.exit(0)
-        else:
-            print(f"  [WARN] Khong the yeu cau quyen Admin (code={ret})")
-            print("  Tiep tuc chay khong co quyen Admin...")
-            return False
-    except Exception as e:
-        print(f"  [WARN] Loi yeu cau Admin: {e}")
-        print("  Tiep tuc chay khong co quyen Admin...")
-        return False
-
-
 def main():
     computer_name = get_computer_name()
 
     print(f"\n{'#'*50}")
     print(f"  Xin chao {computer_name}")
-    print(f"  LTPhoneHelper - Cai dat moi truong tu dong")
+    print(f"  GolikeHelper - Cai dat moi truong tu dong")
     print(f"{'#'*50}")
 
-    # Check admin privileges
+    # Exe was built with uac_admin=True → UAC prompt fires before process starts.
+    # If we reach here without admin (e.g. blocked by AppLocker / network drive),
+    # fail-fast with non-zero exit code so parent C# process knows setup failed.
     if not is_admin():
-        print(f"\n  {YELLOW}[!] Can quyen Administrator de cai dat.")
-        print(f"  Dang yeu cau quyen Admin...{RESET}")
-        request_admin()
-        # If we get here, admin request failed - continue anyway
+        print(f"\n  {RED}[!] Khong co quyen Administrator.")
+        print(f"  Vui long chay GolikeHelper.exe voi quyen Admin (Right-click > Run as administrator).{RESET}")
+        input("\n  Nhan Enter de thoat...")
+        sys.exit(1)
 
     print_step("Bắt đầu cài đặt")
 
     steps = [
         ("Visual C++", setup_vcredist),
-        ("LTHelper (ADB)", setup_env),
+        ("GolikeHelper (ADB)", setup_env),
         ("Node.js", setup_node),
     ]
     total = len(steps)

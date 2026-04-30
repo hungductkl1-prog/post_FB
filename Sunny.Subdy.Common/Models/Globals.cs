@@ -31,7 +31,7 @@ namespace Sunny.Subdy.Common.Models
             return listField;
         }
         public static string DeviceId = Guid.NewGuid().ToString();
-        public static string NameApp = "subdyfarm";
+        public static string NameApp = "auto-phone-farm";
         public static DataGridView DataGridView { get; set; } = new DataGridView();
         public static User User { get; set; }
         public static CancellationTokenSource CancellationTokenSource;
@@ -39,6 +39,7 @@ namespace Sunny.Subdy.Common.Models
         public static ToolStripMenuItem JobTotal_toolStripMenuItem { get; set; }
         public static ToolStripDropDownButton ToolStripDropDownButton1 { get; set; }
         public static Label CoinLable { get; set; }
+        public static Label PendingLable { get; set; }
         public static List<string> Gmails { get; set; } = new List<string>();
         public static readonly object Lock = new object();
 

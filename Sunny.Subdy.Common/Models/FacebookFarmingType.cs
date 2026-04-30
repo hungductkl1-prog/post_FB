@@ -47,6 +47,58 @@
         public const string HDDongBoDanhBa = "HDDongBoDanhBa";
         public const string HDTimKiemGoogle = "HDTimKiemGoogle";
         public const string HDNhanTinBanBe = "HDNhanTinBanBe";
+
+        // Sub-mode tách theo MaxPhoneFarm (decision 3)
+        public const string HDXemWatchTheoTuKhoa = "HDXemWatchTheoTuKhoa";
+        public const string HDXemWatchOld = "HDXemWatchOld";
+        public const string HDTuongTacReelChiDinh = "HDTuongTacReelChiDinh";
+        public const string HDTuongTacReelTuKhoa = "HDTuongTacReelTuKhoa";
+        public const string HDTuongTacBaiVietChiDinh = "HDTuongTacBaiVietChiDinh";
+        public const string HDTuongTacBaiVietTuKhoa = "HDTuongTacBaiVietTuKhoa";
+        public const string HDTuongTacBaiVietIA = "HDTuongTacBaiVietIA";
+        public const string HDTuongTacVideo = "HDTuongTacVideo";
+        public const string HDKetBanGoiY = "HDKetBanGoiY";
+        public const string HDKetBanTepUid = "HDKetBanTepUid";
+        public const string HDKetBanTepUidNew = "HDKetBanTepUidNew";
+        public const string HDKetBanTheoTuKhoa = "HDKetBanTheoTuKhoa";
+        public const string HDKetBanVoiBanCuaBanBe = "HDKetBanVoiBanCuaBanBe";
+        public const string HDKetBanVoiBanBeCuaUid = "HDKetBanVoiBanBeCuaUid";
+        public const string HDKetBanThanhVienNhom = "HDKetBanThanhVienNhom";
+        public const string HDKetBanNewfeed = "HDKetBanNewfeed";
+        public const string HDThamGiaNhomGoiY = "HDThamGiaNhomGoiY";
+        public const string HDThamGiaNhomTuKhoa = "HDThamGiaNhomTuKhoa";
+        public const string HDThamGiaNhomUid = "HDThamGiaNhomUid";
+        public const string HDHuyLoiMoiKetBan = "HDHuyLoiMoiKetBan";
+        public const string HDBaiVietBanBe = "HDBaiVietBanBe";
+        public const string HDBaiVietFanpage = "HDBaiVietFanpage";
+        public const string HDBaiVietNewsfeed = "HDBaiVietNewsfeed";
+        public const string HDBaiVietNewsfeedv2 = "HDBaiVietNewsfeedv2";
+        public const string HDBaiVietNhom = "HDBaiVietNhom";
+        public const string HDChiaSeLivestream = "HDChiaSeLivestream";
+        public const string HDNhanTinPage = "HDNhanTinPage";
+        public const string HDPhanHoiTinNhan = "HDPhanHoiTinNhan";
+        public const string HDTruyCapWebsite = "HDTruyCapWebsite";
+
+        // Form 2B (decision 1) — Spam/Report/Buff/Seeding/khác
+        public const string HDChocBanBe = "HDChocBanBe";
+        public const string HDChucMungSinhNhat = "HDChucMungSinhNhat";
+        public const string HDChaySeeding = "HDChaySeeding";
+        public const string HDSeedingByVideo = "HDSeedingByVideo";
+        public const string HDSeedingEvents = "HDSeedingEvents";
+        public const string HDSpamBaiViet = "HDSpamBaiViet";
+        public const string HDSpamBanBe = "HDSpamBanBe";
+        public const string HDSpamNewfeed = "HDSpamNewfeed";
+        public const string HDSpamNhom = "HDSpamNhom";
+        public const string HDReport = "HDReport";
+        public const string HDReportVideo = "HDReportVideo";
+        public const string HDXoaReel = "HDXoaReel";
+        public const string HDBackupData = "HDBackupData";
+        public const string HDVerifyAccount = "HDVerifyAccount";
+        public const string HDKhangSpam = "HDKhangSpam";
+        public const string HDBuffTinNhanProfile = "HDBuffTinNhanProfile";
+        public const string HDBuffLikeComment = "HDBuffLikeComment";
+        public const string HDBuffFollowLikePage = "HDBuffFollowLikePage";
+        public const string HDCauHinhTaiKhoan = "HDCauHinhTaiKhoan";
         public readonly static Dictionary<string, string> DictionariesAction = new Dictionary<string, string>
         {
              { HDDocThongBao, "Đọc thông báo" },
@@ -94,6 +146,58 @@
              { HDDongBoDanhBa, "Đồng bộ danh bạ" },
              { HDTimKiemGoogle, "Tìm kiếm google" },
              { HDNhanTinBanBe, "Nhắn tin" },
+
+             // Sub-mode
+             { HDXemWatchTheoTuKhoa, "Xem watch theo từ khóa" },
+             { HDXemWatchOld, "Xem watch (cũ)" },
+             { HDTuongTacReelChiDinh, "Tương tác reel chỉ định" },
+             { HDTuongTacReelTuKhoa, "Tương tác reel theo từ khóa" },
+             { HDTuongTacBaiVietChiDinh, "Tương tác bài viết chỉ định" },
+             { HDTuongTacBaiVietTuKhoa, "Tương tác bài viết theo từ khóa" },
+             { HDTuongTacBaiVietIA, "Tương tác bài viết AI" },
+             { HDTuongTacVideo, "Tương tác video" },
+             { HDKetBanGoiY, "Kết bạn gợi ý" },
+             { HDKetBanTepUid, "Kết bạn theo tệp UID" },
+             { HDKetBanTepUidNew, "Kết bạn theo tệp UID (mới)" },
+             { HDKetBanTheoTuKhoa, "Kết bạn theo từ khóa" },
+             { HDKetBanVoiBanCuaBanBe, "Kết bạn với bạn của bạn bè" },
+             { HDKetBanVoiBanBeCuaUid, "Kết bạn với bạn bè của UID" },
+             { HDKetBanThanhVienNhom, "Kết bạn thành viên nhóm" },
+             { HDKetBanNewfeed, "Kết bạn từ newfeed" },
+             { HDThamGiaNhomGoiY, "Tham gia nhóm gợi ý" },
+             { HDThamGiaNhomTuKhoa, "Tham gia nhóm theo từ khóa" },
+             { HDThamGiaNhomUid, "Tham gia nhóm theo UID" },
+             { HDHuyLoiMoiKetBan, "Hủy lời mời kết bạn" },
+             { HDBaiVietBanBe, "Đăng bài viết của bạn bè" },
+             { HDBaiVietFanpage, "Đăng bài viết fanpage" },
+             { HDBaiVietNewsfeed, "Đăng bài viết từ newsfeed" },
+             { HDBaiVietNewsfeedv2, "Đăng bài viết từ newsfeed v2" },
+             { HDBaiVietNhom, "Đăng bài viết nhóm" },
+             { HDChiaSeLivestream, "Chia sẻ livestream" },
+             { HDNhanTinPage, "Nhắn tin page" },
+             { HDPhanHoiTinNhan, "Phản hồi tin nhắn" },
+             { HDTruyCapWebsite, "Truy cập website" },
+
+             // Form 2B
+             { HDChocBanBe, "Chọc bạn bè" },
+             { HDChucMungSinhNhat, "Chúc mừng sinh nhật" },
+             { HDChaySeeding, "Chạy seeding" },
+             { HDSeedingByVideo, "Seeding theo video" },
+             { HDSeedingEvents, "Seeding theo event" },
+             { HDSpamBaiViet, "Spam bài viết" },
+             { HDSpamBanBe, "Spam bạn bè" },
+             { HDSpamNewfeed, "Spam newfeed" },
+             { HDSpamNhom, "Spam nhóm" },
+             { HDReport, "Report" },
+             { HDReportVideo, "Report video" },
+             { HDXoaReel, "Xóa reel" },
+             { HDBackupData, "Backup dữ liệu" },
+             { HDVerifyAccount, "Verify tài khoản" },
+             { HDKhangSpam, "Kháng spam" },
+             { HDBuffTinNhanProfile, "Buff tin nhắn profile" },
+             { HDBuffLikeComment, "Buff like comment" },
+             { HDBuffFollowLikePage, "Buff follow + like page" },
+             { HDCauHinhTaiKhoan, "Cấu hình tài khoản" },
         };
         public readonly static Dictionary<string, string> DescriptionAction = new Dictionary<string, string>
 {
@@ -151,6 +255,58 @@
     { HDDongBoDanhBa, "Đồng bộ danh bạ điện thoại lên Facebook..." },
     { HDTimKiemGoogle, "Tìm kiếm Google theo keyword, lướt xem website..." },
     { HDNhanTinBanBe, "Gửi tin nhắn đến bạn bè/người dùng..." },
+
+    // Sub-mode
+    { HDXemWatchTheoTuKhoa, "Xem Facebook Watch theo từ khóa chỉ định..." },
+    { HDXemWatchOld, "Xem Watch (phiên bản cũ)..." },
+    { HDTuongTacReelChiDinh, "Xem và tương tác với reel chỉ định qua link/UID..." },
+    { HDTuongTacReelTuKhoa, "Tìm reel theo từ khóa rồi tương tác..." },
+    { HDTuongTacBaiVietChiDinh, "Tương tác với bài viết chỉ định qua link/ID..." },
+    { HDTuongTacBaiVietTuKhoa, "Tìm bài viết theo từ khóa rồi tương tác..." },
+    { HDTuongTacBaiVietIA, "Tương tác bài viết sử dụng AI phân tích nội dung..." },
+    { HDTuongTacVideo, "Xem và tương tác video..." },
+    { HDKetBanGoiY, "Kết bạn với danh sách gợi ý..." },
+    { HDKetBanTepUid, "Kết bạn theo danh sách UID từ tệp..." },
+    { HDKetBanTepUidNew, "Kết bạn theo tệp UID (phiên bản mới)..." },
+    { HDKetBanTheoTuKhoa, "Tìm người dùng theo từ khóa rồi kết bạn..." },
+    { HDKetBanVoiBanCuaBanBe, "Kết bạn với bạn của bạn bè..." },
+    { HDKetBanVoiBanBeCuaUid, "Kết bạn với bạn bè của UID chỉ định..." },
+    { HDKetBanThanhVienNhom, "Kết bạn với thành viên trong nhóm..." },
+    { HDKetBanNewfeed, "Kết bạn với người dùng xuất hiện trên newfeed..." },
+    { HDThamGiaNhomGoiY, "Tham gia nhóm gợi ý..." },
+    { HDThamGiaNhomTuKhoa, "Tìm nhóm theo từ khóa rồi tham gia..." },
+    { HDThamGiaNhomUid, "Tham gia nhóm theo UID/link..." },
+    { HDHuyLoiMoiKetBan, "Hủy các lời mời kết bạn đã gửi..." },
+    { HDBaiVietBanBe, "Đăng bài viết của bạn bè..." },
+    { HDBaiVietFanpage, "Đăng bài từ fanpage..." },
+    { HDBaiVietNewsfeed, "Đăng bài lấy từ newsfeed..." },
+    { HDBaiVietNewsfeedv2, "Đăng bài lấy từ newsfeed (phiên bản 2)..." },
+    { HDBaiVietNhom, "Đăng bài lấy từ nhóm..." },
+    { HDChiaSeLivestream, "Chia sẻ livestream..." },
+    { HDNhanTinPage, "Gửi tin nhắn tới page..." },
+    { HDPhanHoiTinNhan, "Phản hồi tin nhắn tự động..." },
+    { HDTruyCapWebsite, "Truy cập website theo URL..." },
+
+    // Form 2B
+    { HDChocBanBe, "Chọc (poke) bạn bè..." },
+    { HDChucMungSinhNhat, "Tự động chúc mừng sinh nhật bạn bè..." },
+    { HDChaySeeding, "Chạy seeding theo danh sách job..." },
+    { HDSeedingByVideo, "Seeding theo danh sách video..." },
+    { HDSeedingEvents, "Seeding theo danh sách event..." },
+    { HDSpamBaiViet, "Spam bình luận/tương tác bài viết hàng loạt..." },
+    { HDSpamBanBe, "Spam bạn bè..." },
+    { HDSpamNewfeed, "Spam newfeed..." },
+    { HDSpamNhom, "Spam nhóm..." },
+    { HDReport, "Report đối tượng (user/page/group)..." },
+    { HDReportVideo, "Report video..." },
+    { HDXoaReel, "Xóa reel đã đăng..." },
+    { HDBackupData, "Backup dữ liệu tài khoản..." },
+    { HDVerifyAccount, "Verify tài khoản theo quy trình..." },
+    { HDKhangSpam, "Kháng checkpoint/spam..." },
+    { HDBuffTinNhanProfile, "Buff tin nhắn profile..." },
+    { HDBuffLikeComment, "Buff like cho comment..." },
+    { HDBuffFollowLikePage, "Buff follow + like page..." },
+    { HDCauHinhTaiKhoan, "Cấu hình tài khoản (giới tính, bio, ...)..." },
 };
 
     }

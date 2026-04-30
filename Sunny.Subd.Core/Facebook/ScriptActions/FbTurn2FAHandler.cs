@@ -48,10 +48,9 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         device.ElementWithAttributes(c);
                         break;
                     case var c when XpathManagerFacebook.Get(XpathType.CP282).Contains(c):
+                        return new SubdyExtension(SubdyEnum.CP_282, $"Tài khoản bị checkpoint 282 [{XpathHelper.ExtractReadable(c)}]");
                     case var x when XpathManagerFacebook.Get(XpathType.Captcha).Contains(x):
-                        {
-                            return new SubdyExtension(SubdyEnum.CP_282, $"Tài khoản bị. [{_case}]");
-                        }
+                        return new SubdyExtension(SubdyEnum.Captcha, $"Tài khoản bị yêu cầu captcha [{XpathHelper.ExtractReadable(x)}]");
                     case "//*[@text=\"Two-factor authentication\"]":
                         {
                             var xml = device.FindElements(10, "", "//*[contains(@text, 'Facebook')]");
@@ -80,7 +79,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                     case "//*[@text=\"You can't make this change right now\"]":
                         {
-                            return new SubdyExtension(SubdyEnum.Stop, $"Đã bị chặn khi bật 2FA. [{_case}]");
+                            return new SubdyExtension(SubdyEnum.Stop, $"Đã bị chặn khi bật 2FA [You can't make this change right now]");
                         }
                     case "//*[@text=\"Get a code from an authentication app\"]":
                         {

@@ -19,6 +19,34 @@ namespace AutoAndroid
         Random random = new Random();
         Stopwatch stopwatch = new Stopwatch();
         public bool Running { get; set; } = true;
+
+        /// <summary>
+        /// Ném OperationCanceledException nếu cờ Running bị tắt.
+        /// Gọi ở đầu/trong mọi vòng lặp dài để tool thoát ngay khi người dùng nhấn Dừng.
+        /// </summary>
+        public void ThrowIfStopped()
+        {
+            if (!Running)
+            {
+                throw new OperationCanceledException("Tool đã dừng (ADBClient.Running = false).");
+            }
+        }
+
+        /// <summary>
+        /// Sleep có thể hủy: chia nhỏ 100ms và kiểm tra Running liên tục.
+        /// </summary>
+        private void InterruptibleSleep(int milliseconds)
+        {
+            const int step = 100;
+            int elapsed = 0;
+            while (elapsed < milliseconds)
+            {
+                ThrowIfStopped();
+                int wait = Math.Min(step, milliseconds - elapsed);
+                Thread.Sleep(wait);
+                elapsed += wait;
+            }
+        }
         public LogHelper LogHelper
         {
             get => _logHelper ??= new LogHelper(Device);
@@ -51,22 +79,22 @@ namespace AutoAndroid
         private bool IsAppiumMode => _currentAutomationType == AutomationType.Appium;
         public DeviceModel Create(string serial)
         {
-            DeviceModel model =null;
+            DeviceModel model = null;
             using var _client = new ADBSocket(serial);
             try
             {
                 model = new DeviceModelContext().GetBySerial(serial);
-                if (model== null)
+                if (model == null)
                 {
                     model = new DeviceModel();
                     model.Serial = serial;
-                    
+
                 }
             }
             catch
             {
             }
-           
+
             model.Port = _client.ForwardPort(7912);
             string name = ProcessHelper.RunAdbWithTimeout($"-s {serial} shell settings get global device_name");
             string version = ProcessHelper.RunAdbWithTimeout($"-s {serial} shell getprop ro.build.version.release");
@@ -74,8 +102,7 @@ namespace AutoAndroid
             model.OS = version;
             model.TypeColor = 0;
             model.Checked = false;
-            ProcessHelper.RunAdbWithTimeout($"-s {serial} shell settings put system user_rotation 0");
-            ProcessHelper.RunAdbWithTimeout($"-s {serial} shell settings put system accelerometer_rotation 0");
+            // Rotation đã được force tại DeviceServices.LoadDeviceInfo khi detect device.
             return model;
         }
         public DeviceModel Device { get; set; }
@@ -88,8 +115,7 @@ namespace AutoAndroid
             maxChange = new MaxChangeService(this);
             ADBKeyboardService = new ADBKeyboardService(this);
             _clipboardService = new ClipboardService(this);
-            ProcessHelper.RunAdbWithTimeout($"-s {Device.Serial} shell settings put system user_rotation 0");
-            ProcessHelper.RunAdbWithTimeout($"-s {Device.Serial} shell settings put system accelerometer_rotation 0");
+            // Rotation đã được force tại DeviceServices.LoadDeviceInfo khi detect device.
         }
         public async Task<bool> TurnOnADBKeyboard()
         {
@@ -127,6 +153,7 @@ namespace AutoAndroid
                 int startTick = Environment.TickCount;
                 while (true)
                 {
+                    ThrowIfStopped();
                     if (xmlSource == "")
                     {
                         xmlSource = GetXMLSource();
@@ -177,6 +204,7 @@ namespace AutoAndroid
             int startTick = Environment.TickCount;
             while (true)
             {
+                ThrowIfStopped();
                 if (bitmap == null)
                 {
                     bitmap = Screenshot();
@@ -215,6 +243,7 @@ namespace AutoAndroid
                 int startTick = Environment.TickCount;
                 while (true)
                 {
+                    ThrowIfStopped();
                     if (sourceImage == null)
                     {
                         sourceImage = Screenshot();
@@ -298,6 +327,7 @@ namespace AutoAndroid
 
                 while (true)
                 {
+                    ThrowIfStopped();
                     if (screenBitmap == null)
                     {
                         screenBitmap = Screenshot();
@@ -412,12 +442,13 @@ namespace AutoAndroid
             ADB.Shell("wait-for-device", 120);
             while (!ADB.Shell("getprop sys.boot_completed").Equals("1"))
             {
+                ThrowIfStopped();
                 LogHelper.SUCCESS("Khởi động máy thành công!");
             }
             Stopwatch stopwatch = Stopwatch.StartNew();
             while (stopwatch.ElapsedMilliseconds < 15000)
             {
-
+                ThrowIfStopped();
                 if (Connect(CurrentAutomationType))
                 {
                     return true;
@@ -506,6 +537,7 @@ namespace AutoAndroid
 
             for (int attempt = 0; attempt < 3; attempt++)
             {
+                ThrowIfStopped();
                 try
                 {
                     if (!ConnectAdb())
@@ -547,10 +579,14 @@ namespace AutoAndroid
                     Device.TypeColor = 2;
                     return true;
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     LogHelper.Log($"Connect Exception lần {attempt + 1}: {ex.Message}");
-                    Thread.Sleep(500);
+                    InterruptibleSleep(500);
                 }
             }
 
@@ -580,9 +616,10 @@ namespace AutoAndroid
         public bool ConnectAdb()
         {
             LogHelper.Log($"Đang connect");
-            int index =0;
+            int index = 0;
             while (Running)
             {
+                ThrowIfStopped();
                 index++;
                 string text = ProcessHelper.RunAdbWithTimeout($"-s {Device.Serial} shell service check settings", 5);
                 // Phải có output hợp lệ (không phải empty/timeout) và không chứa "not found"
@@ -593,16 +630,18 @@ namespace AutoAndroid
                     LogHelper.Log($"Đã connect");
                     return true;
                 }
-                Device.IsLive =false;
+                Device.IsLive = false;
                 Device.IsAdbOnline = false;
                 string reason = string.IsNullOrWhiteSpace(text) ? "timeout/no response" : "Can't find service: settings";
                 LogHelper.Log($"Mất kết nối, chờ ExecuteAdb [{index}] cmd: {reason}");
+                ThrowIfStopped();
                 ProcessHelper.RunAdbCommand($"-s {Device.Serial} shell reconnect");
                 if (index > 10_000)
                 {
                     index = 0;
                 }
             }
+            ThrowIfStopped();
             return false;
         }
         public void AppClear(string package)
@@ -654,12 +693,14 @@ namespace AutoAndroid
         }
         public string Shell(params object[] argv)
         {
+            ThrowIfStopped();
             const int maxRetry = 3;
             int retry = 0;
             string result = "";
 
             while (retry < maxRetry)
             {
+                ThrowIfStopped();
                 try
                 {
                     return ADBSocket.Shell(Device.Serial, argv);
@@ -669,6 +710,7 @@ namespace AutoAndroid
                 catch (Exception ex)
                 {
                     LogHelper.Log($"[Shell] Exception lần {retry + 1}: {ex.Message}");
+                    ThrowIfStopped();
                     Connect(CurrentAutomationType);
                 }
 
@@ -804,12 +846,14 @@ namespace AutoAndroid
 
             return list;
         }
-        public void SetSize(int width = 1440, int height = 2560, int density = 560)
-        {
-            Shell("settings put system accelerometer_rotation 0");
-            Shell("settings put system user_rotation 0");
-            Shell("content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:0");
-        }
+       public void SetSize(int width = 1440, int height = 2560, int density = 560)
+{
+    Shell("settings put system accelerometer_rotation 0");
+    Shell("settings put system user_rotation 0");
+    Shell("content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:0");
+    Shell("wm size reset");
+    Shell("wm density reset");
+}
 
         public List<string> AppRunningList()
         {
@@ -893,9 +937,9 @@ namespace AutoAndroid
             System.Drawing.Point screen = GetScreenResolutionSafe();
             for (int i = 0; i < repeat; i++)
             {
-                int x      = (int)(screen.X * (0.30 + rnd.NextDouble() * 0.40)); // 30–70% ngang
+                int x = (int)(screen.X * (0.30 + rnd.NextDouble() * 0.40)); // 30–70% ngang
                 int startY = (int)(screen.Y * (0.60 + rnd.NextDouble() * 0.25)); // 60–85% dọc
-                int endY   = (int)(screen.Y * (0.15 + rnd.NextDouble() * 0.20)); // 15–35% dọc
+                int endY = (int)(screen.Y * (0.15 + rnd.NextDouble() * 0.20)); // 15–35% dọc
                 Swipe(x, startY, x, endY, duration);
                 if (i < repeat - 1 && delayBetweenSwipes > 0)
                     Thread.Sleep(delayBetweenSwipes);
@@ -908,9 +952,9 @@ namespace AutoAndroid
             System.Drawing.Point screen = GetScreenResolutionSafe();
             for (int i = 0; i < repeat; i++)
             {
-                int x      = (int)(screen.X * (0.30 + rnd.NextDouble() * 0.40)); // 30–70% ngang
+                int x = (int)(screen.X * (0.30 + rnd.NextDouble() * 0.40)); // 30–70% ngang
                 int startY = (int)(screen.Y * (0.15 + rnd.NextDouble() * 0.20)); // 15–35% dọc
-                int endY   = (int)(screen.Y * (0.60 + rnd.NextDouble() * 0.25)); // 60–85% dọc
+                int endY = (int)(screen.Y * (0.60 + rnd.NextDouble() * 0.25)); // 60–85% dọc
                 Swipe(x, startY, x, endY, duration);
                 if (i < repeat - 1 && delayBetweenSwipes > 0)
                     Thread.Sleep(delayBetweenSwipes);
@@ -920,11 +964,17 @@ namespace AutoAndroid
         public System.Drawing.Point GetScreenResolution()
         {
             string text = ADB.Shell("dumpsys display | Find \"mCurrentDisplayRect\"");
-            text = text.Substring(text.IndexOf("- "));
-            text = text.Substring(text.IndexOf(' '), text.IndexOf(')') - text.IndexOf(' '));
+            int dashIdx = text.IndexOf("- ");
+            if (dashIdx < 0) return GetScreenResolutionSafe();
+            text = text.Substring(dashIdx);
+            int spaceIdx = text.IndexOf(' ');
+            int parenIdx = text.IndexOf(')');
+            if (spaceIdx < 0 || parenIdx <= spaceIdx) return GetScreenResolutionSafe();
+            text = text.Substring(spaceIdx, parenIdx - spaceIdx);
             string[] array = text.Split(',');
-            int x = Convert.ToInt32(array[0].Trim());
-            int y = Convert.ToInt32(array[1].Trim());
+            if (array.Length < 2) return GetScreenResolutionSafe();
+            if (!int.TryParse(array[0].Trim(), out int x)) return GetScreenResolutionSafe();
+            if (!int.TryParse(array[1].Trim(), out int y)) return GetScreenResolutionSafe();
             return new System.Drawing.Point(x, y);
         }
         private System.Drawing.Point GetScreenResolutionSafe()
@@ -1116,6 +1166,7 @@ namespace AutoAndroid
                 int tickCount = Environment.TickCount;
                 while (true)
                 {
+                    ThrowIfStopped();
                     try
                     {
                         // 1. Chụp ảnh màn hình theo engine hiện tại
@@ -1170,7 +1221,7 @@ namespace AutoAndroid
             }
             LogHelper.SUCCESS($"Đang send text : {text}");
             ADBKeyboardService.Input(text.ToString(), false);
-          
+
         }
         public string GetTextFromScreenShotByATX(int timeout = 60000)
         {
@@ -1180,6 +1231,7 @@ namespace AutoAndroid
                 int tickCount = Environment.TickCount;
                 while (true)
                 {
+                    ThrowIfStopped();
                     try
                     {
                         // 1. Chụp ảnh màn hình theo engine hiện tại
@@ -1258,6 +1310,7 @@ namespace AutoAndroid
             const int maxRetries = 3;
             for (int attempt = 0; attempt < maxRetries; attempt++)
             {
+                ThrowIfStopped();
                 try
                 {
                     string xml = _currentAutomationType == AutomationType.Appium
@@ -1268,11 +1321,17 @@ namespace AutoAndroid
                     {
                         return xml;
                     }
+                    ThrowIfStopped();
                     Connect(CurrentAutomationType);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     LogHelper.Log($"GetXMLSource lỗi lần {attempt + 1}: {ex.Message}");
+                    ThrowIfStopped();
                     Connect(CurrentAutomationType);
                 }
             }
@@ -1959,23 +2018,30 @@ namespace AutoAndroid
         {
             try
             {
-                Shell("am", "start", "-n",
-                    "com.facebook.katana/.IntentUriHandler",
-                    $"\"fb://faceweb/f?href=https://accountscenter.facebook.com/profiles/{uid}/name\"");
-
-                // Retry đến khi thấy EditText trong XML
+                var urls = new List<string> { $"\"https://accountscenter.facebook.com/profiles/{uid}/name\"", $"\"fb://faceweb/f?href=https://accountscenter.facebook.com/profiles/{uid}/name\"" };
                 string xml = string.Empty;
-                for (int i = 0; i < 5; i++)
+                foreach (var url in urls)
                 {
-                    System.Threading.Thread.Sleep(3000);
-                    xml = GetXMLSource();
-                    if (!string.IsNullOrEmpty(xml) &&
-                        xml.Contains("android.widget.EditText", StringComparison.OrdinalIgnoreCase))
+                    Shell("am", "start", "-n",
+                   "com.facebook.katana/.IntentUriHandler",
+                   url);
+
+                    // Retry đến khi thấy EditText trong XML
+
+                    for (int i = 0; i < 5; i++)
+                    {
+                        System.Threading.Thread.Sleep(5000);
+                        xml = GetXMLSource();
+                        if (!string.IsNullOrEmpty(xml) &&
+                            xml.Contains("android.widget.EditText", StringComparison.OrdinalIgnoreCase))
+                            break;
+                    }
+                    if (!string.IsNullOrEmpty(xml))
                         break;
                 }
-
                 if (string.IsNullOrEmpty(xml))
                     return string.Empty;
+
 
                 // Dùng Linq to XML thay vì XmlDocument/XPath để tránh namespace issue
                 // Parse thủ công: tìm tất cả EditText, với mỗi EditText kiểm tra NextSibling có text = label
@@ -1985,9 +2051,9 @@ namespace AutoAndroid
                 // Lấy tất cả node EditText bằng cách duyệt toàn bộ cây
                 var allNodes = xmlDoc.SelectNodes("//*[@class='android.widget.EditText']");
 
-                string firstName  = string.Empty;
+                string firstName = string.Empty;
                 string middleName = string.Empty;
-                string lastName   = string.Empty;
+                string lastName = string.Empty;
 
                 if (allNodes != null)
                 {
@@ -2381,6 +2447,7 @@ namespace AutoAndroid
             long deadline = DateTimeOffset.Now.ToUnixTimeMilliseconds() + timeout;
             while (DateTimeOffset.Now.ToUnixTimeMilliseconds() < deadline)
             {
+                ThrowIfStopped();
                 try
                 {
                     if (front)
@@ -2618,7 +2685,7 @@ namespace AutoAndroid
             this.Shell("pm grant " + package + " android.permission.MANAGE_EXTERNAL_STORAGE");
 
         }
-        public async Task<string> GetIp(string state ="")
+        public async Task<string> GetIp(string state = "")
         {
             try
             {
@@ -2633,8 +2700,9 @@ namespace AutoAndroid
         {
             for (int i = 0; i < delay; i++)
             {
+                ThrowIfStopped();
                 LogHelper.Log($"Đang chờ {i + 1} giây");
-                Thread.Sleep(1000);
+                InterruptibleSleep(1000);
             }
 
         }
@@ -2643,8 +2711,9 @@ namespace AutoAndroid
             int value = random.Next(min, max);
             for (int i = 0; i < value; i++)
             {
+                ThrowIfStopped();
                 LogHelper.Log($"Đang chờ {i + 1} giây");
-                Thread.Sleep(1000);
+                InterruptibleSleep(1000);
             }
 
         }

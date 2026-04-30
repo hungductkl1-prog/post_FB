@@ -1,5 +1,6 @@
 ﻿using AntdUI;
 using LamToolAutoPhonePrime.Utils;
+using LamToolAutoPhonePrime.Utils.Design;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
@@ -106,14 +107,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
         private void btnShowOptimal_Click(object sender, EventArgs e)
         {
-            // Danh sách cột tối ưu cần hiển thị
+            // Danh sách cột "tối ưu" (đồng bộ với install-default trong ucdgvAccount.cs):
+            // chỉ giữ 5 cột chính + Họ và tên / Nhóm / Kịch bản / Trạng thái (core).
             var optimalColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "Họ và tên", "Mật khẩu", "2FA", "Cookie",
-                "Số điện thoại", "Email", "Nhóm", "Kịch bản",
-                "Proxy", "Ghi chú", "Hôm nay", "Total",
-                "Job success", "Job fail", "Lần tương tác cuối",
-                "Thiết bị", "Tình trạng", "Trạng thái"
+                "Họ và tên", "Nhóm", "Kịch bản",
+                "Total", "Hôm nay", "Lần tương tác cuối", "Xu",
+                "Tình trạng", "Trạng thái"
             };
 
             foreach (Control ctrl in flowLayoutPanel1.Controls)
