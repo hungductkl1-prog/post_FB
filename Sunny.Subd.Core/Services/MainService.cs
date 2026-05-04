@@ -792,6 +792,7 @@ namespace Sunny.Subd.Core.Services
                     _sate = "Chuẩn bị thiết bị và proxy";
                     if (!await ConnectAndPrepareDeviceAsync(true)) continue;
 
+                    
                     if (!await RestoreFacebookAsync()) continue;
 
                     int index = _settingGeneral.GetIntType("comboBox1", 0);

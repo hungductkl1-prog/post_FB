@@ -14,7 +14,7 @@ namespace Sunny.Subd.Core.Facebook
     public class FacebookHander
     {
         public const string DOWNLOAD_FACEBOOK = "https://www.facebook.com/download/direct/fb4a/";
-        public const string DOWNLOAD_INSTAGRAM = "https://vi.softonic.com/download/instagram/android/post-download/v/415.0.0.36.76?dt=internalDownload";
+        public const string DOWNLOAD_INSTAGRAM = "https://d.apkpure.com/b/APK/com.instagram.android?version=latest";
 
         public static string DownloadUrl(string platform)
         {

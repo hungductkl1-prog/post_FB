@@ -298,11 +298,63 @@ namespace AutoAndroid
         #endregion
 
         #region 下载
+        private const string DOWN_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+        /// <summary>
+        /// Dùng curl.exe (có sẵn từ Windows 10 1803+) cho các CDN check JA3 TLS fingerprint.
+        /// HttpClient của .NET dùng Schannel có fingerprint khác Chrome → bị Cloudflare/winudf reject 403.
+        /// </summary>
+        private static bool DownByCurl(string url, string tmpFile, string referer)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "curl.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true
+                };
+                psi.ArgumentList.Add("-sS");
+                psi.ArgumentList.Add("-L");
+                psi.ArgumentList.Add("--max-redirs"); psi.ArgumentList.Add("10");
+                psi.ArgumentList.Add("--fail");
+                psi.ArgumentList.Add("--retry"); psi.ArgumentList.Add("2");
+                psi.ArgumentList.Add("-A"); psi.ArgumentList.Add(DOWN_UA);
+                if (!string.IsNullOrEmpty(referer))
+                {
+                    psi.ArgumentList.Add("-H"); psi.ArgumentList.Add("Referer: " + referer);
+                }
+                psi.ArgumentList.Add("-o"); psi.ArgumentList.Add(tmpFile);
+                psi.ArgumentList.Add(url);
+
+                using (var p = System.Diagnostics.Process.Start(psi))
+                {
+                    p.WaitForExit(15 * 60 * 1000);
+                    return p.ExitCode == 0 && File.Exists(tmpFile) && new FileInfo(tmpFile).Length > 0;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static void GithubDown(string url, string file)
         {
             DownLock.EnterWriteLock();
             try
             {
+                // .NET Framework mặc định KHÔNG bật TLS 1.2. Nhiều CDN (Cloudflare, winudf, apkpure)
+                // sẽ reject TLS 1.0/1.1 thẳng tay → biểu hiện ra ngoài là 403/handshake fail.
+                try
+                {
+                    System.Net.ServicePointManager.SecurityProtocol |=
+                        System.Net.SecurityProtocolType.Tls12 | (System.Net.SecurityProtocolType)3072 /* Tls13 */;
+                }
+                catch { }
+
                 string path = Path.GetDirectoryName(file)?.Trim();
                 if (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
                 {
@@ -316,24 +368,101 @@ namespace AutoAndroid
 
                 string tmpFile = file + ".tmp";
 
+                // Tự suy luận origin (cho Referer) từ host gốc.
+                string originReferer = null;
+                bool useCurl = false;
+                try
+                {
+                    string host0 = new Uri(url).Host.ToLowerInvariant();
+                    if (host0.Contains("apkpure.com") || host0.EndsWith("winudf.com"))
+                    {
+                        originReferer = "https://apkpure.com/";
+                        useCurl = true; // apkpure/winudf check JA3 fingerprint, .NET HttpClient luôn 403
+                    }
+                    else if (host0.Contains("apkmirror.com"))
+                    {
+                        originReferer = "https://www.apkmirror.com/";
+                        useCurl = true;
+                    }
+                    else if (host0.Contains("apkcombo"))
+                    {
+                        originReferer = "https://apkcombo.com/";
+                        useCurl = true;
+                    }
+                }
+                catch { }
+
+                // Fallback bằng curl.exe cho các host check JA3 (CloudFlare bot detection).
+                if (useCurl && DownByCurl(url, tmpFile, originReferer))
+                {
+                    File.Move(tmpFile, file);
+                    return;
+                }
+
+                // TỰ follow redirect: HttpClient của .NET Framework có thể strip header
+                // (User-Agent / Referer) khi redirect cross-host → CDN nhận diện bot và trả 403.
                 using (var handler = new System.Net.Http.HttpClientHandler
                 {
-                    AllowAutoRedirect = true,
-                    MaxAutomaticRedirections = 10
+                    AllowAutoRedirect = false,
+                    UseCookies = true,
+                    CookieContainer = new System.Net.CookieContainer(),
+                    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
                 })
                 using (var client = new System.Net.Http.HttpClient(handler))
                 {
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-                    client.Timeout = TimeSpan.FromMinutes(10);
+                    client.Timeout = TimeSpan.FromMinutes(15);
 
-                    using (var response = client.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead).Result)
+                    string currentUrl = url;
+                    string currentReferer = originReferer;
+                    System.Net.Http.HttpResponseMessage response = null;
+
+                    for (int hop = 0; hop < 10; hop++)
                     {
-                        response.EnsureSuccessStatusCode();
+                        var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, currentUrl);
+                        // Dùng TryAddWithoutValidation để tránh parser .NET im lặng drop UA.
+                        req.Headers.TryAddWithoutValidation("User-Agent", DOWN_UA);
+                        req.Headers.TryAddWithoutValidation("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,application/octet-stream;q=0.9,image/avif,image/webp,*/*;q=0.8");
+                        req.Headers.TryAddWithoutValidation("Accept-Language", "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7");
+                        req.Headers.TryAddWithoutValidation("Upgrade-Insecure-Requests", "1");
+                        req.Headers.TryAddWithoutValidation("Sec-Fetch-Dest", "document");
+                        req.Headers.TryAddWithoutValidation("Sec-Fetch-Mode", "navigate");
+                        req.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "none");
+                        req.Headers.TryAddWithoutValidation("Sec-Fetch-User", "?1");
+                        if (!string.IsNullOrEmpty(currentReferer))
+                        {
+                            req.Headers.TryAddWithoutValidation("Referer", currentReferer);
+                        }
+
+                        response = client.SendAsync(req, System.Net.Http.HttpCompletionOption.ResponseHeadersRead).Result;
+
+                        int status = (int)response.StatusCode;
+                        if (status >= 300 && status < 400 && response.Headers.Location != null)
+                        {
+                            Uri next = response.Headers.Location.IsAbsoluteUri
+                                ? response.Headers.Location
+                                : new Uri(new Uri(currentUrl), response.Headers.Location);
+
+                            currentReferer = currentUrl; // Referer = URL trước
+                            currentUrl = next.ToString();
+                            response.Dispose();
+                            continue;
+                        }
+
+                        break;
+                    }
+
+                    using (response)
+                    {
+                        if (response == null || !response.IsSuccessStatusCode)
+                        {
+                            int code = response == null ? 0 : (int)response.StatusCode;
+                            throw new Exception($"Download fail HTTP {code} - finalUrl={currentUrl}");
+                        }
 
                         string contentType = response.Content.Headers.ContentType?.MediaType ?? "";
                         if (contentType.Contains("text/html"))
                         {
-                            throw new Exception($"URL trả về HTML thay vì file: {contentType}");
+                            throw new Exception($"URL trả về HTML thay vì file: {contentType} - finalUrl={currentUrl}");
                         }
 
                         long? expectedSize = response.Content.Headers.ContentLength;
@@ -366,6 +495,7 @@ namespace AutoAndroid
                     File.Delete(file);
                 if (File.Exists(file + ".tmp"))
                     File.Delete(file + ".tmp");
+                throw; // ném lại để caller biết, thay vì nuốt im lặng
             }
             finally
             {
