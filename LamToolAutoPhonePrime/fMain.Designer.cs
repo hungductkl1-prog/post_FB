@@ -419,6 +419,7 @@ namespace LamToolAutoPhonePrime
 
         private ucdgvAccount _ucFacebook;
         private ucdgvAccount _ucInstagram;
+        private ucdgvAccount _ucThreads;
         private ucHistoriesJob _ucHistoriesJob;
         public ucManagerDevices _ucDevices;
         private System.Windows.Forms.Panel panel1;

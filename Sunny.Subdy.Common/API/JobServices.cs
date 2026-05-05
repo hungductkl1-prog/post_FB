@@ -27,6 +27,7 @@ namespace Sunny.Subdy.Common.API
                     };
 
                 case PlatformModel.Instagram:
+                case PlatformModel.Threads:
                     return new List<string>
                     {
                         JobTypes.Follow,

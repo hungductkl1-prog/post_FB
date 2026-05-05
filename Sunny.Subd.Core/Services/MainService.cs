@@ -46,7 +46,7 @@ namespace Sunny.Subd.Core.Services
             {
                 _facebookService = new FacebookService();
             }
-            else if (platform == "Instagram")
+            else if (platform == PlatformModel.Instagram || platform == PlatformModel.Threads)
             {
                 _facebookService = new InstagramService();
             }
@@ -175,6 +175,7 @@ namespace Sunny.Subd.Core.Services
                             break;
                         }
                     case "Instagram":
+                    case PlatformModel.Threads:
                         {
                             Dictionary<string, string> info = await _facebookService.GetInfo(_client);
                             if (info.ContainsKey("username"))
@@ -222,6 +223,7 @@ namespace Sunny.Subd.Core.Services
                             break;
                         }
                     case "Instagram":
+                    case PlatformModel.Threads:
                         {
                             _backupRestoreHelper.BackupInstagram(fileProfile);
                             break;
@@ -535,6 +537,7 @@ namespace Sunny.Subd.Core.Services
                             break;
                         }
                     case "Instagram":
+                    case PlatformModel.Threads:
                         {
                             if (!_client.AppList().Contains(FacebookHander.Package(_platform)))
                             {
@@ -572,6 +575,7 @@ namespace Sunny.Subd.Core.Services
                         break;
                     }
                 case "Instagram":
+                case PlatformModel.Threads:
                     {
                         var value = await InstagramRequest.GetInfo(_account.Uid);
                         if (!value.ContainsKey("error"))
@@ -642,6 +646,7 @@ namespace Sunny.Subd.Core.Services
                             break;
                         }
                     case "Instagram":
+                    case PlatformModel.Threads:
                         {
                             await _backupRestoreHelper.RestoreInstagram(filezip);
                             break;
@@ -832,7 +837,7 @@ namespace Sunny.Subd.Core.Services
                             await farming.ExecuteAsync();
                         }
                     }
-                    else if (_platform == PlatformModel.Instagram)
+                    else if (_platform == PlatformModel.Instagram || _platform == PlatformModel.Threads)
                     {
                         // Mirror Facebook flow: script "Làm Job Golike" → SpamXuHandler (Golike API).
                         // Các kịch bản custom IG → InstagramFarming.

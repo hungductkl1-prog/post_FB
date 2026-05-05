@@ -33,6 +33,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             select4.Items.Clear();
             select4.Items.Add(PlatformModel.Facebook);
             select4.Items.Add(PlatformModel.Instagram);
+            select4.Items.Add(PlatformModel.Threads);
             select4.SelectedIndex = 0;
             selectDateRange.Items.Clear();
             selectDateRange.Items.AddRange(new object[] { "Tất cả", "3 tháng", "1 tháng", "7 ngày", "Hôm nay" });

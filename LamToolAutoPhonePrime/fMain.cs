@@ -42,7 +42,7 @@ namespace LamToolAutoPhonePrime
                 scriptCtx.PurgeFarmXu();
                 scriptCtx.RemapLegacyFarmXuVipName();
                 var accCtx = new Sunny.Subdy.Data.Context.AccountContext();
-                foreach (var platform in new[] { Sunny.Subdy.Common.Models.PlatformModel.Facebook, Sunny.Subdy.Common.Models.PlatformModel.Instagram })
+                foreach (var platform in new[] { Sunny.Subdy.Common.Models.PlatformModel.Facebook, Sunny.Subdy.Common.Models.PlatformModel.Instagram, Sunny.Subdy.Common.Models.PlatformModel.Threads })
                 {
                     var all = accCtx.GetAll(new List<string>(), platform, true);
                     if (all == null) continue;
@@ -59,6 +59,7 @@ namespace LamToolAutoPhonePrime
 
             // Tạo menu động (thứ tự ngược do DockStyle.Top stacking)
             CreateMenu("Dashboard", "history", Properties.Resources.icons8_history_30);
+            CreateMenu("Threads", "threads", Properties.Resources.icons8_instagram_30);
             CreateMenu("Instagram", "instagram", Properties.Resources.icons8_instagram_30);
             CreateMenu("Facebook", "facebook", Properties.Resources.icons8_facebook_30);
             CreateMenu("Thiết bị", "android", Properties.Resources.icons8_android_30_New);
@@ -186,6 +187,7 @@ namespace LamToolAutoPhonePrime
                 "Thiết bị" => "Quản lý thiết bị",
                 "Facebook" => "Quản lý tài khoản Facebook",
                 "Instagram" => "Quản lý tài khoản Instagram",
+                "Threads" => "Quản lý tài khoản Threads",
                 "Dashboard" => "Dashboard",
                 "Lịch sử" => "Dashboard",
                 _ => btn.Text
@@ -198,6 +200,7 @@ namespace LamToolAutoPhonePrime
                 case "btn_android": _ucDevices.BringToFront(); break;
                 case "btn_facebook": _ucFacebook.BringToFront(); break;
                 case "btn_instagram": _ucInstagram.BringToFront(); break;
+                case "btn_threads": _ucThreads.BringToFront(); break;
                 case "btn_history": _ucHistoriesJob.BringToFront(); break;
             }
 
@@ -217,6 +220,7 @@ namespace LamToolAutoPhonePrime
             "btn_android" => Properties.Resources.icons8_android_30_Acti,
             "btn_facebook" => Properties.Resources.icons8_facebook_30_Acti,
             "btn_instagram" => Properties.Resources.icons8_instagram_30_Acti,
+            "btn_threads" => Properties.Resources.icons8_instagram_30_Acti,
             "btn_history" => Properties.Resources.icons8_history_30_Acti,
             _ => null
         };
@@ -226,6 +230,7 @@ namespace LamToolAutoPhonePrime
             "btn_android" => Properties.Resources.icons8_android_30_New,
             "btn_facebook" => Properties.Resources.icons8_facebook_30,
             "btn_instagram" => Properties.Resources.icons8_instagram_30,
+            "btn_threads" => Properties.Resources.icons8_instagram_30,
             "btn_history" => Properties.Resources.icons8_history_30,
             _ => null
         };
@@ -326,10 +331,11 @@ namespace LamToolAutoPhonePrime
             _ucDevices = new ucManagerDevices(this);
             _ucFacebook = new ucdgvAccount(this, PlatformModel.Facebook);
             _ucInstagram = new ucdgvAccount(this, PlatformModel.Instagram);
+            _ucThreads = new ucdgvAccount(this, PlatformModel.Threads);
             _ucHistoriesJob = new ucHistoriesJob();
 
             pContent.SuspendLayout();
-            foreach (var uc in new Control[] { _ucDevices, _ucFacebook, _ucInstagram, _ucHistoriesJob })
+            foreach (var uc in new Control[] { _ucDevices, _ucFacebook, _ucInstagram, _ucThreads, _ucHistoriesJob })
             {
                 uc.Dock = DockStyle.Fill;
                 pContent.Controls.Add(uc);

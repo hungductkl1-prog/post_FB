@@ -95,6 +95,10 @@ namespace LamToolAutoPhonePrime.Views.Forms
                 {
                     act.MieuTa = igDesc;
                 }
+                else if (ThreadsFarmingType.DescriptionAction.TryGetValue(act.Type, out var trDesc))
+                {
+                    act.MieuTa = trDesc;
+                }
                 else
                 {
                     act.MieuTa = "Không có mô tả";
@@ -111,9 +115,12 @@ namespace LamToolAutoPhonePrime.Views.Forms
             this.Cursor = Cursors.WaitCursor;
             try
             {
-                Form actionsWindow = _script.Platform == PlatformModel.Instagram
-                    ? new fActionsInstagram(_idScript.ToString())
-                    : new fActions(_idScript.ToString());
+                Form actionsWindow = _script.Platform switch
+                {
+                    PlatformModel.Instagram => new fActionsInstagram(_idScript.ToString()),
+                    PlatformModel.Threads => (Form)new fActionsThreads(_idScript.ToString()),
+                    _ => new fActions(_idScript.ToString())
+                };
                 this.Cursor = Cursors.Default;
                 actionsWindow.ShowDialog();
             }
@@ -597,6 +604,38 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     break;
                 case InstagramFarmingType.IGCapNhatThongTin:
                     form = new fIGCapNhatThongTin(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+
+                // Threads
+                case ThreadsFarmingType.TRXemReel:
+                    form = new fTRXemReel(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRXemStory:
+                    form = new fTRXemStory(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRTuongTacNewfeed:
+                    form = new fTRTuongTacNewfeed(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRDangBai:
+                    form = new fTRDangBai(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRDangReel:
+                    form = new fTRDangReel(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRDangStory:
+                    form = new fTRDangStory(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRFollow:
+                    form = new fTRFollow(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRUnfollow:
+                    form = new fTRUnfollow(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRNhanTin:
+                    form = new fTRNhanTin(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+                case ThreadsFarmingType.TRCapNhatThongTin:
+                    form = new fTRCapNhatThongTin(action.ScriptId.ToString(), action.Id.ToString());
                     break;
             }
             if (form == null) return;

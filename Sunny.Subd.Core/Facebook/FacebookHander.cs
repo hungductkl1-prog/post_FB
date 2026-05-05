@@ -16,6 +16,8 @@ namespace Sunny.Subd.Core.Facebook
         public const string DOWNLOAD_FACEBOOK = "https://www.facebook.com/download/direct/fb4a/";
         public const string DOWNLOAD_INSTAGRAM = "https://d.apkpure.com/b/APK/com.instagram.android?version=latest";
 
+        public const string DOWNLOAD_THREADS = "https://d.apkpure.com/b/APK/com.instagram.barcelona?version=latest";
+
         public static string DownloadUrl(string platform)
         {
             switch (platform)
@@ -24,6 +26,8 @@ namespace Sunny.Subd.Core.Facebook
                     return DOWNLOAD_FACEBOOK;
                 case PlatformModel.Instagram:
                     return DOWNLOAD_INSTAGRAM;
+                case PlatformModel.Threads:
+                    return DOWNLOAD_THREADS;
                 default:
                     throw new ArgumentException("Unsupported platform: " + platform);
             }
@@ -47,6 +51,8 @@ namespace Sunny.Subd.Core.Facebook
                     return "com.facebook.orca";
                 case "Instagram":
                     return "com.instagram.android";
+                case PlatformModel.Threads:
+                    return "com.instagram.barcelona";
                 default:
                     throw new ArgumentException("Unsupported platform: " + platform);
             }

@@ -43,7 +43,8 @@ namespace LamToolAutoPhonePrime.Views
             _scriptContext.RemapLegacyFarmXuVipName(); // "Farm-Xu-VIP" → "Làm Job Golike"
             RemapLegacyFarmXuAccounts();
             if (_platform == Sunny.Subdy.Common.Models.PlatformModel.Facebook
-                || _platform == Sunny.Subdy.Common.Models.PlatformModel.Instagram)
+                || _platform == Sunny.Subdy.Common.Models.PlatformModel.Instagram
+                || _platform == Sunny.Subdy.Common.Models.PlatformModel.Threads)
             {
                 _scriptContext.EnsureFarmXuVip(_platform);
             }
