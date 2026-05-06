@@ -111,6 +111,10 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         var vipigClient = new VipIGClient(_cookieService);
                         jobs = await vipigClient.GetJobInstagram(_typeJob);
                     }
+                    else if (_platform == PlatformModel.Threads && _jobService == "https://app.golike.net/")
+                    {
+                        jobs = await new GoLikeClient().GetThreadsJob(_infoAccountService["id"], _account.TokenJob);
+                    }
                     var jobsResult = jobs.FindAll(x => _job_types.Contains(x.Type));
                     if (!jobsResult.Any())
                     {
@@ -860,6 +864,53 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                 }
             }
+            else if (_platform == PlatformModel.Threads)
+            {
+                _jobService = _config.JobService;
+
+                if (string.IsNullOrEmpty(_account.TokenJob))
+                {
+                    throw new Exception("Không có token job service.");
+                }
+                switch (_jobService)
+                {
+                    case "https://app.golike.net/":
+                        {
+                            var client = new GoLikeClient();
+                            bool isvery = false;
+                            for (int i = 0; i < 2; i++)
+                            {
+                                var accountTr = await client.GetThreadsAccount(_account.TokenJob);
+                                if (accountTr.ContainsKey("error"))
+                                {
+                                    throw new Exception($"Get list id account golike (threads) lỗi: {accountTr["error"]}");
+                                }
+                                if (!accountTr.ContainsKey(_account.UserName ?? string.Empty))
+                                {
+                                    accountTr = await client.VerifyAccountThreads(_account.TokenJob, _account.UserName);
+                                    if (accountTr.ContainsKey("error"))
+                                    {
+                                        throw new Exception($"Verify account threads golike lỗi: {accountTr["error"]}");
+                                    }
+                                    SetStatus(accountTr["success"], 2);
+                                    isvery = false;
+                                    continue;
+                                }
+                                else
+                                {
+                                    _infoAccountService["id"] = accountTr[_account.UserName];
+                                    isvery = true;
+                                    break;
+                                }
+                            }
+                            if (!isvery)
+                            {
+                                throw new Exception("Đã xảy ra lỗi khi thêm tài khoản threads vào golike...");
+                            }
+                            break;
+                        }
+                }
+            }
             var jobMappings = new Dictionary<string, string>
 {
     { "checkBox1",  JobTypes.Like },
@@ -1196,6 +1247,18 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             var reward = await new VipIGClient(_cookieService).ClaimFollowReward(idList);
                             string message = (reward["mess"] ?? reward["error"])?.ToString();
                             subdy.Message = message;
+                        }
+                    }
+                    else if (_platform == PlatformModel.Threads)
+                    {
+                        if (_jobService == "https://app.golike.net/")
+                        {
+                            var message = await new GoLikeClient().ReportThreadsJob(job.JobId, _infoAccountService["id"], _account.TokenJob);
+                            if (message.ContainsKey("error"))
+                            {
+                                throw new Exception(message["error"]);
+                            }
+                            subdy.Message = message["success"];
                         }
                     }
                 }

@@ -417,6 +417,208 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             }
             return result;
         }
+
+        // ===================== Threads (Golike) =====================
+        // Mirror của AutoGolikeThreads/GolikeClient.java: list account / get job / complete / skip.
+
+        public async Task<Dictionary<string, string>> GetThreadsAccount(string token)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            try
+            {
+                var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Get, "https://gateway.golike.net/api/threads-account");
+                request.Headers.Add("authorization", $"Bearer {token}");
+                request.Headers.Add("t", "VFZSak1VMTZZekpOVkdzd1RYYzlQUT09");
+                request.Headers.Add("accept", "application/json, text/plain, */*");
+                var response = await client.SendAsync(request);
+                string json = await response.Content.ReadAsStringAsync();
+                if (response == null || string.IsNullOrEmpty(json))
+                {
+                    result["error"] = "Server không phản hồi...";
+                    return result;
+                }
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "Unknown error";
+                    return result;
+                }
+                var jObject = JsonNode.Parse(json)!.AsObject();
+                var data = jObject["data"];
+                if (data is not JsonArray arr || arr.Count < 1)
+                {
+                    result["error"] = "Chưa thêm tài khoản nào.";
+                    return result;
+                }
+                foreach (var item in arr)
+                {
+                    string username = item?["threads_username"]?.ToString();
+                    string id = item?["id"]?.ToString();
+                    if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(id))
+                    {
+                        result[username] = id;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                result["error"] = ex.Message;
+            }
+            return result;
+        }
+
+        public async Task<Dictionary<string, string>> VerifyAccountThreads(string token, string username)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            try
+            {
+                var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Post, "https://gateway.golike.net/api/threads-account/verify-account");
+                request.Headers.Add("authorization", $"Bearer {token}");
+                request.Headers.Add("t", "VFZSak1VMTZZek5OVkVFd1RuYzlQUT09");
+                var content = new StringContent("{\"object_id\":\"" + username + "\"}", null, "application/json");
+                request.Content = content;
+                var response = await client.SendAsync(request);
+                string json = await response.Content.ReadAsStringAsync();
+                if (response == null || string.IsNullOrEmpty(json))
+                {
+                    result["error"] = "Server không phản hồi...";
+                    return result;
+                }
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "Unknown error";
+                    return result;
+                }
+                result["success"] = JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "OK";
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                result["error"] = ex.Message;
+            }
+            return result;
+        }
+
+        public async Task<List<JobModel>> GetThreadsJob(string idAccount, string token)
+        {
+            try
+            {
+                var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Get,
+                    $"https://gateway.golike.net/api/advertising/publishers/threads/jobs?account_id={idAccount}&data=null");
+                request.Headers.Add("authorization", $"Bearer {token}");
+                request.Headers.Add("t", "VFZSak1VMTZZekpOVkdzd1RYYzlQUT09");
+                request.Headers.Add("accept", "application/json");
+                var response = await client.SendAsync(request);
+                string json = await response.Content.ReadAsStringAsync();
+                if (response == null || string.IsNullOrEmpty(json))
+                {
+                    throw new Exception("Server không phản hồi...");
+                }
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    throw new Exception(JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "Unknown error");
+                }
+
+                var jGolike = JsonNode.Parse(json!)!.AsObject();
+                var dataToken = jGolike["data"];
+                if (dataToken == null)
+                {
+                    throw new Exception(jGolike["message"]?.ToString() ?? "Dữ liệu job không hợp lệ.");
+                }
+
+                // Threads endpoint trả về data là object đơn (theo GolikeClient.java), không phải array.
+                // Hỗ trợ cả 2 dạng để chống đổi shape của server.
+                var jobs = new List<JobModel>();
+                if (dataToken is JsonArray arr)
+                {
+                    foreach (var j in arr.OfType<JsonObject>())
+                        jobs.Add(new JobModel(j, "https://app.golike.net/"));
+                }
+                else if (dataToken is JsonObject obj && obj.ContainsKey("id"))
+                {
+                    jobs.Add(new JobModel(obj, "https://app.golike.net/"));
+                }
+                return jobs;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                throw ex;
+            }
+        }
+
+        public async Task<Dictionary<string, string>> ReportThreadsJob(string idJob, string idAccount, string token)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            try
+            {
+                var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Post,
+                    "https://gateway.golike.net/api/advertising/publishers/threads/complete-jobs");
+                request.Headers.Add("authorization", $"Bearer {token}");
+                request.Headers.Add("t", "VFZSak1VMTZZek5OYW1NMFQwRTlQUT09");
+                request.Headers.Add("accept", "application/json");
+                var body = $"{{\"ads_id\":{idJob},\"account_id\":{idAccount},\"async\":true,\"data\":null}}";
+                request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+                var response = await client.SendAsync(request);
+                string json = await response.Content.ReadAsStringAsync();
+                if (response == null || string.IsNullOrEmpty(json))
+                {
+                    result["error"] = "Server không phản hồi...";
+                    return result;
+                }
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "Unknown error";
+                    return result;
+                }
+                result["success"] = JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "OK";
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                result["error"] = ex.Message;
+            }
+            return result;
+        }
+
+        public async Task<Dictionary<string, string>> SkipThreadsJob(string idJob, string idAccount, string objectId, string type, string token)
+        {
+            Dictionary<string, string> result = new Dictionary<string, string>();
+            try
+            {
+                var client = new HttpClient();
+                var request = new HttpRequestMessage(HttpMethod.Post,
+                    "https://gateway.golike.net/api/advertising/publishers/threads/skip-jobs");
+                request.Headers.Add("authorization", $"Bearer {token}");
+                request.Headers.Add("t", "VFZSak1VMTZZekpOVkdzd1RYYzlQUT09");
+                request.Headers.Add("accept", "application/json");
+                var body = $"{{\"ads_id\":\"{idJob}\",\"account_id\":\"{idAccount}\",\"object_id\":\"{objectId}\",\"type\":\"{type}\"}}";
+                request.Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+                var response = await client.SendAsync(request);
+                string json = await response.Content.ReadAsStringAsync();
+                if (response == null || string.IsNullOrEmpty(json))
+                {
+                    result["error"] = "Server không phản hồi...";
+                    return result;
+                }
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    result["error"] = JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "Unknown error";
+                    return result;
+                }
+                result["success"] = JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "OK";
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                result["error"] = ex.Message;
+            }
+            return result;
+        }
     }
 
 }
