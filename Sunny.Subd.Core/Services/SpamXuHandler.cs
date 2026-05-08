@@ -1,4 +1,5 @@
 ﻿using AutoAndroid;
+using Org.BouncyCastle.Asn1.Utilities;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Services;
 using Sunny.Subd.Core.Utils;
@@ -16,6 +17,7 @@ using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 
 using System.Diagnostics;
+using System.Security.Policy;
 using System.Xml.Linq;
 
 namespace Sunny.Subd.Core.Facebook.ScriptActions
@@ -43,6 +45,11 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
         private Dictionary<string, string> _infoAccountService = new Dictionary<string, string>();
         private string _cookieService = string.Empty;
         private string _jobPrefix = string.Empty;
+        private static string ShortId(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return "null";
+            return id.Length >= 3 ? id.Substring(0, 3) : id;
+        }
         private async Task<List<JobModel>> GetJob()
         {
 
@@ -113,7 +120,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     }
                     else if (_platform == PlatformModel.Threads && _jobService == "https://app.golike.net/")
                     {
-                        jobs = await new GoLikeClient().GetThreadsJob(_infoAccountService["id"], _account.TokenJob);
+                        jobs = await new GoLikeClient().GetThreadsJob(_account.Uid, _account.TokenJob);
                     }
                     var jobsResult = jobs.FindAll(x => _job_types.Contains(x.Type));
                     if (!jobsResult.Any())
@@ -866,50 +873,9 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             }
             else if (_platform == PlatformModel.Threads)
             {
+                _account.TokenJob = Globals.User.Token;
+                _tokenJobService = _account.TokenJob;
                 _jobService = _config.JobService;
-
-                if (string.IsNullOrEmpty(_account.TokenJob))
-                {
-                    throw new Exception("Không có token job service.");
-                }
-                switch (_jobService)
-                {
-                    case "https://app.golike.net/":
-                        {
-                            var client = new GoLikeClient();
-                            bool isvery = false;
-                            for (int i = 0; i < 2; i++)
-                            {
-                                var accountTr = await client.GetThreadsAccount(_account.TokenJob);
-                                if (accountTr.ContainsKey("error"))
-                                {
-                                    throw new Exception($"Get list id account golike (threads) lỗi: {accountTr["error"]}");
-                                }
-                                if (!accountTr.ContainsKey(_account.UserName ?? string.Empty))
-                                {
-                                    accountTr = await client.VerifyAccountThreads(_account.TokenJob, _account.UserName);
-                                    if (accountTr.ContainsKey("error"))
-                                    {
-                                        throw new Exception($"Verify account threads golike lỗi: {accountTr["error"]}");
-                                    }
-                                    SetStatus(accountTr["success"], 2);
-                                    isvery = false;
-                                    continue;
-                                }
-                                else
-                                {
-                                    _infoAccountService["id"] = accountTr[_account.UserName];
-                                    isvery = true;
-                                    break;
-                                }
-                            }
-                            if (!isvery)
-                            {
-                                throw new Exception("Đã xảy ra lỗi khi thêm tài khoản threads vào golike...");
-                            }
-                            break;
-                        }
-                }
             }
             var jobMappings = new Dictionary<string, string>
 {
@@ -1032,10 +998,11 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         _client.Shell($"am start -n com.facebook.katana/.IntentUriHandler \"fb://feed\"");
                     }
-                    else if (_platform == "Instagram")
+                    else
                     {
                         _client.AppStart(FacebookHander.Package(_platform));
                     }
+
                     continue;
                 }
                 _client.ElementWithAttributes("//*[@content-desc=\"Close\"]", timeoutInSeconds: 1);
@@ -1098,7 +1065,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                        type == JobTypes.Wow || type == JobTypes.Angry ||
                        type == JobTypes.Care || type == JobTypes.LikeComment)
                     {
-                        if (_platform == PlatformModel.Facebook)
+                        if (_platform == PlatformModel.Facebook && _platform == PlatformModel.Threads)
                         {
                             if (!_client.ElementWithAttributes("//*[@content-desc=\"Navigate to your Reels profile\"]", 5, click: false))
                             {
@@ -1167,7 +1134,12 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                                 subdy.SubdyEnum = SubdyEnum.Block;
                                 subdy.Message = $"Chặn tương tác {job.Type}";
                             }
-                            else if (_platform == "Instagram" && !xml.Contains("liked"))
+                            else if (_platform == PlatformModel.Instagram && !xml.Contains("liked"))
+                            {
+                                subdy.SubdyEnum = SubdyEnum.Block;
+                                subdy.Message = $"Chặn tương tác {job.Type}";
+                            }
+                            else if (_platform == PlatformModel.Threads && !xml.Contains("unlike"))
                             {
                                 subdy.SubdyEnum = SubdyEnum.Block;
                                 subdy.Message = $"Chặn tương tác {job.Type}";
@@ -1249,18 +1221,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             subdy.Message = message;
                         }
                     }
-                    else if (_platform == PlatformModel.Threads)
-                    {
-                        if (_jobService == "https://app.golike.net/")
-                        {
-                            var message = await new GoLikeClient().ReportThreadsJob(job.JobId, _infoAccountService["id"], _account.TokenJob);
-                            if (message.ContainsKey("error"))
-                            {
-                                throw new Exception(message["error"]);
-                            }
-                            subdy.Message = message["success"];
-                        }
-                    }
+
                 }
                 catch (Exception ex)
                 {
@@ -1268,11 +1229,21 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     subdy.Message = ex.Message;
                 }
             }
-            else
+            if (_platform == PlatformModel.Threads && _jobService == "https://app.golike.net/")
             {
-                if (_jobService == "https://app.golike.net/")
+                try
                 {
-                    subdy.Message = await JobClient.ReportFacebookJob(_jobService, _account.Uid, _account.FullName, _tokenJobService, job, _jobPrefix);
+                    var message = await new GoLikeClient().ReportThreadsJob(job.JobId, _account.Uid, _account.TokenJob, (subdy.SubdyEnum == SubdyEnum.Success));
+                    if (message.ContainsKey("error"))
+                    {
+                        throw new Exception(message["error"]);
+                    }
+                    subdy.Message = message["success"];
+                }
+                catch (Exception ex)
+                {
+                    subdy.SubdyEnum = SubdyEnum.JobFail;
+                    subdy.Message = ex.Message;
                 }
             }
 
@@ -1384,7 +1355,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 }
                 if (!isLink)
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tồn tại bài viết.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại bài viết.");
                 }
             ReFail:
                 isLink = false;
@@ -1401,9 +1372,10 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         //  _client.SwipeByPercent(56, 82, 56, 16, 1000);
                         continue;
                     }
+
                     if (dump.Contains(", pressed. double tap and hold"))
                     {
-                        return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Đã làm job đó trước.");
+                        return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
                     }
 
                     isLink = true;
@@ -1411,7 +1383,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 }
                 if (!isLink)
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tìm được nút {job.Type}.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
                 }
                 job.Link = url;
                 int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
@@ -1436,11 +1408,11 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             if (!string.IsNullOrEmpty(attributeValue))
                             {
                                 var rectangleArea = new RectangleArea(attributeValue);
-                                var x = rectangleArea.Right -2;
+                                var x = rectangleArea.Right - 2;
                                 var y = ((rectangleArea.Top + rectangleArea.Bottom) / 2);
                                 if (_client.Click(x, y))
                                 {
-                                    return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                                    return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
                                 }
                             }
                         }
@@ -1472,17 +1444,17 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                         if (_client.ElementWithAttributes($"//*[@content-desc='{num}']", 3))
                         {
-                            return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                            return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
                         }
                     }
                 }
             }
-            else if (_platform == "Instagram")
+            else if (_platform == PlatformModel.Instagram)
             {
                 string link = $"instagram://media?id={job.ObjectId}";
                 if (!await GotoUrl(link))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tồn tại bài viết.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại bài viết.");
                 }
                 bool isLink = false;
                 for (int i = 0; i < 10; i++)
@@ -1495,7 +1467,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     dump = dump.ToLower();
                     if (_client.ElementWithAttributes("//*[@content-desc=\"Liked\"]", 1, dump, false))
                     {
-                        return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Đã làm job đó trước.");
+                        return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
                     }
                     if (_client.ElementWithAttributes("//*[@content-desc=\"Like\"]", 1, dump, false))
                     {
@@ -1506,17 +1478,60 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 }
                 if (!isLink)
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tìm được nút {job.Type}.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
                 }
                 job.Link = link;
                 int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
                 await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
                 if (_client.ElementWithAttributes("//*[@content-desc=\"Like\"]", 5, "", true))
                 {
-                    return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                    return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
                 }
             }
-            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tìm được nút {job.Type}.");
+            else if (_platform == PlatformModel.Threads)
+            {
+                string link = job.Link;
+                if (!await GotoUrl(link))
+                {
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại bài viết.");
+                }
+
+            ReFail:
+                bool isLink = false;
+                for (int i = 0; i < 10; i++)
+                {
+                    string dump = _client.GetXMLSource();
+                    if (string.IsNullOrEmpty(dump))
+                    {
+                        continue;
+                    }
+                    if (!_client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"Share\"]", "//*[@resource-id=\"feed_post_ufi_like_button\"]" }, 5, dump, false) && !_client.ElementWithAttributes(new List<string> { "//*[@resource-id=\"feed_post_ufi_share_button\"]", "//*[@resource-id=\"feed_post_ufi_unlike_button\"]" }, 5, dump, false))
+                    {
+                        _client.SwipeUp(1, SubdyHelper.RandomValue(500, 2000), SubdyHelper.RandomValue(500, 2000));
+                        continue;
+                    }
+
+                    if (dump.Contains("Unlike"))
+                    {
+                        return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
+                    }
+
+                    isLink = true;
+                    break;
+                }
+                if (!isLink)
+                {
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
+                }
+                job.Link = link;
+                int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
+                await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
+                if (_client.ElementWithAttributes(new List<string> { "//*[@resource-id=\"feed_post_ufi_unlike_button\"]", "//*[contains(@content-desc, \"Like\")]" }, 5))
+                {
+                    return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
+                }
+            }
+            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
         }
         private async Task<bool> GotoUrl(string url)
         {
@@ -1530,7 +1545,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 "//*[@content-desc=\"Go to profile\"]",
                 "//*[@text=\"Sorry, this page isn't available.\"]",
                 "//*[@text=\"The link you followed may be broken, or the page may have been removed. \"]",
-                "//*[@content-desc=\"Navigate to your Reels profile\"]"
+                "//*[@content-desc=\"Navigate to your Reels profile\"]",
+                "//*[@text=\"Sorry, something went wrong.\"]"
             };
             if (url.Contains("posts"))
             {
@@ -1572,14 +1588,28 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 xpaths.Add("//*[@text=\"Following\"]");
                 xpaths.Add("//*[@text=\"Follow\"]");
             }
-
+            else if (url.Contains("post") && url.Contains("www.threads.com"))
+            {
+                xpaths.AddRange(new string[]{
+                "//*[contains(@content-desc, \"Turn on notifications\")]",
+                "//*[@content-desc=\"More options\"]",
+                "//*[@text=\" views\"]",
+                });
+            }
+            else if (url.Contains("threads") && url.Contains("@") && !url.Contains("post"))
+            {
+                xpaths.AddRange(new string[]{
+                "//*[@content-desc=\"Follow\"]",
+                "//*[@content-desc=\"Following\"]",
+                });
+            }
             if (_platform == PlatformModel.Facebook)
             {
                 _client.ADB.Shell($"am start -n com.facebook.katana/com.facebook.katana.IntentUriHandler -d \"{url}\"");
             }
-            else if (_platform == "Instagram")
+            else if (_platform == PlatformModel.Instagram || _platform == PlatformModel.Threads)
             {
-                _client.ADB.Shell($"am start -a android.intent.action.VIEW -d \"{url}\" -p com.instagram.android");
+                _client.ADB.Shell($"am start -a android.intent.action.VIEW -d \"{url}\" -p {FacebookHander.Package(_platform)}");
             }
 
             await Task.Delay(5000);
@@ -1603,6 +1633,14 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                         return false;
                     }
+                //threads post
+                case "//*[contains(@content-desc, \"Turn on notifications\")]":
+                case "//*[@content-desc=\"More options\"]":
+                case "//*[@text=\" views\"]":
+                    {
+                        return true;
+                    }
+                //facebook post
                 case "//*[@content-desc=\"Navigate to your Reels profile\"]":
                 case "//*[@text=\"From your messages.\"]":
                     {
@@ -1618,6 +1656,8 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     {
                         return true;
                     }
+                case "//*[@content-desc=\"Following\"]":
+                case "//*[@content-desc=\"Follow\"]":
                 case "//*[@text=\"Following\"]":
                     {
                         return true;
@@ -1631,6 +1671,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                         return false;
                     }
+                case "//*[@text=\"Sorry, something went wrong.\"]":
                 case "//*[@text=\"Follow\"]":
                 case "//*[contains(@text, 'Follow')]":
                 case "//*[contains(@content-desc, 'Follow')]":
@@ -1656,26 +1697,26 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 string link = $"fb://profile/{job.JobId}";
                 if (!await GotoUrl(link))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tồn tại profile.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại profile.");
                 }
                 if (_client.ElementWithAttributes("//*[@text=\"Following\"]", 5, "", false))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Đã làm job đó trước.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
                 }
                 job.Link = link;
                 int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
                 await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
                 if (_client.ElementWithAttributes("//*[@text=\"Follow\"]", 5))
                 {
-                    return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                    return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
                 }
             }
-            else if (_platform == "Instagram")
+            else if (_platform == PlatformModel.Instagram)
             {
                 string link = $"instagram://user?username={job.ObjectId}";
                 if (!await GotoUrl(link))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tồn tại bài viết.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại bài viết.");
                 }
                 bool isLink = false;
                 for (int i = 0; i < 10; i++)
@@ -1688,7 +1729,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                     dump = dump.ToLower();
                     if (_client.ElementWithAttributes("//*[@text=\"Requested\"]", 1, dump, false) || (_client.FindElements(1, "", "//*[@resource-id=\"com.instagram.android:id/profile_header_user_action_follow_button\"]").Any() && _client.FindElements(1, "", "//*[@resource-id=\"com.instagram.android:id/profile_header_user_action_follow_button\"]")[0].OuterXml.ToLower().Contains("following")))
                     {
-                        return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Đã làm job đó trước.");
+                        return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
                     }
                     if (_client.ElementWithAttributes(new List<string> { "//*[@text=\"Follow\"]", "//*[contains(@text, 'Follow')]", "//*[contains(@content-desc, 'Follow')]" }, 1, dump, false))
                     {
@@ -1698,17 +1739,44 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 }
                 if (!isLink)
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tìm được nút {job.Type}.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
                 }
                 job.Link = link;
                 int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
                 await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
                 if (_client.ElementWithAttributes(new List<string> { "//*[@text=\"Follow\"]", "//*[contains(@text, 'Follow')]", "//*[contains(@content-desc, 'Follow')]" }, 5, "", true))
                 {
-                    return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                    return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
                 }
             }
-            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tìm được nút {job.Type}.");
+            else if (_platform == PlatformModel.Threads)
+            {
+                string link = job.ObjectId;
+                if (!await GotoUrl(link))
+                {
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại bài viết.");
+                }
+                var _case = _client.FindElement("", new List<string> { "//*[@content-desc=\"Following\"]", "//*[@content-desc=\"Follow\"]", "//*[@resource-id=\"profile_screen_follow_button\"]" }, 10);
+                switch (_case)
+                {
+                    case "//*[@content-desc=\"Following\"]":
+                        {
+                            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
+                        }
+                    case "//*[@resource-id=\"profile_screen_follow_button\"]":
+                    case "//*[@content-desc=\"Follow\"]":
+                        {
+                            int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
+                            await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
+                            if (_client.ElementWithAttributes(_case))
+                            {
+                                return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
+                            }
+                            break;
+                        }
+                }
+            }
+            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
         }
         private async Task<SubdyExtension> JobLikePage(JobModel job)
         {
@@ -1718,21 +1786,21 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 string link = $"fb://page/{job.JobId}";
                 if (!await GotoUrl(link))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tồn tại page.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại page.");
                 }
                 if (_client.ElementWithAttributes("//*[@text=\"Liked\"]", 5, "", false))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Đã làm job đó trước.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
                 }
                 job.Link = link;
                 int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
                 await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
                 if (_client.ElementWithAttributes("//*[@text=\"Like\"]", 5))
                 {
-                    return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                    return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
                 }
             }
-            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tìm được nút {job.Type}.");
+            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
         }
         private async Task<SubdyExtension> JobGroup(JobModel job)
         {
@@ -1742,21 +1810,21 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                 string link = $"https://www.facebook.com/groups/{job.JobId}";
                 if (!await GotoUrl(link))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tồn tại group.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tồn tại group.");
                 }
                 if (_client.ElementWithAttributes("//*[contains(@content-desc, 'joined')]", 5, "", false))
                 {
-                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Đã làm job đó trước.");
+                    return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Đã làm job đó trước.");
                 }
                 job.Link = link;
                 int second = SubdyHelper.RandomValue(_settingScriptAction.GetIntType("numericUpDown26", 5), _settingScriptAction.GetIntType("numericUpDown4", 10));
                 await DelayMessageAsync(second, "Delay trước khi click tương tác" + ". Đợi {time} giây", 2);
                 if (_client.ElementWithAttributes("//*[contains(@content-desc, 'Join')]", 5))
                 {
-                    return new SubdyExtension(SubdyEnum.Success, $"Job: {job.ObjectId?.Substring(0, 3)}... success.");
+                    return new SubdyExtension(SubdyEnum.Success, $"Job: {ShortId(job.ObjectId)}... success.");
                 }
             }
-            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {job.ObjectId?.Substring(0, 3)}... fail. Không tìm được nút {job.Type}.");
+            return new SubdyExtension(SubdyEnum.JobFail, $"Job: {ShortId(job.ObjectId)}... fail. Không tìm được nút {job.Type}.");
         }
         private async Task<SubdyExtension> JobShare(JobModel job)
         {

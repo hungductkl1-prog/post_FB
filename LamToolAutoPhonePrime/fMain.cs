@@ -59,7 +59,7 @@ namespace LamToolAutoPhonePrime
 
             // Tạo menu động (thứ tự ngược do DockStyle.Top stacking)
             CreateMenu("Dashboard", "history", Properties.Resources.icons8_history_30);
-            CreateMenu("Threads", "threads", Properties.Resources.icons8_instagram_30);
+            CreateMenu("Thread", "threads", Properties.Resources.icons8_threads_30);
             CreateMenu("Instagram", "instagram", Properties.Resources.icons8_instagram_30);
             CreateMenu("Facebook", "facebook", Properties.Resources.icons8_facebook_30);
             CreateMenu("Thiết bị", "android", Properties.Resources.icons8_android_30_New);
@@ -187,7 +187,7 @@ namespace LamToolAutoPhonePrime
                 "Thiết bị" => "Quản lý thiết bị",
                 "Facebook" => "Quản lý tài khoản Facebook",
                 "Instagram" => "Quản lý tài khoản Instagram",
-                "Threads" => "Quản lý tài khoản Threads",
+                "Thread" => "Quản lý tài khoản Thread",
                 "Dashboard" => "Dashboard",
                 "Lịch sử" => "Dashboard",
                 _ => btn.Text
@@ -220,7 +220,7 @@ namespace LamToolAutoPhonePrime
             "btn_android" => Properties.Resources.icons8_android_30_Acti,
             "btn_facebook" => Properties.Resources.icons8_facebook_30_Acti,
             "btn_instagram" => Properties.Resources.icons8_instagram_30_Acti,
-            "btn_threads" => Properties.Resources.icons8_instagram_30_Acti,
+            "btn_threads" => Properties.Resources.icons8_threads_30_Acti,
             "btn_history" => Properties.Resources.icons8_history_30_Acti,
             _ => null
         };
@@ -230,7 +230,7 @@ namespace LamToolAutoPhonePrime
             "btn_android" => Properties.Resources.icons8_android_30_New,
             "btn_facebook" => Properties.Resources.icons8_facebook_30,
             "btn_instagram" => Properties.Resources.icons8_instagram_30,
-            "btn_threads" => Properties.Resources.icons8_instagram_30,
+            "btn_threads" => Properties.Resources.icons8_threads_30,
             "btn_history" => Properties.Resources.icons8_history_30,
             _ => null
         };

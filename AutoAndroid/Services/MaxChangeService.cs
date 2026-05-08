@@ -314,13 +314,14 @@ namespace AutoAndroid
         }
         public async Task<string> GetIP(string state = "")
         {
-           service.LogHelper.State = state;
+            await Install();
+            service.LogHelper.State = state;
             string ip = "";
             for (int i = 0; i < 10; i++)
             {
                 try
                 {
-                    await Install();
+                  
                     service.LogHelper.SUCCESS($"Đang kiểm tra IP [{i + 1}]");
                     service.AppStart(package_MaxChange);
                     string result = ProcessHelper.RunAdbWithTimeout($"-s {service.Device.Serial} shell am broadcast -a {package_MaxChange}.GET_DEVICE_IP -n {package_MaxChange}/.AdbCaller");
@@ -337,6 +338,24 @@ namespace AutoAndroid
                             return message;
                         }
 
+                    }
+                    else
+                    {
+                        result = service.Shell("am", "broadcast", "-a", $"{package_MaxChange}.GET_DEVICE_IP", "-n", $"{package_MaxChange}/.AdbCaller");
+                        if (result.Contains("result=1"))
+                        {
+                            Match match = Regex.Match(result, @"data=""(?<json>\{.*?\})""");
+                            if (match.Success)
+                            {
+                                var json = match.Groups[1].Value;
+                                var doc = System.Text.Json.JsonDocument.Parse(json);
+
+                                string message = doc.RootElement.GetProperty("ip").GetString();
+                                service.LogHelper.SUCCESS($"IP: {message}");
+                                return message;
+                            }
+
+                        }
                     }
                     ip = "";
                     service.LogHelper.ERROR("Không lấy được IP");

@@ -69,7 +69,9 @@ namespace Sunny.Subd.Core.Utils
              $"//*[contains(text, \"Is this your account\")]",
              "//*[@text=\"Add a profile picture\"]",
              "//*[@text=\"Add a mobile number to your account\"]",
-             "//*[@resource-id=\"com.instagram.android:id/profile_tab\"]"
+             "//*[@resource-id=\"com.instagram.android:id/profile_tab\"]",
+             "//*[@content-desc=\"Profile\"]",
+             "//*[@resource-id=\"barcelona_tab_main_feed\"]"
           });
             _xpathGroups.TryAdd(XpathType.Loading, new List<string>
       {
@@ -91,6 +93,8 @@ namespace Sunny.Subd.Core.Utils
       });
             _xpathGroups.TryAdd(XpathType.NavigationButton, new List<string>
       {
+                "//*[@resource-id=\"BdsButton\"]",
+         "//*[@resource-id=\"login_screen_login_with_ig_button\"]",
          "//*[@text=\"Use another profile\"]",
           "//*[@content-desc=\"I already have an account\"]",
           "//*[@text=\"Continue using English (US)\"]",

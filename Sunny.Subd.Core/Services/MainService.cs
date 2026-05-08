@@ -130,7 +130,7 @@ namespace Sunny.Subd.Core.Services
         }
         public async Task ExtractAndUpdateAuthenticationInfoAsync()
         {
-            if (string.IsNullOrEmpty(_account.FullName))
+            if (string.IsNullOrEmpty(_account.FullName) && _platform == PlatformModel.Facebook)
             {
                 _account.FullName = _client.GetFacebookFullName(_account.Uid); 
             }

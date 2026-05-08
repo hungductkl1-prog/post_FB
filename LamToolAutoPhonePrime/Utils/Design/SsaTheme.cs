@@ -1033,10 +1033,11 @@ namespace LamToolAutoPhonePrime.Utils.Design
         private static void ReloadScriptSelectItems(ucdgvAccount uc, AntdUI.Select cbo)
         {
             cbo.Items.Clear();
-            // FarmXu bị ẩn — "Làm Job Golike" hiện cho cả Facebook và Instagram (cùng route SpamXuHandler).
+            // FarmXu bị ẩn — "Làm Job Golike" hiện cho Facebook/Instagram/Threads (cùng route SpamXuHandler).
             var platformName = GetField<string>(uc, "_platform") ?? "";
             if (string.Equals(platformName, "Facebook", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(platformName, "Instagram", StringComparison.OrdinalIgnoreCase))
+                || string.Equals(platformName, "Instagram", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(platformName, "Threads", StringComparison.OrdinalIgnoreCase))
             {
                 cbo.Items.Add(DefaultGolikeScript);
             }
