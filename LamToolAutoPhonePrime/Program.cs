@@ -34,11 +34,23 @@ namespace LamToolAutoPhonePrime
             // Binding.cctor reads this switch once; if set after first access it's too late.
             AppContext.SetSwitch("System.Windows.Forms.Binding.IsSupported", true);
 
+            // WinForms config phải set trước khi tạo splash form (splash là Form thường).
+            ComWrappers.RegisterForMarshalling(WinFormsComInterop.WinFormsComWrappers.Instance);
+            ApplicationConfiguration.Initialize();
+            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+
+            // Splash hiển thị xuyên suốt giai đoạn kiểm tra môi trường + init.
+            // Chạy trong UI thread riêng (STA) để spinner mượt khi main thread block I/O.
+            SplashHandle splash = null;
+            try { splash = new SplashHandle(); } catch (Exception ex) { Trace.TraceWarning("Splash init failed: " + ex); }
+
             // Kiểm tra môi trường trước khi khởi động
             try
             {
+                splash?.SetStatus("Đang kiểm tra môi trường...");
                 if (!IsEnvironmentReady())
                 {
+                    splash?.SetStatus("Đang cài đặt môi trường (GolikeHelper)...");
                     RunLTPhoneHelper();
 
                     // Re-check sau khi helper kết thúc. Nếu vẫn chưa ready
@@ -46,6 +58,7 @@ namespace LamToolAutoPhonePrime
                     // rõ thay vì RestartApp im lặng để rồi loop vô hạn.
                     if (!IsEnvironmentReady())
                     {
+                        splash?.Close();
                         MessageBox.Show(
                             "Cài đặt môi trường chưa hoàn tất.\n" +
                             "Vui lòng chạy GolikeHelper.exe (Right-click > Run as administrator) rồi thử lại.",
@@ -55,6 +68,7 @@ namespace LamToolAutoPhonePrime
                         return;
                     }
 
+                    splash?.Close();
                     RestartApp();
                     return;
                 }
@@ -69,6 +83,7 @@ namespace LamToolAutoPhonePrime
             // Sau đó start-server mới dưới quyền Admin để adb thực sự bind 5037 ổn định.
             try
             {
+                splash?.SetStatus("Đang khởi động ADB...");
                 ADBHelper.KillAllAdbProcesses();
                 Thread.Sleep(500);
                 ADBHelper.EnsureServerStarted();
@@ -78,14 +93,8 @@ namespace LamToolAutoPhonePrime
                 Trace.TraceError("ADB clean slate failed: " + ex);
             }
 
-            // Kiểm tra VCpp trước khi load font (chỉ mất thời gian nếu cần cài)
-          
-
+            splash?.SetStatus("Đang tải cấu hình giao diện...");
             Localization.Provider = new VietnameseLocalization();
-
-            ComWrappers.RegisterForMarshalling(WinFormsComInterop.WinFormsComWrappers.Instance);
-            ApplicationConfiguration.Initialize();
-            Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 
             // Wire up SortableBindingList to auto-unregister items from ThrottledPropertyNotifier
             // on removal, preventing stale PropertyChanged events from crashing DataGridView.
@@ -94,16 +103,23 @@ namespace LamToolAutoPhonePrime
             SortableBindingList<JobHistory>.OnBeforeRemove = ThrottledPropertyNotifier.Unregister;
 
             // Load font sau khi init WinForms để tránh lỗi GDI+
+            splash?.SetStatus("Đang tải font...");
             FontUtil.LoadCustomFonts();
+            splash?.SetStatus("Đang khởi tạo thiết bị...");
             Globals.DeviceId = new DeviceIdBuilder()
                    .OnWindows(windows => windows.AddWindowsDeviceId())
                    .ToString();
             // Gắn icon Golike cho toàn bộ form (cả dialog mở sau).
             AppIconHelper.Install();
-            using (var frm = new fLogin())
-            {
-               frm.ShowDialog();
-            }
+
+            // Auto-login nếu đã có cache: chạy ngầm (không hiện UI) để fMain có Globals.User
+            // mà không phải hỏi user. Nếu không có cache hoặc fail → user dùng tool ở chế độ
+            // chưa login; LoginGuard sẽ bật fLogin khi cần.
+            splash?.SetStatus("Đang đăng nhập tài khoản...");
+            try { TempLoginStorage.TryAutoLogin(); } catch (Exception ex) { Trace.TraceWarning("Auto-login skipped: " + ex); }
+
+            splash?.SetStatus("Đang mở giao diện...");
+            splash?.Close();
             Application.Run(new fMain());
         }
 

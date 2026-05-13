@@ -477,19 +477,26 @@ namespace LamToolAutoPhonePrime
                 // Chạy song song ADB init và Device models
                // var adbTask = Task.Run(() => ADBHelper.InitADB());
                 var deviceTask = Task.Run(() => DeviceServices.GetDeviceModels());
-                
+
                 await Task.WhenAll(deviceTask);
-                var key =  LamToolClient.GetLicenses(Globals.User.Token_Golike);
-                if (!key.success)
+
+                // License check chỉ chạy khi đã đăng nhập (Globals.User != null).
+                // Nếu chưa login → bỏ qua, LoginGuard sẽ bật fLogin khi user thực sự
+                // dùng feature cần auth (tạo nhóm / thêm tài khoản / chạy job).
+                if (Globals.User?.Token_Golike != null)
                 {
-                    var veri = LamToolClient.VerifyLicense(Globals.User.Token_Golike, Globals.NameApp, Globals.DeviceId, Globals.DeviceId);
-                    if (!veri.valid)
+                    var key = LamToolClient.GetLicenses(Globals.User.Token_Golike);
+                    if (!key.success)
                     {
-                        MessageBox.Show(veri.error);
-                        Program.SetStartup(false);
-                        TempLoginStorage.Clear();
-                        Application.Restart();
-                        Environment.Exit(0);
+                        var veri = LamToolClient.VerifyLicense(Globals.User.Token_Golike, Globals.NameApp, Globals.DeviceId, Globals.DeviceId);
+                        if (!veri.valid)
+                        {
+                            MessageBox.Show(veri.error);
+                            Program.SetStartup(false);
+                            TempLoginStorage.Clear();
+                            Application.Restart();
+                            Environment.Exit(0);
+                        }
                     }
                 }
                 // if (!File.Exists(@"C:\DTAHelper\sdk\platform-tools\adb.exe"))

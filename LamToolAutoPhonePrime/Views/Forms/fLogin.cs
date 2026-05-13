@@ -176,5 +176,46 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             catch { }
         }
+
+        /// <summary>
+        /// Auto-login bằng credential cache (nếu có). Không hiện UI.
+        /// Set Globals.User khi thành công, trả về true. Sai cache → trả false, không throw.
+        /// </summary>
+        public static bool TryAutoLogin()
+        {
+            var cached = Load();
+            if (string.IsNullOrWhiteSpace(cached.Username) || string.IsNullOrWhiteSpace(cached.Password))
+                return false;
+
+            try
+            {
+                var user = SubdyClient.Login(cached.Username.Trim(), cached.Password.Trim());
+                if (user == null) return false;
+
+                try
+                {
+                    user.Token_Golike = SubdyClient.GetTokenAutoGolike(cached.Username.Trim(), cached.Password.Trim());
+                }
+                catch { /* token-golike có thể fail nhưng login chính vẫn dùng được */ }
+
+                try
+                {
+                    var report = new GoLikeClient().GetCoinReport(user.Token);
+                    if (report.CurrentCoin >= 0)
+                    {
+                        user.Balance = report.CurrentCoin;
+                        user.PendingBalance = report.PendingCoin;
+                    }
+                }
+                catch { /* ignore */ }
+
+                Globals.User = user;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }
