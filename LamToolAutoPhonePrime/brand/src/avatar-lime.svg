@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="AutoGoLike">
+  <title>AutoGoLike avatar (lime)</title>
+  <rect width="1024" height="1024" fill="#d3ff3c"/>
+  <g transform="translate(512 460)">
+    <g transform="rotate(-4)">
+      <rect x="-280" y="-280" width="560" height="560" rx="120" fill="#0a0a0a"/>
+      <text x="0" y="98" text-anchor="middle"
+            font-family="'Space Grotesk','Archivo Black','Inter',system-ui,-apple-system,sans-serif"
+            font-weight="800" font-size="320" fill="#d3ff3c"
+            letter-spacing="-16">GL</text>
+    </g>
+  </g>
+  <text x="512" y="900" text-anchor="middle"
+        font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
+        font-weight="700" font-size="80" fill="#0a0a0a"
+        letter-spacing="-2.5">AutoGoLike</text>
+</svg>

@@ -43,6 +43,12 @@ namespace Sunny.Subdy.Common.Models
         public static List<string> Gmails { get; set; } = new List<string>();
         public static readonly object Lock = new object();
 
+        // Startup background tasks: spawned trong Program.Main song song với new fMain()
+        // để splash không phải chờ ADB/WMI/HTTP. fMain_Load đợi từng task khi thật sự cần.
+        // Default = CompletedTask để code đợi không NPE khi chạy ngoài Program.Main (test, designer).
+        public static Task AdbReadyTask { get; set; } = Task.CompletedTask;
+        public static Task DeviceIdTask { get; set; } = Task.CompletedTask;
+        public static Task AutoLoginTask { get; set; } = Task.CompletedTask;
     }
 
     /// <summary>

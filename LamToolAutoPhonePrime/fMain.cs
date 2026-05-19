@@ -35,27 +35,33 @@ namespace LamToolAutoPhonePrime
         {
             InitializeComponent();
 
-            // Dọn legacy FarmXu + remap "Farm-Xu-VIP" → "Làm Job Golike" ngay khi load app (idempotent).
-            try
+            // Dọn legacy FarmXu + remap "Farm-Xu-VIP" → "Làm Job Golike". Idempotent &
+            // hoàn toàn read/write DB → defer sang background để không kéo dài constructor.
+            // Cleanup này không ảnh hưởng UI render; account cũ chỉ hiển thị sai NameScript
+            // trong vài giây đầu nếu user mở tab Account ngay lập tức.
+            _ = Task.Run(() =>
             {
-                var scriptCtx = new Sunny.Subdy.Data.Context.ScriptContext();
-                scriptCtx.PurgeFarmXu();
-                scriptCtx.RemapLegacyFarmXuVipName();
-                var accCtx = new Sunny.Subdy.Data.Context.AccountContext();
-                foreach (var platform in new[] { Sunny.Subdy.Common.Models.PlatformModel.Facebook, Sunny.Subdy.Common.Models.PlatformModel.Instagram, Sunny.Subdy.Common.Models.PlatformModel.Threads })
+                try
                 {
-                    var all = accCtx.GetAll(new List<string>(), platform, true);
-                    if (all == null) continue;
-                    var legacy = all.Where(a =>
-                        string.Equals(a.NameScript, Sunny.Subdy.Data.Context.ScriptNames.FarmXu, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(a.NameScript, Sunny.Subdy.Data.Context.ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
-                    ).ToList();
-                    if (legacy.Count == 0) continue;
-                    foreach (var a in legacy) a.NameScript = Sunny.Subdy.Data.Context.ScriptNames.FarmXuVip;
-                    accCtx.Update(legacy);
+                    var scriptCtx = new Sunny.Subdy.Data.Context.ScriptContext();
+                    scriptCtx.PurgeFarmXu();
+                    scriptCtx.RemapLegacyFarmXuVipName();
+                    var accCtx = new Sunny.Subdy.Data.Context.AccountContext();
+                    foreach (var platform in new[] { Sunny.Subdy.Common.Models.PlatformModel.Facebook, Sunny.Subdy.Common.Models.PlatformModel.Instagram, Sunny.Subdy.Common.Models.PlatformModel.Threads })
+                    {
+                        var all = accCtx.GetAll(new List<string>(), platform, true);
+                        if (all == null) continue;
+                        var legacy = all.Where(a =>
+                            string.Equals(a.NameScript, Sunny.Subdy.Data.Context.ScriptNames.FarmXu, StringComparison.OrdinalIgnoreCase)
+                            || string.Equals(a.NameScript, Sunny.Subdy.Data.Context.ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
+                        ).ToList();
+                        if (legacy.Count == 0) continue;
+                        foreach (var a in legacy) a.NameScript = Sunny.Subdy.Data.Context.ScriptNames.FarmXuVip;
+                        accCtx.Update(legacy);
+                    }
                 }
-            }
-            catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
+                catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
+            });
 
             // Tạo menu động (thứ tự ngược do DockStyle.Top stacking)
             CreateMenu("Dashboard", "history", Properties.Resources.icons8_history_30);
@@ -95,6 +101,26 @@ namespace LamToolAutoPhonePrime
             toolTip.SetToolTip(btn_setting, "Đóng");
             toolTip.SetToolTip(button9, "Đăng xuất");
 
+            // Overload alert: subscribe event để hiện toast cảnh báo khi CPU/RAM cao kéo dài.
+            SystemUsageMonitor.OverloadDetected += OnSystemOverload;
+            this.FormClosed += (_, __) => SystemUsageMonitor.OverloadDetected -= OnSystemOverload;
+        }
+
+        private void OnSystemOverload(string resource, float value)
+        {
+            if (this.IsDisposed || !this.IsHandleCreated) return;
+            try
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    AntdHelper.NotifyWarn(
+                        this,
+                        $"Tài nguyên {resource} cao",
+                        $"{resource} đang ở mức {value:0.0}% trong hơn {SystemUsageMonitor.SustainedSeconds}s. " +
+                        "Cân nhắc giảm số thiết bị chạy song song.");
+                }));
+            }
+            catch { /* form đang đóng — bỏ qua */ }
         }
 
         #region ==== Menu ====
@@ -156,6 +182,63 @@ namespace LamToolAutoPhonePrime
             ResetButtonStyle(btn);
         }
 
+        // Khi user kéo cạnh trên / góc trên để resize, OS sinh WM_SIZE liên tục vì cả
+        // origin lẫn height đều thay đổi. WinForms relayout toàn bộ control mỗi tick
+        // → khựng rõ rệt so với kéo phải/trái/dưới (chỉ đổi size, không đổi origin).
+        // Suspend layout trong khoảng [WM_ENTERSIZEMOVE..WM_EXITSIZEMOVE] để gom layout
+        // lại 1 lần duy nhất khi user nhả chuột — kéo lên mượt như các hướng còn lại.
+        private const int WM_ENTERSIZEMOVE = 0x0231;
+        private const int WM_EXITSIZEMOVE = 0x0232;
+        private bool _resizeLayoutSuspended;
+
+        protected override void WndProc(ref System.Windows.Forms.Message m)
+        {
+            if (m.Msg == WM_ENTERSIZEMOVE && !_resizeLayoutSuspended)
+            {
+                _resizeLayoutSuspended = true;
+                SuspendLayout();
+            }
+            else if (m.Msg == WM_EXITSIZEMOVE && _resizeLayoutSuspended)
+            {
+                _resizeLayoutSuspended = false;
+                ResumeLayout(true);
+                PerformLayout();
+                Invalidate(true);
+            }
+            base.WndProc(ref m);
+        }
+
+        protected override bool ProcessCmdKey(ref System.Windows.Forms.Message msg, Keys keyData)
+        {
+            // Ctrl+1..5 → chuyển nhanh giữa các tab menu.
+            // Thứ tự hiển thị (top→bottom): Thiết bị, Facebook, Instagram, Thread, Dashboard.
+            if ((keyData & Keys.Control) == Keys.Control)
+            {
+                string? target = (keyData & Keys.KeyCode) switch
+                {
+                    Keys.D1 => "btn_android",
+                    Keys.D2 => "btn_facebook",
+                    Keys.D3 => "btn_instagram",
+                    Keys.D4 => "btn_threads",
+                    Keys.D5 => "btn_history",
+                    _ => null
+                };
+                if (target != null)
+                {
+                    var btn = pMenu.Controls
+                        .OfType<System.Windows.Forms.Panel>()
+                        .SelectMany(p => p.Controls.OfType<System.Windows.Forms.Button>())
+                        .FirstOrDefault(b => b.Name == target);
+                    if (btn != null && pMenu.Enabled && _loadingOverlay?.Visible != true)
+                    {
+                        btn.PerformClick();
+                        return true;
+                    }
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         private void MenuButton_Click(object sender, EventArgs e)
         {
             if (_loadingOverlay?.Visible == true || !pMenu.Enabled) return;
@@ -195,17 +278,20 @@ namespace LamToolAutoPhonePrime
             label1.Text = labelText;
             // windowBar.Text giữ cố định ("GolikeAutoPhone") — không đổi theo section
 
+            // UC nặng (Devices/Instagram/Threads/Histories) được lazy-create sau frame đầu.
+            // Nếu user click trước khi sẵn sàng → no-op, sẽ vào tab khi UC tạo xong.
             switch (btn.Name)
             {
-                case "btn_android": _ucDevices.BringToFront(); break;
-                case "btn_facebook": _ucFacebook.BringToFront(); break;
-                case "btn_instagram": _ucInstagram.BringToFront(); break;
-                case "btn_threads": _ucThreads.BringToFront(); break;
-                case "btn_history": _ucHistoriesJob.BringToFront(); break;
+                case "btn_android": _ucDevices?.BringToFront(); break;
+                case "btn_facebook": _ucFacebook?.BringToFront(); break;
+                case "btn_instagram": _ucInstagram?.BringToFront(); break;
+                case "btn_threads": _ucThreads?.BringToFront(); break;
+                case "btn_history": _ucHistoriesJob?.BringToFront(); break;
             }
 
             // Chỉ hiện button thu gọn/mở rộng panel khi ở tab Thiết bị
-            _ucDevices.TogglePanelButtonVisible = btn.Name == "btn_android";
+            if (_ucDevices != null)
+                _ucDevices.TogglePanelButtonVisible = btn.Name == "btn_android";
         }
 
         private void ResetButtonStyle(System.Windows.Forms.Button btn)
@@ -321,32 +407,26 @@ namespace LamToolAutoPhonePrime
             // which may be null at Program.Main time).
             Sunny.Subdy.Data.Models.ThrottledPropertyNotifier.Initialize();
 
-            // Hiển thị thông tin tài khoản từ Globals.User
+            // AutoLogin chạy nền từ Program.Main. Đợi tối đa 1.2s để hiển thị info ngay
+            // nếu HTTP đã trả về; nếu chưa, UpdateUserInfo có Globals.User=null → no-op,
+            // và LicenseCheck trong LoadData sẽ đợi đầy đủ AutoLoginTask.
+            try { await Task.WhenAny(Globals.AutoLoginTask, Task.Delay(1200)); } catch { }
             UpdateUserInfo();
 
-            // Bắt đầu tải dữ liệu nền song song với việc tạo UI controls
-            var dataTask = LoadData();
-
-            // Tạo controls trên UI thread trong khi dữ liệu đang tải
-            _ucDevices = new ucManagerDevices(this);
+            // Tab Facebook là tab mặc định mở đầu — tạo trước, BringToFront, hide loading
+            // để user thấy UI hữu dụng ngay. Các UC khác defer sang sau (lazy create chunks)
+            // → cắt được ~60-70% thời gian fMain_Load block trên UI thread.
             _ucFacebook = new ucdgvAccount(this, PlatformModel.Facebook);
-            _ucInstagram = new ucdgvAccount(this, PlatformModel.Instagram);
-            _ucThreads = new ucdgvAccount(this, PlatformModel.Threads);
-            _ucHistoriesJob = new ucHistoriesJob();
-
             pContent.SuspendLayout();
-            foreach (var uc in new Control[] { _ucDevices, _ucFacebook, _ucInstagram, _ucThreads, _ucHistoriesJob })
-            {
-                uc.Dock = DockStyle.Fill;
-                pContent.Controls.Add(uc);
-                EnableDoubleBuffer(uc);
-            }
+            _ucFacebook.Dock = DockStyle.Fill;
+            pContent.Controls.Add(_ucFacebook);
+            EnableDoubleBuffer(_ucFacebook);
             pContent.ResumeLayout(false);
             pContent.PerformLayout();
 
-            // Chờ dữ liệu tải xong
-            await dataTask;
-           await _ucDevices.LoadDevices();
+            // Bắt đầu tải dữ liệu nền — không await ở đây để UI hiện sớm.
+            var dataTask = LoadData();
+
             pMenu.Enabled = true;
             HideLoading();
 
@@ -355,13 +435,72 @@ namespace LamToolAutoPhonePrime
             if (first != null)
                 MenuButton_Click(first, EventArgs.Empty);
 
+            // Yield để frame đầu (Facebook + menu) render xong, rồi mới tạo UC còn lại.
+            // BeginInvoke đẩy việc về cuối WM queue → user thấy form responsive ngay,
+            // các UC nặng tạo bất đồng bộ; nếu user click tab trước khi UC ready, tab đó
+            // sẽ chưa xuất hiện (MenuButton_Click null-check qua field).
+            await Task.Yield();
+            this.BeginInvoke(new Action(CreateRemainingControls));
+
+            // Chờ dữ liệu tải xong (không block UI render — đã hide loading trước đó).
+            await dataTask;
+
             // Hướng dẫn sử dụng lần đầu cho user mới — delay nhỏ để UI render xong.
             if (!UserTourHelper.HasSeenTour())
             {
                 await Task.Delay(400);
+                // Quick Start Wizard chạy trước UserTour — overview 4 bước farm trước khi tour chi tiết.
+                try { LamToolAutoPhonePrime.Views.Forms.fQuickStartWizard.ShowIfFirstRun(this); }
+                catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
+
                 try { UserTourHelper.ShowFirstRunPrompt(this); }
                 catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
             }
+        }
+
+        private async void CreateRemainingControls()
+        {
+            // Tạo từng UC một, yield giữa các lần để UI thread xử lý input/paint khác.
+            // Thứ tự ưu tiên dựa trên tần suất user dùng: Devices → Instagram → Threads → History.
+            try
+            {
+                pContent.SuspendLayout();
+                _ucDevices = new ucManagerDevices(this);
+                _ucDevices.Dock = DockStyle.Fill;
+                pContent.Controls.Add(_ucDevices);
+                EnableDoubleBuffer(_ucDevices);
+                pContent.ResumeLayout(false);
+                await Task.Yield();
+
+                pContent.SuspendLayout();
+                _ucInstagram = new ucdgvAccount(this, PlatformModel.Instagram);
+                _ucInstagram.Dock = DockStyle.Fill;
+                pContent.Controls.Add(_ucInstagram);
+                EnableDoubleBuffer(_ucInstagram);
+                pContent.ResumeLayout(false);
+                await Task.Yield();
+
+                pContent.SuspendLayout();
+                _ucThreads = new ucdgvAccount(this, PlatformModel.Threads);
+                _ucThreads.Dock = DockStyle.Fill;
+                pContent.Controls.Add(_ucThreads);
+                EnableDoubleBuffer(_ucThreads);
+                pContent.ResumeLayout(false);
+                await Task.Yield();
+
+                pContent.SuspendLayout();
+                _ucHistoriesJob = new ucHistoriesJob();
+                _ucHistoriesJob.Dock = DockStyle.Fill;
+                pContent.Controls.Add(_ucHistoriesJob);
+                EnableDoubleBuffer(_ucHistoriesJob);
+                pContent.ResumeLayout(false);
+                await Task.Yield();
+
+                // Devices xong → load list devices (đợi ADB ready trước).
+                try { await Globals.AdbReadyTask; } catch { }
+                if (!IsDisposed) await _ucDevices.LoadDevices();
+            }
+            catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
         }
 
         /// <summary>Expose UserControl tài khoản cho UserTourHelper (giữ field private của designer).</summary>
@@ -480,6 +619,13 @@ namespace LamToolAutoPhonePrime
 
                 await Task.WhenAll(deviceTask);
 
+                // Đợi auto-login + device-id hoàn tất (chạy nền từ Program.Main).
+                // Cần xong trước license check: AutoLogin cấp Globals.User, DeviceId cấp param.
+                try { await Globals.AutoLoginTask; } catch { }
+                try { await Globals.DeviceIdTask; } catch { }
+                // Refresh user info sau khi auto-login chắc chắn xong (label balance/email).
+                if (!IsDisposed) UpdateUserInfo();
+
                 // License check chỉ chạy khi đã đăng nhập (Globals.User != null).
                 // Nếu chưa login → bỏ qua, LoginGuard sẽ bật fLogin khi user thực sự
                 // dùng feature cần auth (tạo nhóm / thêm tài khoản / chạy job).
@@ -534,6 +680,7 @@ namespace LamToolAutoPhonePrime
                         var cpu = await cpuTask;
                         ControlHelper.SetToolStripLabelTextSafe(uiLabel5, $"{cpu:0.00}%");
                         ControlHelper.SetToolStripLabelTextSafe(uiLabel6, $"{ram:0.00}%");
+                        SystemUsageMonitor.CheckOverload(cpu, ram);
                         _lastUiUpdate = now;
                     }
 
@@ -553,7 +700,7 @@ namespace LamToolAutoPhonePrime
                         _lastHistoriesUpdate = now;
                     }
 
-                    if (_lastCheckUpdateTime == null || (now - _lastCheckUpdateTime.Value).TotalMinutes >= 15)
+                    if (_lastCheckUpdateTime == null || (now - _lastCheckUpdateTime.Value).TotalMinutes >= 5)
                     {
                        this.BeginInvoke(new Action(CheckUpdateVersion));
                         _lastCheckUpdateTime = now;
@@ -607,13 +754,26 @@ namespace LamToolAutoPhonePrime
         {
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
             var (ok, vs, url) = LamToolClient.GetApiResponseAsync(Globals.DeviceId, Globals.NameApp, version);
-            
-            if (LamToolClient.IsNewerVersion(version, vs))
+
+            if (!LamToolClient.IsNewerVersion(version, vs)) return;
+
+            // Toast (non-blocking) thay vì modal countdown — user có thể tiếp tục dùng app.
+            // Click vào notification hoặc đợi user mở Settings để cập nhật.
+            AntdHelper.NotifyWarn(
+                this,
+                "Có bản cập nhật mới",
+                $"Phiên bản [{vs}] đã sẵn sàng. Đang chuẩn bị cập nhật...");
+
+            // Sau 3 giây mở modal confirm — giữ behaviour cũ (force update) nhưng không
+            // block UI ngay lúc khởi động (tránh user nhìn modal 120s ngay khi vừa mở app).
+            var t = new System.Windows.Forms.Timer { Interval = 3000 };
+            t.Tick += (_, __) =>
             {
-                string title = "Thông báo";
-                string message = $"Đã có version [{vs}] mới nhất.";
-                fShowThongBao f = new fShowThongBao(title, message) { TopMost = true };
-                if (f.ShowDialog() == DialogResult.OK)
+                t.Stop();
+                t.Dispose();
+                if (this.IsDisposed) return;
+                if (AntdHelper.Confirm(this, "Cập nhật phiên bản",
+                        $"Đã có phiên bản [{vs}] mới nhất. Bạn có muốn cập nhật ngay bây giờ?"))
                 {
                     this.Hide();
                     using (var updateForm = new fUpdateAuto(url, version) { TopMost = true })
@@ -622,7 +782,8 @@ namespace LamToolAutoPhonePrime
                     }
                     Environment.Exit(0);
                 }
-            }
+            };
+            t.Start();
         }
         private void OpenBrowser(string url)
         {

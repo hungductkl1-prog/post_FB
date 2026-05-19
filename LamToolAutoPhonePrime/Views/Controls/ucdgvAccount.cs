@@ -1206,24 +1206,40 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // Refresh DataGridView để load đúng trạng thái checkbox
             uc.dataGridView1.Refresh();
 
-            fAddUsercontrol f = new fAddUsercontrol("SelectDevices", _platform, uc);
-            f.ShowDialog();
+            DialogResult dialogResult;
+            using (var f = new fAddUsercontrol("SelectDevices", _platform, uc))
+            {
+                dialogResult = f.ShowDialog(_form);
+            }
 
-            // Restore original state (không restore button2.Location: fAddUsercontrol
-            // sẽ tự re-anchor về mép phải panel6 mỗi lần Shown, tránh lần mở thứ 2
-            // button bị đẩy ngoài bounds do container có width khác).
-            uc.splitContainer1.Panel2Collapsed = panelRightCollapsed;
-            uc.button2.Visible = false;
+            // Reparent + restore layout trong 1 batch (SuspendLayout) để tránh
+            // nhiều layout pass đồng bộ trên DataGridView + splitContainer + ~30 control con
+            // → đây là root cause UI đơ vài giây sau khi click "Bắt đầu".
+            _form.pContent.SuspendLayout();
+            uc.SuspendLayout();
+            try
+            {
+                // Reparent TRƯỚC khi thay đổi property layout — tránh trigger layout trên
+                // parent cũ (dialog đang dispose) rồi lại layout lần nữa trên parent mới.
+                uc.Dock = DockStyle.Fill;
+                if (uc.Parent != _form.pContent)
+                {
+                    _form.pContent.Controls.Add(uc);
+                }
+                uc.splitContainer1.Panel2Collapsed = panelRightCollapsed;
+                uc.button2.Visible = false;
+            }
+            finally
+            {
+                uc.ResumeLayout(false);
+                _form.pContent.ResumeLayout(false);
+                _form.pContent.PerformLayout();
+            }
 
-            uc.Dock = DockStyle.Fill;
-            _form.pContent.Controls.Add(uc);
             // Đưa tab Facebook (this) lên front để user không thấy tab Thiết bị đè lên
             this.BringToFront();
-            if (f.DialogResult != DialogResult.OK)
-            {
-                return false;
-            }
-            return true;
+
+            return dialogResult == DialogResult.OK;
         }
 
         private void CreateMenuStrip()
@@ -2165,6 +2181,13 @@ namespace LamToolAutoPhonePrime.Views.Controls
             int comboTop = 70;
             int x        = PAD;
 
+            // Load cấu hình copy đã lưu của nền tảng hiện tại (nếu có).
+            // Giữ nguyên slot rỗng (None) ở giữa để khôi phục đúng vị trí trước đó.
+            var savedRaw = SettingsTool.GetSettings(CopyFormatSettingName).GetValue(CopyFormatKey);
+            var savedProps = string.IsNullOrEmpty(savedRaw)
+                ? new List<string>()
+                : savedRaw.Split('|').ToList();
+
             for (int i = 0; i < SLOTS; i++)
             {
                 if (i > 0)
@@ -2190,7 +2213,17 @@ namespace LamToolAutoPhonePrime.Views.Controls
                     Font          = new Font("Segoe UI", 8.5f)
                 };
                 cbo.Items.AddRange(labels.Cast<object>().ToArray());
-                cbo.SelectedIndex = 0; // mặc định item rỗng
+
+                // Khôi phục lựa chọn cũ: slot i dùng prop thứ i trong savedProps
+                string savedLabel = "";
+                if (i < savedProps.Count)
+                {
+                    var match = _copyFields.FirstOrDefault(f => f.PropName == savedProps[i]);
+                    if (!string.IsNullOrEmpty(match.Label)) savedLabel = match.Label;
+                }
+                int idx = string.IsNullOrEmpty(savedLabel) ? 0 : Array.IndexOf(labels, savedLabel);
+                cbo.SelectedIndex = idx >= 0 ? idx : 0;
+
                 combos.Add(cbo);
                 dlg.Controls.Add(cbo);
                 x += COMBO_W;
@@ -2260,11 +2293,34 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
             if (!selectedProps.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng chọn ít nhất một trường."); return; }
 
+            // Lưu cấu hình ngay sau khi user xác nhận OK, trước cả auth check.
+            // Lý do: định dạng cột không phải dữ liệu nhạy cảm — nếu user bấm Copy rồi
+            // hủy ở popup xác thực, lần sau mở lại vẫn cần giữ nguyên lựa chọn của họ.
+            SaveCopyFormat(combos);
+
             bool needsAuth = selectedProps.Any(p => p == nameof(Account.Password) || p == nameof(Account.TowFA));
             if (needsAuth && !VerifySubdyPassword()) return;
 
             ConvertHelper.CopyFormat(string.Join("|", selectedProps), dataGridView1);
         }
+
+        // Lưu thứ tự 10 slot (kể cả slot rỗng) theo nền tảng hiện tại
+        // để mở lại dialog lần sau giữ nguyên vị trí đã chọn.
+        private void SaveCopyFormat(List<ComboBox> combos)
+        {
+            var slotProps = combos
+                .Select(c => c.SelectedItem?.ToString() ?? "")
+                .Select(label => string.IsNullOrEmpty(label)
+                    ? ""
+                    : _copyFields.FirstOrDefault(f => f.Label == label).PropName ?? "")
+                .ToList();
+            var cfg = SettingsTool.GetSettings(CopyFormatSettingName);
+            cfg.AddOrUpdateProperty(CopyFormatKey, string.Join("|", slotProps));
+            SettingsTool.UpdateSetting(CopyFormatSettingName);
+        }
+
+        private string CopyFormatSettingName => $"CopyFormat_{_platform}";
+        private const string CopyFormatKey = "Slots";
 
         /// <summary>
         /// Hiển thị popup nhập mật khẩu Subdy để xác thực trước khi copy dữ liệu nhạy cảm.

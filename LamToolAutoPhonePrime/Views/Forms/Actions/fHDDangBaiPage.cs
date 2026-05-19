@@ -27,6 +27,7 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
         {
             InitializeComponent();
             FontUtil.ApplyFontToAllControls(this);
+            LamToolAutoPhonePrime.Utils.Design.FormResponsiveHelper.MakeScrollable(this);
             _context = new ScriptActionContext();
             this.scriptId = scriptId;
             this.actionId = actionId;

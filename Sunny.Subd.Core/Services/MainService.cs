@@ -132,7 +132,7 @@ namespace Sunny.Subd.Core.Services
         {
             if (string.IsNullOrEmpty(_account.FullName) && _platform == PlatformModel.Facebook)
             {
-                _account.FullName = _client.GetFacebookFullName(_account.Uid); 
+                _account.FullName = _client.GetFacebookFullName(_account.Uid);
             }
             if (!_client.IsRoot()) return;
             _sate = "Lấy thông tin xác thực";
@@ -158,10 +158,10 @@ namespace Sunny.Subd.Core.Services
                         throw new Exception("Chuỗi xác thực không hợp lệ.");
                     }
                 }
-                catch 
+                catch
                 {
                 }
-               
+
             }
             if (string.IsNullOrEmpty(_account.FullName))
             {
@@ -170,7 +170,7 @@ namespace Sunny.Subd.Core.Services
                 {
                     case PlatformModel.Facebook:
                         {
-                            
+
 
                             break;
                         }
@@ -428,13 +428,16 @@ namespace Sunny.Subd.Core.Services
             return _client.AppWait(FacebookHander.Package(_platform));
         }
 
-        // Kết nối và chuẩn bị thiết bị
-        private async Task<bool> ConnectAndPrepareDeviceAsync(bool changeProxy)
+        // Kết nối và chuẩn bị thiết bị.
+        // Trả về (ok, noInternet). noInternet=true khi fail VÌ thiết bị không lên được mạng
+        // (caller dùng để đếm chu kỳ liên tiếp và bail out nếu quá ngưỡng). false nếu fail
+        // vì lý do khác (không connect được adb, v.v.) hoặc khi thành công.
+        private async Task<(bool ok, bool noInternet)> ConnectAndPrepareDeviceAsync(bool changeProxy)
         {
             if (!await ConnectDeviceAsync())
             {
                 SetStatus("Không thể kết nối thiết bị.", 1);
-                return false;
+                return (false, false);
             }
 
             if (changeProxy)
@@ -446,20 +449,64 @@ namespace Sunny.Subd.Core.Services
             if (_settingGeneral.GetBooleanValue("checkBox4", false))
             {
                 int retryCount = _settingGeneral.GetIntType("numericUpDown1", 1);
+                bool triedJoinWifi = false;
                 for (int i = 0; i < retryCount; i++)
                 {
                     if (await IsInternetAsync())
-                        return true;
+                        return (true, false);
+
+                    // Mất mạng → nếu user đã cấu hình ssid/pass cho serial này thì
+                    // join wifi qua adb-join-wifi rồi thử lại. Chỉ chạy 1 lần để
+                    // tránh spam install/launch APK trong vòng lặp.
+                    if (!triedJoinWifi)
+                    {
+                        triedJoinWifi = true;
+                        if (await TryJoinConfiguredWifiAsync() && await IsInternetAsync())
+                            return (true, false);
+                    }
                 }
 
                 SetStatus($"Reboot khi mất mạng quá {retryCount} lần", 2);
                 _client.RebootAndWaitForDeviceReady();
-                return false;
+                return (false, true);
             }
 
-            bool hasNet = await IsInternetAsync();
-            if (!hasNet) SetStatus("Không có kết nối internet sau khi thử lại.", 1);
-            return hasNet;
+            if (await IsInternetAsync()) return (true, false);
+
+            // Single-attempt branch: nếu fail và có ssid/pass cấu hình → thử join và re-check.
+            if (await TryJoinConfiguredWifiAsync() && await IsInternetAsync())
+                return (true, false);
+
+            SetStatus("Không có kết nối internet sau khi thử lại.", 1);
+            return (false, true);
+        }
+
+        // Đọc wifi-credentials.json theo serial, dùng adb-join-wifi để thiết bị
+        // tự kết nối vào ssid/pass người dùng đã cấu hình. Trả về true nếu đã
+        // gửi lệnh thành công (chưa xác minh internet — caller sẽ IsInternetAsync lại).
+        private async Task<bool> TryJoinConfiguredWifiAsync()
+        {
+            try
+            {
+                var serial = _client.Device?.Serial;
+                if (string.IsNullOrEmpty(serial)) return false;
+                var cred = WifiCredentialsStore.GetBySerial(serial);
+                if (cred == null || string.IsNullOrEmpty(cred.UserName)) return false;
+
+                SetStatus($"Kết nối lại Wifi '{cred.UserName}'…", 2);
+                var wifi = new AdbJoinWifiService(_client);
+                bool sent = await wifi.ConnectToWifiNetwork(cred.UserName, cred.Password);
+                if (!sent) return false;
+
+                // Cho thiết bị vài giây để DHCP cấp IP và app join wifi hoàn tất.
+                await Task.Delay(5000);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Warning($"[TryJoinConfiguredWifi] {ex.Message}");
+                return false;
+            }
         }
 
         // Kết nối thiết bị
@@ -771,8 +818,18 @@ namespace Sunny.Subd.Core.Services
         public async Task RunAsync()
         {
             _swTotal.Start();
+            // Đếm số chu kỳ LIÊN TIẾP thiết bị không có internet. Reset về 0 sau khi
+            // 1 account chạy qua được bước restore (xem dưới). Vượt ngưỡng → bail out
+            // để tránh loop vô hạn khi modem/wifi chết.
+            const int NO_INTERNET_LIMIT = 5;
+            int noInternetStreak = 0;
             while (!_ct.IsCancellationRequested)
             {
+                if (noInternetStreak > NO_INTERNET_LIMIT)
+                {
+                    _client.LogHelper.ERROR("Thiết bị không có internet! Vui lòng tự cấu hình internet cho thiết bị");
+                    break;
+                }
                 _account = null;
                 if (!AccountServices.Accounts.Any())
                 {
@@ -780,10 +837,39 @@ namespace Sunny.Subd.Core.Services
                     break;
                 }
 
+                // Auto-reconnect wifi nếu host mất internet (throttled 30s).
+                // Chỉ guard, không block luôn nếu wifi config rỗng.
+                try
+                {
+                    if (!Sunny.Subdy.Common.Helper.WifiAutoConnect.IsInternetAvailable())
+                    {
+                        _sate = "Mất internet — thử reconnect wifi";
+                        SetStatus("Đang kết nối lại wifi…", 1);
+                        bool ok = await Sunny.Subdy.Common.Helper.WifiAutoConnect.EnsureInternetAsync(_ct);
+                        if (!ok)
+                        {
+                            // Chưa có internet — chờ 10s rồi loop lại check.
+                            await Task.Delay(10000, _ct);
+                            continue;
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Sunny.Subdy.Common.Logs.LogManager.Error(ex);
+                }
+
                 if (IsReboot()) continue;
 
                 _sate = "Kết nối thiết bị";
-                if (!await ConnectAndPrepareDeviceAsync(false)) continue;
+                {
+                    var r = await ConnectAndPrepareDeviceAsync(false);
+                    if (!r.ok)
+                    {
+                        if (r.noInternet) noInternetStreak++;
+                        continue;
+                    }
+                }
 
                 _sate = "Chuẩn bị tài khoản";
                 _account = AccountServices.GetAccount();
@@ -795,9 +881,16 @@ namespace Sunny.Subd.Core.Services
                     if (!await CheckLiveAsync()) continue;
 
                     _sate = "Chuẩn bị thiết bị và proxy";
-                    if (!await ConnectAndPrepareDeviceAsync(true)) continue;
+                    {
+                        var r = await ConnectAndPrepareDeviceAsync(true);
+                        if (!r.ok)
+                        {
+                            if (r.noInternet) noInternetStreak++;
+                            continue;
+                        }
+                    }
 
-                    
+                    noInternetStreak = 0;
                     if (!await RestoreFacebookAsync()) continue;
 
                     int index = _settingGeneral.GetIntType("comboBox1", 0);

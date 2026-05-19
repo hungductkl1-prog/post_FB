@@ -71,6 +71,16 @@ namespace Sunny.Subdy.UI.View.Pages
             // Events
             dataGridView1.SelectionChanged += DataGridView_SelectionChanged;
             dataGridView1.CellFormatting += uiDataGridView1_CellFormatting;
+            dataGridView1.CellPainting   += uiDataGridView1_CellPainting;
+            dataGridView1.RowPrePaint    += uiDataGridView1_RowPrePaint;
+            // Khử khựng khi scroll: bật DoubleBuffered qua reflection (property protected).
+            try
+            {
+                typeof(DataGridView)
+                    .GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.SetValue(dataGridView1, true);
+            }
+            catch { }
             dataGridView1.RowTemplate.Height = Math.Max(22, dataGridView1.RowTemplate.Height);
 
 
@@ -124,6 +134,10 @@ namespace Sunny.Subdy.UI.View.Pages
 
             dataGridView1.MouseClick += Control_MouseClick;
 
+            // Bulk-select: click vào header cột "Chọn" → hiện menu Chọn tất cả / Bỏ chọn / Đảo chọn.
+            // Phím tắt khi grid focus: Ctrl+A (all), Ctrl+D (deselect), Ctrl+I (invert).
+            SetupBulkSelectMenu();
+
             dataGridView1.CurrentCellDirtyStateChanged += (s, e) =>
             {
                 if (dataGridView1.IsCurrentCellDirty)
@@ -153,6 +167,40 @@ namespace Sunny.Subdy.UI.View.Pages
                 }
             };
 
+            // Khi IsRowEnabled của 1 device đổi (do HasInternet/IsLive thay đổi từ probe nền),
+            // tự sync row.ReadOnly + auto-uncheck nếu disabled. Tránh tình trạng user vẫn tick
+            // được máy không đủ điều kiện (vd Internet đỏ) như trước.
+            _deviceBindingSource.ListChanged += (s, e) =>
+            {
+                if (e.ListChangedType != ListChangedType.ItemChanged) return;
+                if (e.PropertyDescriptor?.Name != nameof(DeviceModel.IsRowEnabled)) return;
+                if (e.NewIndex < 0 || e.NewIndex >= dataGridView1.Rows.Count) return;
+
+                var row = dataGridView1.Rows[e.NewIndex];
+                if (row.DataBoundItem is not DeviceModel dev) return;
+
+                bool enabled = dev.IsRowEnabled;
+                if (row.ReadOnly != !enabled) row.ReadOnly = !enabled;
+                if (!enabled && dev.Checked) dev.Checked = false;
+            };
+
+            // Default IsRowEnabled=false ngay từ lúc bind → row mới phải set ReadOnly=true
+            // ngay tại RowsAdded. Nếu chỉ dựa vào ListChanged thì những row chưa từng đổi
+            // IsRowEnabled (probe chưa chạy) sẽ vẫn editable, user tick được khi không nên.
+            dataGridView1.RowsAdded += (s, e) =>
+            {
+                for (int i = 0; i < e.RowCount; i++)
+                {
+                    int idx = e.RowIndex + i;
+                    if (idx < 0 || idx >= dataGridView1.Rows.Count) continue;
+                    var row = dataGridView1.Rows[idx];
+                    if (row.DataBoundItem is not DeviceModel dev) continue;
+                    bool enabled = dev.IsRowEnabled;
+                    if (row.ReadOnly != !enabled) row.ReadOnly = !enabled;
+                    if (!enabled && dev.Checked) dev.Checked = false;
+                }
+            };
+
             this.Load += ucManagerDevices_Load;
             this.Disposed += (s, e) =>
             {
@@ -162,13 +210,102 @@ namespace Sunny.Subdy.UI.View.Pages
                 _deviceBindingSource?.Dispose();
             };
             Common.Helper.FontUtil.ApplyFontToAllControls(this);
-           button1.Click += button1_Click;
+            button1.Click += button1_Click;
+            button53.Click += button53_Click;
         }
 
         private void Button2_Click(object? sender, EventArgs e)
         {
             throw new NotImplementedException();
         }
+
+        #region Bulk Select (Select All / Deselect / Invert)
+
+        private System.Windows.Forms.ContextMenuStrip? _bulkSelectMenu;
+
+        private void SetupBulkSelectMenu()
+        {
+            _bulkSelectMenu = new System.Windows.Forms.ContextMenuStrip();
+            _bulkSelectMenu.Items.Add("Chọn tất cả (Ctrl+A)", null, (_, __) => BulkSelect(BulkSelectMode.All));
+            _bulkSelectMenu.Items.Add("Bỏ chọn tất cả (Ctrl+D)", null, (_, __) => BulkSelect(BulkSelectMode.None));
+            _bulkSelectMenu.Items.Add("Đảo chọn (Ctrl+I)", null, (_, __) => BulkSelect(BulkSelectMode.Invert));
+            _bulkSelectMenu.Items.Add(new ToolStripSeparator());
+            _bulkSelectMenu.Items.Add("Chỉ chọn thiết bị Online", null, (_, __) => BulkSelect(BulkSelectMode.OnlineOnly));
+
+            dataGridView1.ColumnHeaderMouseClick += (s, e) =>
+            {
+                if (e.ColumnIndex != dataGridViewCheckBoxColumn1.Index) return;
+                var cellRect = dataGridView1.GetCellDisplayRectangle(e.ColumnIndex, -1, false);
+                _bulkSelectMenu.Show(dataGridView1, new Point(cellRect.Left, cellRect.Bottom));
+            };
+
+            dataGridView1.KeyDown += (s, e) =>
+            {
+                if (!e.Control) return;
+                switch (e.KeyCode)
+                {
+                    case Keys.A: BulkSelect(BulkSelectMode.All); e.Handled = true; e.SuppressKeyPress = true; break;
+                    case Keys.D: BulkSelect(BulkSelectMode.None); e.Handled = true; e.SuppressKeyPress = true; break;
+                    case Keys.I: BulkSelect(BulkSelectMode.Invert); e.Handled = true; e.SuppressKeyPress = true; break;
+                }
+            };
+        }
+
+        private enum BulkSelectMode { All, None, Invert, OnlineOnly }
+
+        private void BulkSelect(BulkSelectMode mode)
+        {
+            BulkUpdateChecked(d =>
+            {
+                if (mode == BulkSelectMode.None)
+                {
+                    d.Checked = false;
+                    return;
+                }
+
+                if (!d.IsRowEnabled)
+                {
+                    if (d.Checked) d.Checked = false;
+                    return;
+                }
+
+                d.Checked = mode switch
+                {
+                    BulkSelectMode.All => true,
+                    BulkSelectMode.Invert => !d.Checked,
+                    BulkSelectMode.OnlineOnly => d.IsLive,
+                    _ => d.Checked
+                };
+            });
+        }
+
+        /// <summary>
+        /// Batch-update Checked qua toàn bộ DeviceModels: tắt ListChanged để tránh grid repaint
+        /// từng row (gây UI đơ vài giây khi nhiều thiết bị), rồi ResetBindings 1 lần ở cuối.
+        /// </summary>
+        private void BulkUpdateChecked(Action<DeviceModel> mutate)
+        {
+            if (_deviceBindingList == null || _deviceBindingList.Count == 0) return;
+
+            _deviceBindingSource.RaiseListChangedEvents = false;
+            _deviceBindingList.RaiseListChangedEvents = false;
+            try
+            {
+                foreach (var d in _deviceBindingList) mutate(d);
+            }
+            finally
+            {
+                _deviceBindingList.RaiseListChangedEvents = true;
+                _deviceBindingSource.RaiseListChangedEvents = true;
+                _deviceBindingList.ResetBindings();
+                dataGridView1.Refresh();
+                UpdateStatusBar();
+                _saveCheckedTimer?.Stop();
+                _saveCheckedTimer?.Start();
+            }
+        }
+
+        #endregion
 
 
         #region Filter ComboBox
@@ -227,6 +364,12 @@ namespace Sunny.Subdy.UI.View.Pages
         private AntdUI.Input? _txtDeviceId;
         private AntdUI.Input? _txtDeviceName;
 
+        // State của popup "Cài đặt phone" — persistent giữa các lần mở
+        // Load config đã lưu từ đĩa (nếu có) để giữ trạng thái qua các phiên app.
+        private LamToolAutoPhonePrime.Views.Forms.PhoneSetupOptions _phoneSetup =
+            LamToolAutoPhonePrime.Views.Forms.fPhoneSetupOptions.TryLoad()
+            ?? new LamToolAutoPhonePrime.Views.Forms.PhoneSetupOptions();
+
         private void SetupRightPanel()
         {
             panelRight.Controls.Clear();
@@ -241,222 +384,53 @@ namespace Sunny.Subdy.UI.View.Pages
                 Padding = new Padding(10, 5, 5, 5)
             };
 
+            // Tắt scroll NGANG — chỉ scroll dọc. Buttons sẽ stretch theo panel width
+            // qua Anchor = Top|Left|Right (set ở từng button bên dưới).
+            main.HorizontalScroll.Enabled = false;
+            main.HorizontalScroll.Visible = false;
+            main.HorizontalScroll.Maximum = 0;
+            main.AutoScroll = true;
+
             int y = 5;
 
-            // ── Cài đặt phone ──
+            // ── Cài đặt phone ── (mở popup → bấm Áp dụng chạy luôn trên các device tick checkbox)
             main.Controls.Add(MkGroupLabel("Cài đặt phone", boldFont, ref y, W));
 
-            // 2-column checkboxes matching screenshot
-            var chkPairs = new (string left, string right)[]
+            var btnOpenSetup = new AntdUI.Button
             {
-                ("Cài đặt ban đầu", "Chinh sáng"),
-                ("Tắt âm thanh", "Set % pin"),
-                ("Cài ngôn ngữ English", "Tắt GPS"),
-                ("Cài app Facebook", "Cài GolikeHelper"),
-                ("Khởi động lại máy", "Cấp quyền GolikeHelper"),
+                Text = "Cài đặt ban đầu", Shape = AntdUI.TShape.Round,
+                IconSvg = "SettingOutlined",
+                Size = new Size(W, 36), Location = new Point(10, y), Font = boldFont,
+                Type = AntdUI.TTypeMini.Default,
             };
-
-            // Row 0: Cài đặt ban đầu | Chinh sáng [100] %
-            _chkCaiDatBanDau = MkCheckbox("Cài đặt ban đầu", normalFont);
-            _chkCaiDatBanDau.Location = new Point(10, y);
-            main.Controls.Add(_chkCaiDatBanDau);
-            var lblBright = MkLabel("Chinh sáng", normalFont);
-            lblBright.Location = new Point(170, y + 3);
-            main.Controls.Add(lblBright);
-            _nudBright = new NumericUpDown { Minimum = 0, Maximum = 100, Value = 100, Width = 55, Location = new Point(250, y), Font = normalFont };
-            main.Controls.Add(_nudBright);
-            var lblBrightPct = MkLabel("%", normalFont);
-            lblBrightPct.Location = new Point(308, y + 3);
-            main.Controls.Add(lblBrightPct);
-            y += 28;
-
-            // Row 1: Tắt âm thanh | Set % pin [999] %
-            _chkTatAmThanh = MkCheckboxAt("Tắt âm thanh", normalFont, 10, y);
-            main.Controls.Add(_chkTatAmThanh);
-            var lblPin = MkLabel("Set % pin", normalFont);
-            lblPin.Location = new Point(170, y + 3);
-            main.Controls.Add(lblPin);
-            _nudPin = new NumericUpDown { Minimum = 0, Maximum = 999, Value = 999, Width = 55, Location = new Point(250, y), Font = normalFont };
-            main.Controls.Add(_nudPin);
-            var lblPinPct = MkLabel("%", normalFont);
-            lblPinPct.Location = new Point(308, y + 3);
-            main.Controls.Add(lblPinPct);
-            y += 28;
-
-            // Row 2: Cài ngôn ngữ English | Tắt GPS
-            _chkNgonNguEng = MkCheckboxAt("Cài ngôn ngữ English", normalFont, 10, y);
-            main.Controls.Add(_chkNgonNguEng);
-            _chkTatGPS = MkCheckboxAt("Tắt GPS", normalFont, 170, y);
-            main.Controls.Add(_chkTatGPS);
-            y += 28;
-
-            // Row 3: Cài app Facebook | Cài GolikeHelper
-            _chkCaiFacebook = MkCheckboxAt("Cài app Facebook", normalFont, 10, y);
-            main.Controls.Add(_chkCaiFacebook);
-            _chkCaiTLC = MkCheckboxAt("Cài GolikeHelper", normalFont, 170, y);
-            main.Controls.Add(_chkCaiTLC);
-            y += 28;
-
-            // Row 4: Khởi động lại máy | Cấp quyền GolikeHelper
-            _chkKhoiDong = MkCheckboxAt("Khởi động lại máy", normalFont, 10, y);
-            main.Controls.Add(_chkKhoiDong);
-            _chkCapQuyenTLC = MkCheckboxAt("Cấp quyền GolikeHelper", normalFont, 170, y);
-            main.Controls.Add(_chkCapQuyenTLC);
-            y += 35;
-
-            // Buttons: Bắt đầu | Kết nối
-            var btnStart = new AntdUI.Button
+            btnOpenSetup.Click += async (s, e) =>
             {
-                Text = "Bắt đầu", Type = AntdUI.TTypeMini.Primary, Shape = AntdUI.TShape.Round,
-                Size = new Size(145, 36), Location = new Point(10, y), Font = boldFont
-            };
-            btnStart.Click += async (s, e) =>
-            {
-                // Chỉ lấy các device đang bị bôi đen (highlighted) trong grid
-                var targets = GetSelectedDevices();
-                if (targets.Count == 0)
+                using var dlg = new LamToolAutoPhonePrime.Views.Forms.fPhoneSetupOptions
                 {
-                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng bôi đen ít nhất 1 thiết bị để bắt đầu.");
+                    Initial = _phoneSetup
+                };
+                var owner = this.FindForm();
+                if (dlg.ShowDialog(owner) != DialogResult.OK || dlg.Result == null) return;
+
+                _phoneSetup = dlg.Result;
+
+                if (!_phoneSetup.AnyChecked)
+                {
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thao tác",
+                        "Vui lòng tick ít nhất 1 mục trong \"Cài đặt ban đầu\" trước khi Áp dụng.");
                     return;
                 }
 
-                bool caiDatBanDau   = _chkCaiDatBanDau?.Checked == true;
-                bool tatAmThanh     = _chkTatAmThanh?.Checked == true;
-                bool ngonNguEng     = _chkNgonNguEng?.Checked == true;
-                bool caiFacebook    = _chkCaiFacebook?.Checked == true;
-                bool khoiDong       = _chkKhoiDong?.Checked == true;
-                bool tatGPS         = _chkTatGPS?.Checked == true;
-                bool caiTLC         = _chkCaiTLC?.Checked == true;
-                bool capQuyenTLC    = _chkCapQuyenTLC?.Checked == true;
-
-                if (!caiDatBanDau && !tatAmThanh && !ngonNguEng && !caiFacebook
-                    && !khoiDong && !tatGPS && !caiTLC && !capQuyenTLC)
-                {
-                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thao tác", "Vui lòng tick ít nhất 1 mục trong 'Cài đặt phone'.");
-                    return;
-                }
-
-                SetRightPanelEnabled(false);
-                // Auto re-enable panel sau 60s — tránh kẹt UI nếu 1 device treo lâu
-                _ = Task.Delay(TimeSpan.FromSeconds(60)).ContinueWith(_ =>
-                {
-                    if (IsDisposed || Disposing) return;
-                    try { BeginInvoke(new Action(() => SetRightPanelEnabled(true))); } catch { }
-                }, TaskScheduler.Default);
-                try
-                {
-                    var tasks = new List<Task>();
-                    foreach (var device in targets)
-                    {
-                        var dev = device;
-                        tasks.Add(Task.Run(async () =>
-                        {
-                            var client = new ADBClient(dev);
-                            try
-                            {
-                                // 1. Cài đặt ban đầu: setup ATX + cài GolikeHelper + cấp quyền
-                                //    + reset wallpaper + cài DeviceInfoHW + cài Facebook
-                                if (caiDatBanDau)
-                                {
-                                    dev.Status = "Cài đặt ban đầu...";
-                                    dev.TypeColor = 0;
-
-                                    // auto setup và connect atx
-                                    client.Connect();
-
-                                    // cài đặt apk com.golike.helper (+ DeviceInfoHW) và cấp quyền cơ bản
-                                    await client.maxChange.Install();
-
-                                    // cài đặt hình nền điện thoại
-                                    client.maxChange.ResetWallpaperDefault();
-
-                                    // cài đặt apk facebook
-                                    await InstallFacebookApk(client);
-                                }
-
-                                // 2. Tắt âm thanh: dùng lệnh adb
-                                if (tatAmThanh)
-                                {
-                                    dev.Status = "Tắt âm thanh...";
-                                    client.Shell("media volume --stream 3 --set 0");
-                                    client.Shell("media volume --stream 1 --set 0");
-                                    client.Shell("media volume --stream 5 --set 0");
-                                    client.Shell("media volume --stream 2 --set 0");
-                                    client.Shell("media volume --stream 4 --set 0");
-                                    client.LogHelper.SUCCESS("Đã tắt âm thanh");
-                                }
-
-                                // 3. Cài đặt ngôn ngữ English
-                                if (ngonNguEng)
-                                {
-                                    dev.Status = "Cài ngôn ngữ English...";
-                                    var lang = new ChangeLanguageService(client);
-                                    await lang.Change("en", "US");
-                                    client.LogHelper.SUCCESS("Đã chuyển ngôn ngữ English");
-                                }
-
-                                // 4. Cài đặt app Facebook
-                                if (caiFacebook)
-                                {
-                                    dev.Status = "Cài Facebook...";
-                                    await InstallFacebookApk(client);
-                                }
-
-                                // 5. Khởi động lại máy
-                                if (khoiDong)
-                                {
-                                    dev.Status = "Khởi động lại...";
-                                    client.RebootAndWaitForDeviceReady();
-                                }
-
-                                // 6. Tắt GPS
-                                if (tatGPS)
-                                {
-                                    dev.Status = "Tắt GPS...";
-                                    client.Shell("settings put secure location_providers_allowed -gps,-network");
-                                    client.LogHelper.SUCCESS("Đã tắt GPS");
-                                }
-
-                                // 7. Cài GolikeHelper
-                                if (caiTLC)
-                                {
-                                    dev.Status = "Cài GolikeHelper...";
-                                    await client.maxChange.Install();
-                                }
-
-                                // 8. Cấp quyền GolikeHelper
-                                if (capQuyenTLC)
-                                {
-                                    dev.Status = "Cấp quyền GolikeHelper...";
-                                    client.SetEnableModuleMaxChange();
-                                    client.LogHelper.SUCCESS("Đã cấp quyền GolikeHelper");
-                                }
-
-                                dev.Status = "Hoàn thành";
-                                dev.TypeColor = 2;
-                            }
-                            catch (Exception ex)
-                            {
-                                dev.Status = $"Lỗi: {ex.Message}";
-                                dev.TypeColor = 1;
-                                LogManager.Error(ex);
-                            }
-                        }));
-                    }
-                    await Task.WhenAll(tasks);
-                    ApplyFilter();
-                }
-                finally
-                {
-                    SetRightPanelEnabled(true);
-                }
+                await RunPhoneSetupAsync(_phoneSetup);
             };
-            main.Controls.Add(btnStart);
+            main.Controls.Add(btnOpenSetup);
+            y += 44;
 
+            // Button: Kết nối (full-width)
             var btnConnect = new AntdUI.Button
             {
                 Text = "Kết nối", Type = AntdUI.TTypeMini.Success, Shape = AntdUI.TShape.Round,
-                Size = new Size(145, 36), Location = new Point(170, y), Font = boldFont
+                Size = new Size(W, 36), Location = new Point(10, y), Font = boldFont
             };
             btnConnect.Click += async (s, e) =>
             {
@@ -473,7 +447,7 @@ namespace Sunny.Subdy.UI.View.Pages
                 ApplyFilter();
             };
             main.Controls.Add(btnConnect);
-            y += 50;
+            y += 44;
 
             // ── Cập nhật tên ──
             main.Controls.Add(MkGroupLabel("Cập nhật tên", boldFont, ref y, W));
@@ -482,7 +456,11 @@ namespace Sunny.Subdy.UI.View.Pages
             var lblId = MkLabel("Id", boldFont);
             lblId.Location = new Point(15, y + 5);
             main.Controls.Add(lblId);
-            _txtDeviceId = new AntdUI.Input { Location = new Point(70, y), Size = new Size(245, 30), Font = normalFont };
+            _txtDeviceId = new AntdUI.Input
+            {
+                Location = new Point(70, y), Size = new Size(245, 30), Font = normalFont,
+                ReadOnly = true,
+            };
             main.Controls.Add(_txtDeviceId);
             y += 38;
 
@@ -494,7 +472,7 @@ namespace Sunny.Subdy.UI.View.Pages
             main.Controls.Add(_txtDeviceName);
             y += 38;
 
-            // Auto Index | Update
+            // Auto Index | Update — chỉ tác động lên các device có checkbox=true
             var btnAutoIndex = new AntdUI.Button
             {
                 Text = "Auto Index", Shape = AntdUI.TShape.Round, Size = new Size(145, 34),
@@ -502,15 +480,15 @@ namespace Sunny.Subdy.UI.View.Pages
             };
             btnAutoIndex.Click += (s, e) =>
             {
-                var selected = GetSelectedOrCheckedDevices();
-                if (selected.Count == 0)
+                var targets = GetCheckedDevices();
+                if (targets.Count == 0)
                 {
-                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị.");
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng tick checkbox ít nhất 1 thiết bị.");
                     return;
                 }
                 string baseName = (_txtDeviceName?.Text ?? "").Trim();
-                for (int i = 0; i < selected.Count; i++)
-                    selected[i].NameDevice = string.IsNullOrEmpty(baseName) ? $"{i + 1}" : $"{baseName} {i + 1}";
+                for (int i = 0; i < targets.Count; i++)
+                    targets[i].NameDevice = string.IsNullOrEmpty(baseName) ? $"{i + 1}" : $"{baseName} {i + 1}";
                 dataGridView1.Refresh();
             };
             main.Controls.Add(btnAutoIndex);
@@ -521,10 +499,10 @@ namespace Sunny.Subdy.UI.View.Pages
             };
             btnUpdate.Click += async (s, e) =>
             {
-                var selected = GetSelectedOrCheckedDevices();
-                if (selected.Count == 0)
+                var targets = GetCheckedDevices();
+                if (targets.Count == 0)
                 {
-                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng chọn hoặc bôi đen ít nhất 1 thiết bị.");
+                    AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị", "Vui lòng tick checkbox ít nhất 1 thiết bị.");
                     return;
                 }
                 string newName = (_txtDeviceName?.Text ?? "").Trim();
@@ -533,11 +511,11 @@ namespace Sunny.Subdy.UI.View.Pages
                     AntdHelper.NotifyWarn(this.FindForm(), "Thiếu tên", "Vui lòng nhập Name trước khi Update.");
                     return;
                 }
-                foreach (var dev in selected) dev.NameDevice = newName;
+                foreach (var dev in targets) dev.NameDevice = newName;
                 dataGridView1.Refresh();
 
                 var tasks = new List<Task>();
-                foreach (var device in selected)
+                foreach (var device in targets)
                 {
                     var dev = device;
                     tasks.Add(Task.Run(() =>
@@ -562,39 +540,42 @@ namespace Sunny.Subdy.UI.View.Pages
             main.Controls.Add(btnUpdate);
             y += 48;
 
-            // ── Test change ──
-            main.Controls.Add(MkGroupLabel("Test change", boldFont, ref y, W));
-            var btnInfoDevice = new AntdUI.Button
+            // ── Cấu hình wifi ── (thay "Chức năng khác")
+            // Mở popup fInputWifiCredentials để nhập danh sách ssid|password.
+            // MainService sẽ dùng danh sách này để auto-reconnect khi host mất internet.
+            main.Controls.Add(MkGroupLabel("Cấu hình wifi", boldFont, ref y, W));
+            var btnWifi = new AntdUI.Button
             {
-                Text = "Info Device", Shape = AntdUI.TShape.Round, Size = new Size(145, 34),
-                Location = new Point(10, y), Font = normalFont
+                Text     = "Cấu hình wifi",
+                Shape    = AntdUI.TShape.Round,
+                IconSvg  = "WifiOutlined",
+                Size     = new Size(W, 36),
+                Location = new Point(10, y),
+                Font     = boldFont,
+                Type     = AntdUI.TTypeMini.Default,
             };
-            main.Controls.Add(btnInfoDevice);
-            var btnChange4G = new AntdUI.Button
+            btnWifi.Click += (s, e) =>
             {
-                Text = "Change 4G", Shape = AntdUI.TShape.Round, Size = new Size(145, 34),
-                Location = new Point(170, y), Font = normalFont, Type = AntdUI.TTypeMini.Primary
+                using var dlg = new LamToolAutoPhonePrime.Views.Forms.fInputWifiCredentials();
+                dlg.ShowDialog(this.FindForm());
+                // Danh sách wifi đã được popup tự lưu vào Config/wifi-credentials-input.txt
+                // → WifiAutoConnect.LoadWifiList() sẽ đọc khi cần.
             };
-            main.Controls.Add(btnChange4G);
-            y += 48;
+            main.Controls.Add(btnWifi);
+            y += 44;
 
-            // ── Chức năng khác ──
-            main.Controls.Add(MkGroupLabel("Chức năng khác", boldFont, ref y, W));
-            var btnTelegram = new AntdUI.Button
+            var lblWifiHint = new System.Windows.Forms.Label
             {
-                Text = "Thông báo Telegram", Shape = AntdUI.TShape.Round, Size = new Size(145, 34),
-                Location = new Point(10, y), Font = normalFont
+                Text = "Khi chạy, nếu PC mất internet, app sẽ tự kết nối lại\ntheo danh sách wifi đã cấu hình.",
+                AutoSize  = false,
+                Size      = new Size(W, 32),
+                Location  = new Point(10, y),
+                Font      = normalFont,
+                ForeColor = Color.FromArgb(140, 140, 140),
+                BackColor = Color.Transparent,
             };
-            main.Controls.Add(btnTelegram);
-            var btnSort = new AntdUI.Button
-            {
-                Text = "Sắp xếp", Shape = AntdUI.TShape.Round, Size = new Size(90, 34),
-                Location = new Point(170, y), Font = normalFont
-            };
-            main.Controls.Add(btnSort);
-            var nudSortNum = new NumericUpDown { Minimum = 1, Maximum = 100, Value = 10, Width = 50, Location = new Point(268, y + 2), Font = normalFont };
-            main.Controls.Add(nudSortNum);
-            y += 48;
+            main.Controls.Add(lblWifiHint);
+            y += 40;
 
             _mainRightPanel = main;
             panelRight.Controls.Add(main);
@@ -628,11 +609,16 @@ namespace Sunny.Subdy.UI.View.Pages
                 BackColor = Color.FromArgb(230, 230, 230),
             };
 
-            // Đặt button lên Form chính (fMain), sát mép phải
+            // Đặt button lên Form chính (fMain), sát mép phải.
+            // CHỈ attach vào fMain — không attach vào dialog tạm (fAddUsercontrol),
+            // vì khi dialog Close() sẽ Dispose() toàn bộ Controls của nó, kéo theo
+            // _btnTogglePanel bị dispose → các lần dùng sau (SetButtonActive →
+            // TogglePanelButtonVisible.set) sẽ throw ObjectDisposedException.
             this.ParentChanged += (s, e) =>
             {
                 var form = this.FindForm();
-                if (form == null || _btnTogglePanel.Parent == form) return;
+                if (form is not fMain) return;
+                if (_btnTogglePanel.Parent == form) return;
                 form.Controls.Add(_btnTogglePanel);
                 _btnTogglePanel.BringToFront();
                 PositionToggleButton(form);
@@ -719,14 +705,143 @@ namespace Sunny.Subdy.UI.View.Pages
         private List<DeviceModel> GetSelectedOrCheckedDevices()
         {
             var result = new HashSet<DeviceModel>();
-            // Add checked devices
+            // Add checked devices — chỉ những row đủ điều kiện (IsRowEnabled).
+            // Row bị disable nhưng vẫn còn Checked do health-check flip trễ sẽ bị bỏ qua.
             foreach (var d in DeviceServices.DeviceModels)
-                if (d.Checked) result.Add(d);
-            // Add selected (highlighted) rows
+                if (d.Checked && d.IsRowEnabled) result.Add(d);
+            // Add selected (highlighted/bôi đen) rows — vẫn phải đạt điều kiện thì
+            // mới được coi là target hợp lệ cho job.
             foreach (DataGridViewRow row in dataGridView1.SelectedRows)
-                if (row.DataBoundItem is DeviceModel dev)
+                if (row.DataBoundItem is DeviceModel dev && dev.IsRowEnabled)
                     result.Add(dev);
             return result.ToList();
+        }
+
+        /// <summary>Chỉ lấy các device có checkbox=true.</summary>
+        private List<DeviceModel> GetCheckedDevices()
+            => DeviceServices.DeviceModels.Where(d => d.Checked).ToList();
+
+        /// <summary>
+        /// Thực thi flow "Cài đặt phone" trên các device đang tick checkbox theo cấu hình truyền vào.
+        /// Được gọi ngay sau khi popup Áp dụng → không cần bấm Bắt đầu.
+        /// </summary>
+        private async Task RunPhoneSetupAsync(LamToolAutoPhonePrime.Views.Forms.PhoneSetupOptions opts)
+        {
+            var targets = GetCheckedDevices();
+            if (targets.Count == 0)
+            {
+                AntdHelper.NotifyWarn(this.FindForm(), "Chưa chọn thiết bị",
+                    "Vui lòng tick checkbox ít nhất 1 thiết bị trước khi Áp dụng.");
+                return;
+            }
+
+            bool caiDatBanDau = opts.CaiDatBanDau;
+            bool tatAmThanh   = opts.TatAmThanh;
+            bool ngonNguEng   = opts.NgonNguEng;
+            bool caiFacebook  = opts.CaiFacebook;
+            bool khoiDong     = opts.KhoiDong;
+            bool tatGPS       = opts.TatGPS;
+            bool caiTLC       = opts.CaiGolikeHelper;
+            bool capQuyenTLC  = opts.CapQuyenGolikeHelper;
+
+            SetRightPanelEnabled(false);
+            // Auto re-enable panel sau 60s — tránh kẹt UI nếu 1 device treo lâu
+            _ = Task.Delay(TimeSpan.FromSeconds(60)).ContinueWith(_ =>
+            {
+                if (IsDisposed || Disposing) return;
+                try { BeginInvoke(new Action(() => SetRightPanelEnabled(true))); } catch { }
+            }, TaskScheduler.Default);
+
+            try
+            {
+                var tasks = new List<Task>();
+                foreach (var device in targets)
+                {
+                    var dev = device;
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        var client = new ADBClient(dev);
+                        try
+                        {
+                            if (caiDatBanDau)
+                            {
+                                dev.Status = "Cài đặt ban đầu...";
+                                dev.TypeColor = 0;
+                                client.Connect();
+                                await client.maxChange.Install();
+                                client.maxChange.ResetWallpaperDefault();
+                                await InstallFacebookApk(client);
+                            }
+
+                            if (tatAmThanh)
+                            {
+                                dev.Status = "Tắt âm thanh...";
+                                client.Shell("media volume --stream 3 --set 0");
+                                client.Shell("media volume --stream 1 --set 0");
+                                client.Shell("media volume --stream 5 --set 0");
+                                client.Shell("media volume --stream 2 --set 0");
+                                client.Shell("media volume --stream 4 --set 0");
+                                client.LogHelper.SUCCESS("Đã tắt âm thanh");
+                            }
+
+                            if (ngonNguEng)
+                            {
+                                dev.Status = "Cài ngôn ngữ English...";
+                                var lang = new ChangeLanguageService(client);
+                                await lang.Change("en", "US");
+                                client.LogHelper.SUCCESS("Đã chuyển ngôn ngữ English");
+                            }
+
+                            if (caiFacebook)
+                            {
+                                dev.Status = "Cài Facebook...";
+                                await InstallFacebookApk(client);
+                            }
+
+                            if (khoiDong)
+                            {
+                                dev.Status = "Khởi động lại...";
+                                client.RebootAndWaitForDeviceReady();
+                            }
+
+                            if (tatGPS)
+                            {
+                                dev.Status = "Tắt GPS...";
+                                client.Shell("settings put secure location_providers_allowed -gps,-network");
+                                client.LogHelper.SUCCESS("Đã tắt GPS");
+                            }
+
+                            if (caiTLC)
+                            {
+                                dev.Status = "Cài GolikeHelper...";
+                                await client.maxChange.Install();
+                            }
+
+                            if (capQuyenTLC)
+                            {
+                                dev.Status = "Cấp quyền GolikeHelper...";
+                                client.SetEnableModuleMaxChange();
+                                client.LogHelper.SUCCESS("Đã cấp quyền GolikeHelper");
+                            }
+
+                            dev.Status = "Hoàn thành";
+                            dev.TypeColor = 2;
+                        }
+                        catch (Exception ex)
+                        {
+                            dev.Status = $"Lỗi: {ex.Message}";
+                            dev.TypeColor = 1;
+                            LogManager.Error(ex);
+                        }
+                    }));
+                }
+                await Task.WhenAll(tasks);
+                ApplyFilter();
+            }
+            finally
+            {
+                SetRightPanelEnabled(true);
+            }
         }
 
         private static void LaunchViewControl(string args)
@@ -927,8 +1042,17 @@ namespace Sunny.Subdy.UI.View.Pages
                 return;
             }
 
-            // Row text color via e.CellStyle (avoids paint loop from row.DefaultCellStyle)
-            if (!device.IsAdbOnline)
+            // Status column: custom-painted (xem uiDataGridView1_CellPainting) — không override ForeColor.
+            if (colName == "col_Status") return;
+
+            // Row text color via e.CellStyle (avoids paint loop from row.DefaultCellStyle).
+            // Disabled row (ATX/internet fail) ưu tiên xám trước — tránh chạm row.DefaultCellStyle
+            // trong RowPrePaint (gây invalidate đệ quy → khựng khi scroll).
+            if (!device.IsRowEnabled)
+            {
+                e.CellStyle.ForeColor = _disabledFore;
+            }
+            else if (!device.IsAdbOnline)
             {
                 e.CellStyle.ForeColor = _grayOffline;
             }
@@ -943,6 +1067,119 @@ namespace Sunny.Subdy.UI.View.Pages
             }
             // Giữ cùng ForeColor khi row được "bôi đen" để đọc được trên nền pale blue
             e.CellStyle.SelectionForeColor = e.CellStyle.ForeColor;
+        }
+
+        private static readonly Color _disabledFore = Color.FromArgb(170, 170, 170);
+
+        // Cache màu segment cho col_Status (tránh allocate mỗi lần paint)
+        private static readonly Color _segOk        = Color.FromArgb(34, 139, 34);   // forest green
+        private static readonly Color _segFail      = Color.FromArgb(220, 53, 69);   // red
+        private static readonly Color _segNeutral   = Color.FromArgb(89, 89, 89);    // gray-8 — cho text plain
+        private static readonly Color _segSeparator = Color.FromArgb(217, 217, 217); // border
+
+        /// <summary>
+        /// Custom paint col_Status: hiển thị từng segment (Internet/App Fb/Tiếng Anh/...) với màu riêng.
+        /// Format dữ liệu: "<OK>label|<FAIL>label|..." từ DeviceHealthCheckService.
+        /// Nếu không phải format mới → fallback render text plain bằng style mặc định.
+        /// </summary>
+        /// <summary>
+        /// Row disabled (IsRowEnabled=false) → đổi ForeColor xám để user thấy ngay
+        /// row không khả dụng. ReadOnly đã được set ở ApplyRowEnabledState.
+        /// </summary>
+        private void uiDataGridView1_RowPrePaint(object? sender, DataGridViewRowPrePaintEventArgs e)
+        {
+            // Trước đây handler này gán row.DefaultCellStyle.ForeColor trong paint callback
+            // — gây Invalidate đệ quy mỗi tick scroll → khựng và đôi khi đổi cursor sang IBeam.
+            // Toàn bộ logic màu disabled đã chuyển sang CellFormatting (e.CellStyle).
+            // Giữ handler rỗng để không cần unwire ở nơi khác.
+        }
+
+        private void uiDataGridView1_CellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            var dgv = sender as DataGridView;
+            if (dgv == null) return;
+            if (dgv.Columns[e.ColumnIndex].Name != "col_Status") return;
+
+            string? raw = e.Value as string;
+            if (string.IsNullOrEmpty(raw)) return;
+
+            // Nếu không chứa marker mới → để DataGridView render mặc định (cellformatting đã set color)
+            if (!raw.Contains("<OK>") && !raw.Contains("<FAIL>")) return;
+
+            // ── Custom paint ─────────────────────────────────
+            // 1. Paint background + border default
+            e.Paint(e.ClipBounds, DataGridViewPaintParts.Background
+                                | DataGridViewPaintParts.Border
+                                | DataGridViewPaintParts.SelectionBackground);
+
+            var g = e.Graphics;
+            var prevSmooth = g.SmoothingMode;
+            var prevText = g.TextRenderingHint;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+            var rect = e.CellBounds;
+            int padL = 6;
+            int padR = 6;
+
+            // Font lấy từ cellstyle (có thể là Body9Bold)
+            var font = e.CellStyle.Font ?? dgv.Font;
+
+            // Parse segments tách bởi '|'
+            var parts = raw.Split('|');
+            float x = rect.Left + padL;
+            float yCenter = rect.Top + rect.Height / 2f;
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = parts[i];
+                Color color;
+                string label;
+
+                if (part.StartsWith("<OK>", StringComparison.Ordinal))
+                {
+                    color = _segOk;
+                    label = "✓ " + part.Substring(4);
+                }
+                else if (part.StartsWith("<FAIL>", StringComparison.Ordinal))
+                {
+                    color = _segFail;
+                    label = "✗ " + part.Substring(6);
+                }
+                else
+                {
+                    color = _segNeutral;
+                    label = part;
+                }
+
+                // Đo kích thước segment
+                var sz = g.MeasureString(label, font);
+
+                // Vẽ text
+                using (var brush = new SolidBrush(color))
+                {
+                    g.DrawString(label, font, brush, x, yCenter - sz.Height / 2f);
+                }
+                x += sz.Width;
+
+                // Separator giữa segments
+                if (i < parts.Length - 1)
+                {
+                    string sep = "  •  ";
+                    var sepSz = g.MeasureString(sep, font);
+                    using (var b = new SolidBrush(_segSeparator))
+                        g.DrawString(sep, font, b, x, yCenter - sepSz.Height / 2f);
+                    x += sepSz.Width;
+                }
+
+                // Stop nếu vượt quá cell width
+                if (x > rect.Right - padR) break;
+            }
+
+            g.SmoothingMode = prevSmooth;
+            g.TextRenderingHint = prevText;
+            e.Handled = true;
         }
 
         private void UpdateStatusBar()
@@ -960,6 +1197,12 @@ namespace Sunny.Subdy.UI.View.Pages
             {
                 ApplyFilter();
                 _ = Configs();
+
+                // Auto-connect ATX cho mọi device ADB online để cột "Live" hiển thị
+                // ngay khi user mở tab Thiết bị / bấm reload — không phải chờ user
+                // tick + bấm Kết nối thủ công. Đồng thời sau khi connect xong,
+                // re-evaluate IsRowEnabled (yêu cầu cả internet + ATX OK).
+                _ = AutoConnectAndRefresh();
             }
             catch (Exception ex)
             {
@@ -974,7 +1217,101 @@ namespace Sunny.Subdy.UI.View.Pages
                     CreateMenuStrip();
                 }
             }
+        }
 
+        /// <summary>
+        /// Chạy nền: connect ATX cho mọi device, đợi DeviceHealthCheckService probe
+        /// internet, rồi re-evaluate IsRowEnabled. Refresh UI ở mỗi giai đoạn.
+        /// </summary>
+        private async Task AutoConnectAndRefresh()
+        {
+            try
+            {
+                // 1) Connect ATX trước cho mọi máy (fail-fast 10s/máy bên trong ConnectAll).
+                //    Sau bước này: IsLive đã chính xác → biết máy nào dùng được.
+                await DeviceServices.ConnectAll();
+
+                // Refresh UI ngay sau ConnectAll để user thấy trạng thái ATX (kể cả lỗi)
+                // trước khi health-check bắt đầu ghi vào col_Status.
+                if (!IsDisposed && dataGridView1.IsHandleCreated)
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        try
+                        {
+                            ApplyRowEnabledState();
+                            dataGridView1.Refresh();
+                            UpdateStatusBar();
+                        }
+                        catch { }
+                    }));
+                }
+
+                // 2) Sau khi ATX đã settle, mới start health-check (internet/app/lang/...).
+                //    Chỉ chạy cho máy có ATX live — máy ATX fail thì giữ nguyên Status
+                //    "Không connect được ATX (...)" cho user thấy.
+                foreach (var dev in DeviceServices.DeviceModels.ToList())
+                {
+                    if (dev.IsAdbOnline && dev.IsLive)
+                        DeviceHealthCheckService.StartAsync(dev);
+                }
+
+                // 3) Đợi thêm tối đa 8s để internet flag stabilize trước khi finalize row state.
+                var deadline = DateTime.UtcNow.AddSeconds(8);
+                while (DateTime.UtcNow < deadline)
+                {
+                    var pending = DeviceServices.DeviceModels
+                        .Where(d => d.IsAdbOnline && !d.HasInternet && d.IsLive)
+                        .ToList();
+                    if (pending.Count == 0) break;
+                    await Task.Delay(500);
+                }
+
+                // Recompute lần cuối — đề phòng HasInternet được set trễ sau ConnectAll.
+                foreach (var dev in DeviceServices.DeviceModels)
+                {
+                    if (!dev.IsAdbOnline)
+                    {
+                        dev.IsRowEnabled = false;
+                        continue;
+                    }
+                    dev.IsRowEnabled = dev.HasInternet && dev.IsLive;
+                }
+
+                // UI refresh trên UI thread.
+                if (!IsDisposed && dataGridView1.IsHandleCreated)
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        try
+                        {
+                            ApplyRowEnabledState();
+                            dataGridView1.Refresh();
+                            UpdateStatusBar();
+                        }
+                        catch { }
+                    }));
+                }
+            }
+            catch (Exception ex) { LogManager.Error(ex); }
+        }
+
+        /// <summary>
+        /// Đồng bộ Row.ReadOnly + ForeColor theo IsRowEnabled.
+        /// Row disabled (mất internet hoặc ATX fail) → user không tick được checkbox.
+        /// </summary>
+        private void ApplyRowEnabledState()
+        {
+            if (dataGridView1.Rows.Count == 0) return;
+            for (int i = 0; i < dataGridView1.Rows.Count; i++)
+            {
+                var row = dataGridView1.Rows[i];
+                if (row.DataBoundItem is not DeviceModel dev) continue;
+                bool enabled = dev.IsRowEnabled;
+                if (row.ReadOnly != !enabled) row.ReadOnly = !enabled;
+                // Nếu disabled mà đang Checked → uncheck (chống chạy job trên máy fail).
+                if (!enabled && dev.Checked) dev.Checked = false;
+            }
         }
 
         private async Task Configs()
@@ -1041,7 +1378,9 @@ namespace Sunny.Subdy.UI.View.Pages
                 {
                     try
                     {
-                        int targetPanel2 = 350;
+                        // Panel phải rộng hơn (400) để chứa toàn bộ control 305px + padding + scrollbar dọc
+                        // — tránh scroll ngang khó dùng.
+                        int targetPanel2 = 400;
                         int available = splitContainer1.Width - splitContainer1.SplitterWidth;
                         if (available > targetPanel2 + 100)
                         {
@@ -1316,17 +1655,23 @@ namespace Sunny.Subdy.UI.View.Pages
                 var text = it.Text;
 
                 // ── Chọn ──────────────────────────────────────────────────────
+                // Điều kiện bắt buộc để tick được Checked = IsRowEnabled (ATX connected && HasInternet).
+                // Phải batch qua BulkUpdateChecked, nếu không mỗi ForEach gây ListChanged → grid
+                // repaint từng row → UI đơ vài giây khi có nhiều thiết bị.
                 if (text == "Tất cả")
-                    DeviceServices.DeviceModels.ForEach(x => x.Checked = true);
+                    BulkUpdateChecked(d => d.Checked = d.IsRowEnabled);
                 else if (text == "Bôi đen")
                 {
-                    DeviceServices.DeviceModels.ForEach(x => x.Checked = false);
-                    foreach (var d in GetSelectedDevices()) d.Checked = true;
+                    var selected = new HashSet<DeviceModel>(GetSelectedDevices());
+                    BulkUpdateChecked(d => d.Checked = selected.Contains(d) && d.IsRowEnabled);
                 }
                 else if (text == "Bỏ chọn bôi đen")
-                    foreach (var d in GetSelectedDevices()) d.Checked = false;
+                {
+                    var selected = new HashSet<DeviceModel>(GetSelectedDevices());
+                    BulkUpdateChecked(d => { if (selected.Contains(d)) d.Checked = false; });
+                }
                 else if (text == "Bỏ chọn tất cả")
-                    DeviceServices.DeviceModels.ForEach(x => x.Checked = false);
+                    BulkUpdateChecked(d => d.Checked = false);
 
                 // ── Connect / Disconnect ───────────────────────────────────────
                 else if (text == "Connect")
@@ -1966,10 +2311,11 @@ namespace Sunny.Subdy.UI.View.Pages
             Form parentForm = this.FindForm();
             if (parentForm != null)
             {
+                // Hide button TRƯỚC khi Close() để tránh lần repaint cuối trên dialog đang dispose
+                button2.Visible = false;
                 parentForm.DialogResult = DialogResult.OK;
                 parentForm.Close();
             }
-            button2.Visible = false;
         }
 
         private void button3_Click(object sender, EventArgs e)

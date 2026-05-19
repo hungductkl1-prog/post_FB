@@ -156,6 +156,48 @@ namespace LamToolAutoPhonePrime.Utils.Design
 
             pContent.BackColor = ColorPalette.Background;
             pContent.Padding   = new Padding(0); // UserControls tự padding
+
+            MountSystemStatusBar(form, pContent);
+
+            // ucHistoriesJob được tạo sau (trong fMain_Load async). Hook ControlAdded
+            // để inject Operations Dashboard cards lên top khi nó join pContent.
+            pContent.ControlAdded += (s, e) =>
+            {
+                if (e.Control is ucHistoriesJob hj) MountOperationsDashboard(hj);
+            };
+            // Trường hợp đã add trước khi hook (idempotent):
+            foreach (Control c in pContent.Controls)
+            {
+                if (c is ucHistoriesJob hj) MountOperationsDashboard(hj);
+            }
+        }
+
+        /// <summary>
+        /// Inject Operations Dashboard cards (Dock=Top) vào trong ucHistoriesJob.
+        /// Idempotent — chỉ tạo 1 lần.
+        /// </summary>
+        private static void MountOperationsDashboard(ucHistoriesJob hj)
+        {
+            const string key = "ssaOperationsDashboard";
+            if (hj.Controls.Find(key, true).Length > 0) return;
+
+            var dash = new ucOperationsDashboard { Name = key };
+            hj.Controls.Add(dash);
+            dash.BringToFront();
+        }
+
+        /// <summary>
+        /// Mount ucSystemStatusBar lên trên cùng pContent (Dock=Top, height 32).
+        /// Idempotent — chỉ tạo 1 lần.
+        /// </summary>
+        private static void MountSystemStatusBar(fMain form, System.Windows.Forms.Panel pContent)
+        {
+            const string key = "ssaSystemStatusBar";
+            if (pContent.Controls.Find(key, true).Length > 0) return;
+
+            var bar = new ucSystemStatusBar { Name = key };
+            pContent.Controls.Add(bar);
+            bar.BringToFront();
         }
 
         /// <summary>
@@ -187,12 +229,15 @@ namespace LamToolAutoPhonePrime.Utils.Design
 
             // Font: Segoe UI Bold — chuẩn Windows desktop, crisp, không răng cưa
             var menuFont = new Font(FontScale.FamilyName, 11F, FontStyle.Bold);
+            var groupFont = new Font(FontScale.FamilyName, 8.5F, FontStyle.Bold);
 
             var menu = new AntdUI.Menu
             {
                 Dock        = DockStyle.Fill,
-                BackColor   = ColorPalette.Surface,
+                BackColor   = ColorPalette.SidebarBg,
                 ForeColor   = ColorPalette.TextPrimary,
+                BackHover   = ColorPalette.SidebarItemHover,
+                BackActive  = ColorPalette.SidebarItemActive,
                 Radius      = Radius.Md,
                 Font        = menuFont,
                 ShowSubBack = false,
@@ -200,19 +245,63 @@ namespace LamToolAutoPhonePrime.Utils.Design
                 Unique      = true,
             };
 
-            // Map svg icon theo button name
-            foreach (var btn in oldButtons)
-            {
-                var iconSvg = btn.Name switch
-                {
-                    "btn_android"  => "MobileOutlined",
-                    "btn_facebook" => "FacebookOutlined",
-                    "btn_history"  => "DashboardOutlined",
-                    _              => "AppstoreOutlined"
-                };
+            // SSA: group structure — Operations / Automation / Infrastructure
+            // Group headers là MenuItem disabled, chỉ render text uppercase tracking
+            // (vẫn nằm trong Items để giữ thứ tự render).
+            var byName = oldButtons.ToDictionary(b => b.Name, b => b);
 
+            void AddGroup(string title)
+            {
+                // Group header = MenuItem disabled (không click được, dim color tự apply).
+                var header = new AntdUI.MenuItem(title.ToUpperInvariant())
+                {
+                    Enabled = false,
+                    Font    = groupFont,
+                    ID      = $"grp_{title}"
+                };
+                menu.Items.Add(header);
+            }
+
+            void AddItem(string btnName)
+            {
+                if (!byName.TryGetValue(btnName, out var btn)) return;
+                var iconSvg = btnName switch
+                {
+                    "btn_android"   => "MobileOutlined",
+                    "btn_facebook"  => "FacebookOutlined",
+                    "btn_instagram" => "InstagramOutlined",
+                    "btn_threads"   => "CommentOutlined",
+                    "btn_history"   => "DashboardOutlined",
+                    _               => "AppstoreOutlined"
+                };
                 var item = new AntdUI.MenuItem(btn.Text, iconSvg) { Tag = btn, ID = btn.Name };
                 menu.Items.Add(item);
+            }
+
+            AddGroup("Tổng quan");
+            AddItem("btn_history");
+
+            AddGroup("Tự động hoá");
+            AddItem("btn_facebook");
+            AddItem("btn_instagram");
+            AddItem("btn_threads");
+
+            AddGroup("Hạ tầng");
+            AddItem("btn_android");
+
+            // Fallback: any button không match group nào → push xuống cuối "Khác"
+            var grouped = new HashSet<string> {
+                "btn_history", "btn_facebook", "btn_instagram", "btn_threads", "btn_android"
+            };
+            var others = oldButtons.Where(b => !grouped.Contains(b.Name)).ToList();
+            if (others.Count > 0)
+            {
+                AddGroup("Khác");
+                foreach (var b in others)
+                {
+                    var item = new AntdUI.MenuItem(b.Text, "AppstoreOutlined") { Tag = b, ID = b.Name };
+                    menu.Items.Add(item);
+                }
             }
 
             // Invoke trực tiếp MenuButton_Click của fMain (sender = Button cũ)
@@ -381,7 +470,7 @@ namespace LamToolAutoPhonePrime.Utils.Design
                 x += btnFolderMgr.Width + Spacing.Lg;
             }
 
-            // Common ghost styling cho 3 button Jobs/Settings/Tương tác
+            // Secondary buttons (outline ghost) cho Jobs/Settings/Tương tác
             foreach (var (b, w) in new[]
             {
                 (btnJobs,     120),
@@ -390,15 +479,10 @@ namespace LamToolAutoPhonePrime.Utils.Design
             })
             {
                 if (b == null) continue;
-                b.Anchor      = AnchorStyles.Top | AnchorStyles.Right;
-                b.Ghost       = true;
-                b.BorderWidth = 1F;
-                b.Radius      = Radius.Md;
-                b.Shape       = TShape.Default;
-                b.Font        = FontScale.Body9Bold;
-                b.ForeColor   = ColorPalette.TextSecondary;
-                b.Size        = new Size(w, btnH);
-                b.Visible     = true;
+                ButtonStyle.ApplySecondary(b);
+                b.Anchor  = AnchorStyles.Top | AnchorStyles.Right;
+                b.Size    = new Size(w, btnH);
+                b.Visible = true;
             }
 
             // Right-anchored flow: từ phải sang trái
@@ -450,6 +534,7 @@ namespace LamToolAutoPhonePrime.Utils.Design
             var cboFilter = GetField<AntdUI.SelectMultiple>(uc, "cboFilterAccount");
             var btnReload = GetField<AntdUI.Button>(uc, "button9");
             var btnEye    = GetField<System.Windows.Forms.Button>(uc, "button17");
+            var btnDensity = EnsureDensityButton(uc);
 
             if (panel7 == null) return;
 
@@ -463,19 +548,23 @@ namespace LamToolAutoPhonePrime.Utils.Design
             if (btnColumns != null && btnColumns.Parent != panel7)
                 panel7.Controls.Add(btnColumns);
 
+            if (btnDensity != null && btnDensity.Parent != panel7)
+                panel7.Controls.Add(btnDensity);
+
             // Ẩn button17 "con mắt" cũ (giữ để reference code, handler click sẽ được forward)
             if (btnEye != null) btnEye.Visible = false;
 
             const int h = 36;
             int py = Spacing.Md;
 
-            // Tổng chiều rộng cần cho 4 control + 3 gap
-            // [cboFilter 180] [search 240] [reload 100] [columns 120] + 3*Sm + padding 2*Md
+            // Tổng chiều rộng cần cho 5 control + 4 gap
+            // [cboFilter 180] [search 240] [reload 100] [density 38] [columns 120]
             const int colsW    = 180;
             const int searchW  = 240;
             const int reloadW  = 100;
+            const int densityW = 38;
             const int columnsW = 120;
-            int needW = colsW + searchW + reloadW + columnsW + Spacing.Sm * 3 + Spacing.Md * 2;
+            int needW = colsW + searchW + reloadW + densityW + columnsW + Spacing.Sm * 4 + Spacing.Md * 2;
 
             // Panel7 Dock=Right; mở rộng Width đủ chỗ cho toàn bộ controls
             if (panel7.Width < needW) panel7.Width = needW;
@@ -499,6 +588,14 @@ namespace LamToolAutoPhonePrime.Utils.Design
                 btnReload.Size     = new Size(100, h);
                 rx -= btnReload.Width;
                 btnReload.Location = new Point(rx, py);
+                rx -= Spacing.Sm;
+            }
+            if (btnDensity != null)
+            {
+                btnDensity.Anchor   = AnchorStyles.Top | AnchorStyles.Right;
+                btnDensity.Size     = new Size(38, h);
+                rx -= btnDensity.Width;
+                btnDensity.Location = new Point(rx, py);
                 rx -= Spacing.Sm;
             }
             if (input6 != null)
@@ -580,17 +677,11 @@ namespace LamToolAutoPhonePrime.Utils.Design
                 select1.Radius = Radius.Md;
             }
 
-            // panel3 inner buttons: cài đặt jobs / chung / tương tác
+            // panel3 inner buttons: cài đặt jobs / chung / tương tác — secondary outline
             foreach (var name in new[] { "button4", "button5", "button6" })
             {
                 var b = GetField<AntdUI.Button>(uc, name);
-                if (b == null) continue;
-                b.Ghost       = true;
-                b.BorderWidth = 1F;
-                b.Radius      = Radius.Md;
-                b.Shape       = TShape.Default;
-                b.Font        = FontScale.Body9Bold;
-                b.ForeColor   = ColorPalette.TextSecondary;
+                ButtonStyle.ApplySecondary(b);
             }
 
             // panel4: Run / Stop / Search / Add-Account
@@ -599,33 +690,10 @@ namespace LamToolAutoPhonePrime.Utils.Design
             var btnAdd  = GetField<AntdUI.Button>(uc, "button16");
             var input6  = GetField<Input>(uc, "input6");
 
-            if (btnRun != null)
-            {
-                btnRun.DefaultBack = ColorPalette.Success;
-                btnRun.ForeColor   = Color.White;
-                btnRun.Radius      = Radius.Md;
-                btnRun.Shape       = TShape.Default;
-                btnRun.Font        = FontScale.Body9Bold;
-                btnRun.Type        = TTypeMini.Success;
-            }
-            if (btnStop != null)
-            {
-                btnStop.DefaultBack = ColorPalette.Error;
-                btnStop.ForeColor   = Color.White;
-                btnStop.Radius      = Radius.Md;
-                btnStop.Shape       = TShape.Default;
-                btnStop.Font        = FontScale.Body9Bold;
-                btnStop.Type        = TTypeMini.Error;
-            }
-            if (btnAdd != null)
-            {
-                btnAdd.DefaultBack = ColorPalette.Accent;
-                btnAdd.ForeColor   = Color.White;
-                btnAdd.Radius      = Radius.Md;
-                btnAdd.Shape       = TShape.Default;
-                btnAdd.Font        = FontScale.Body9Bold;
-                btnAdd.Type        = TTypeMini.Warn;
-            }
+            // Visual hierarchy: Run = Success (primary action), Stop = Danger, Add = Accent (secondary CTA)
+            ButtonStyle.ApplySuccess(btnRun);
+            ButtonStyle.ApplyDanger(btnStop);
+            ButtonStyle.ApplyAccent(btnAdd);
             if (input6 != null)
             {
                 input6.Radius      = Radius.Md;
@@ -652,17 +720,8 @@ namespace LamToolAutoPhonePrime.Utils.Design
                 cbo.Radius = Radius.Md;
             }
 
-            // button9 "Tải lại"
-            var btnReload = GetField<AntdUI.Button>(uc, "button9");
-            if (btnReload != null)
-            {
-                btnReload.DefaultBack = ColorPalette.Primary;
-                btnReload.ForeColor   = Color.White;
-                btnReload.Radius      = Radius.Md;
-                btnReload.Shape       = TShape.Default;
-                btnReload.Font        = FontScale.Body9Bold;
-                btnReload.Type        = TTypeMini.Primary;
-            }
+            // button9 "Tải lại" — primary blue
+            ButtonStyle.ApplyPrimary(GetField<AntdUI.Button>(uc, "button9"));
 
             // Count chips toolStrip2 (Live/Die/Khác)
             var ts2 = GetField<ToolStrip>(uc, "toolStrip2");
@@ -697,10 +756,19 @@ namespace LamToolAutoPhonePrime.Utils.Design
             // Figma-style: bỏ hẳn cell border (không vertical + không horizontal)
             dgv.CellBorderStyle        = DataGridViewCellBorderStyle.None;
             dgv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
-            dgv.RowTemplate.Height     = 30; // đồng bộ với grid bên Thiết bị
+            dgv.RowTemplate.Height     = TableDensity.RowHeight(TableDensity.Current);
             dgv.GridColor              = ColorPalette.BorderLight;
-            dgv.ColumnHeadersHeight    = GridStyleHelper.HeaderHeight;     // 40
+            dgv.ColumnHeadersHeight    = TableDensity.HeaderHeight(TableDensity.Current);
             dgv.BorderStyle            = BorderStyle.None;
+
+            // Subscribe ModeChanged để re-apply khi user toggle
+            EventHandler<TableDensityMode> handler = (_, mode) =>
+            {
+                if (dgv.IsDisposed) return;
+                TableDensity.Apply(dgv, mode);
+            };
+            TableDensity.ModeChanged += handler;
+            dgv.Disposed += (_, __) => TableDensity.ModeChanged -= handler;
             dgv.BackgroundColor        = ColorPalette.Surface;
             dgv.EnableHeadersVisualStyles = false;
             // Bỏ alternating rows — Figma dùng flat white background
@@ -879,61 +947,56 @@ namespace LamToolAutoPhonePrime.Utils.Design
         }
 
         /// <summary>
-        /// Thay hand-drawn empty state trong ctor bằng paint SSA chuẩn:
-        /// icon nhỏ + title + hint. Gắn trực tiếp lên grid Paint.
+        /// Mount EmptyStateView overlay lên grid card (panel5).
+        /// Toggle visibility theo dgv.Rows.Count: > 0 thì ẩn, = 0 thì hiển thị.
+        /// CTA → click vào btnAdd (button16) — tận dụng handler cũ.
         /// </summary>
         private static void StyleEmptyStatePanel(ucdgvAccount uc)
         {
             var dgv = GetField<DataGridView>(uc, "dataGridView1");
-            if (dgv == null) return;
+            var panel5 = GetField<AntdUI.Panel>(uc, "panel5");
+            var btnAdd = GetField<AntdUI.Button>(uc, "button16");
+            if (dgv == null || panel5 == null) return;
 
-            // Event cũ đã đăng ký trong ctor sẽ vẫn chạy trước.
-            // Để thay thế gọn: override background color khi rỗng.
-            dgv.Paint += (s, e) =>
+            const string key = "ssaEmptyState";
+            if (panel5.Controls.Find(key, true).Length > 0) return;
+
+            var es = new EmptyStateView
             {
-                if (dgv.Rows.Count != 0) return;
-
-                var rect = dgv.ClientRectangle;
-                var g = e.Graphics;
-                var prevMode = g.SmoothingMode;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-
-                using var titleFont = FontScale.HeadingBold;
-                using var hintFont  = FontScale.Body9;
-
-                const string title = "Chưa có tài khoản nào";
-                const string hint  = "Nhấn \"Thêm tài khoản\" để bắt đầu";
-
-                var titleSize = g.MeasureString(title, titleFont);
-                var hintSize  = g.MeasureString(hint, hintFont);
-
-                int iconSize = 48;
-                float totalH = iconSize + titleSize.Height + hintSize.Height + Spacing.Md * 2;
-                float startY = (rect.Height - totalH) / 2f;
-
-                // Icon disc (circle với svg-ish "inbox" hint)
-                var iconRect = new RectangleF((rect.Width - iconSize) / 2f, startY, iconSize, iconSize);
-                using var discBrush = new SolidBrush(ColorPalette.BorderLight);
-                g.FillEllipse(discBrush, iconRect);
-                using var innerPen = new Pen(ColorPalette.TextDisabled, 2f);
-                g.DrawLine(innerPen, iconRect.Left + 14, iconRect.Top + iconSize * 0.6f,
-                                      iconRect.Right - 14, iconRect.Top + iconSize * 0.6f);
-                g.DrawLine(innerPen, iconRect.Left + 14, iconRect.Top + iconSize * 0.6f,
-                                      iconRect.Left + 20, iconRect.Top + iconSize * 0.35f);
-                g.DrawLine(innerPen, iconRect.Right - 14, iconRect.Top + iconSize * 0.6f,
-                                      iconRect.Right - 20, iconRect.Top + iconSize * 0.35f);
-
-                using var titleBrush = new SolidBrush(ColorPalette.TextSecondary);
-                using var hintBrush  = new SolidBrush(ColorPalette.TextTertiary);
-                g.DrawString(title, titleFont, titleBrush,
-                    (rect.Width - titleSize.Width) / 2f,
-                    startY + iconSize + Spacing.Md);
-                g.DrawString(hint, hintFont, hintBrush,
-                    (rect.Width - hintSize.Width) / 2f,
-                    startY + iconSize + Spacing.Md + titleSize.Height + Spacing.Xs);
-
-                g.SmoothingMode = prevMode;
+                Name     = key,
+                Title    = "Chưa có tài khoản nào",
+                Subtitle = "Bắt đầu farm tự động trong 4 bước:",
+                Steps    = new[]
+                {
+                    "Kết nối thiết bị Android",
+                    "Thêm tài khoản Facebook/Instagram/Threads",
+                    "Chọn kịch bản farm",
+                    "Nhấn \"Chạy\" để bắt đầu",
+                },
+                CtaText  = "Thêm tài khoản",
+                Visible  = false,
             };
+            es.CtaClicked += (_, __) =>
+            {
+                if (btnAdd != null) btnAdd.PerformClick();
+            };
+
+            panel5.Controls.Add(es);
+            es.BringToFront();
+
+            void Toggle()
+            {
+                if (dgv.IsDisposed) return;
+                es.Visible = dgv.Rows.Count == 0;
+            }
+
+            dgv.RowsAdded   += (_, __) => Toggle();
+            dgv.RowsRemoved += (_, __) => Toggle();
+            dgv.DataBindingComplete += (_, __) => Toggle();
+            dgv.HandleCreated += (_, __) => Toggle();
+
+            // Initial check
+            Toggle();
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -1107,6 +1170,51 @@ namespace LamToolAutoPhonePrime.Utils.Design
             btn.IconSvg     = iconSvg;
             if (!string.IsNullOrEmpty(text)) btn.Text = text;
             return btn;
+        }
+
+        /// <summary>
+        /// Density toggle button — cycle Normal → Compact → Ultra → Normal.
+        /// Tooltip shows current mode; icon-only (icon-only ghost = tertiary hierarchy).
+        /// </summary>
+        private static AntdUI.Button? EnsureDensityButton(ucdgvAccount uc)
+        {
+            const string key = "ssaBtnDensity";
+            var panel7 = GetField<AntdUI.Panel>(uc, "panel7");
+            if (panel7 == null) return null;
+
+            var existing = panel7.Controls.Find(key, true).FirstOrDefault() as AntdUI.Button;
+            if (existing != null)
+            {
+                UpdateDensityButtonVisual(existing);
+                return existing;
+            }
+
+            var btn = new AntdUI.Button { Name = key };
+            ConfigureGhostToolbarButton(btn, "ColumnHeightOutlined", null);
+            UpdateDensityButtonVisual(btn);
+
+            var tip = new ToolTip { AutoPopDelay = 4000, InitialDelay = 250 };
+            tip.SetToolTip(btn, $"Mật độ bảng: {TableDensity.Label(TableDensity.Current)}\n(click để chuyển)");
+
+            btn.Click += (_, __) =>
+            {
+                TableDensity.Current = TableDensity.Cycle(TableDensity.Current);
+                UpdateDensityButtonVisual(btn);
+                tip.SetToolTip(btn, $"Mật độ bảng: {TableDensity.Label(TableDensity.Current)}\n(click để chuyển)");
+            };
+
+            return btn;
+        }
+
+        private static void UpdateDensityButtonVisual(AntdUI.Button btn)
+        {
+            // Icon thay đổi theo mode để feedback rõ ràng
+            btn.IconSvg = TableDensity.Current switch
+            {
+                TableDensityMode.Compact => "VerticalAlignMiddleOutlined",
+                TableDensityMode.Ultra   => "MinusOutlined",
+                _                        => "ColumnHeightOutlined",
+            };
         }
 
         /// <summary>

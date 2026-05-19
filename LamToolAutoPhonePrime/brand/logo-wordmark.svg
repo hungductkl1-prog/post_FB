@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60" role="img" aria-label="AutoGoLike">
+  <title>AutoGoLike wordmark</title>
+  <text x="0" y="40"
+        font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
+        font-weight="700" font-size="34" fill="#0a0a0a"
+        letter-spacing="-1">AutoGoLike</text>
+  <text x="2" y="56"
+        font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
+        font-weight="500" font-size="9" fill="#555555"
+        letter-spacing="1.5">BY GOLIKE · OFFICIAL</text>
+</svg>

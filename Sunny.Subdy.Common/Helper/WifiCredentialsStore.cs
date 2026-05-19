@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace LamToolAutoPhonePrime.Utils
+namespace Sunny.Subdy.Common.Helper
 {
     public class WifiCredential
     {
@@ -49,6 +49,13 @@ namespace LamToolAutoPhonePrime.Utils
                 }
                 catch { return new Dictionary<string, WifiCredential>(); }
             }
+        }
+
+        public static WifiCredential? GetBySerial(string deviceId)
+        {
+            if (string.IsNullOrEmpty(deviceId)) return null;
+            var all = LoadAll();
+            return all.TryGetValue(deviceId, out var c) ? c : null;
         }
 
         public static void Save(IEnumerable<WifiCredential> credentials)

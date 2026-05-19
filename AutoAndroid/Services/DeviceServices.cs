@@ -25,36 +25,58 @@ namespace Sunny.Subdy.Common.Services
             AutomationType automationType = AutomationTypeResolver.Parse(type);
             CurrentAutomationType = AutomationTypeResolver.Normalize(automationType);
 
-            lock (_lock)
+            // Toàn bộ phần adb-shell (LoadDeviceInfo: device_name, version, ForwardPort,
+            // ForcePortrait — ~6 lệnh shell/máy) chạy trên thread-pool để KHÔNG block UI
+            // khi user mở tab Thiết bị / bấm "Tải lại". Mỗi máy được probe song song.
+            await Task.Run(() =>
             {
                 var lines = ADBHelper.GetDevices();
-                DeviceModels.Clear();
-
                 var seen = new HashSet<string>();
-                int index = 1;
+                var ordered = new List<string>();
                 foreach (var line in lines)
                 {
                     if (string.IsNullOrWhiteSpace(line) || !seen.Add(line)) continue;
-                    try
-                    {
-                        var model = LoadDeviceInfo(line);
-                        if (model == null) continue;
-                        model.IsLive = false;
-                        model.Index = index++;
-                        DeviceModels.Add(model);
-                    }
-                    catch { }
+                    ordered.Add(line);
                 }
-            }
+
+                // Load info song song — mỗi serial 1 task. Giữ thứ tự bằng index trong array.
+                var models = new DeviceModel?[ordered.Count];
+                Parallel.For(0, ordered.Count, i =>
+                {
+                    try { models[i] = LoadDeviceInfo(ordered[i]); }
+                    catch { models[i] = null; }
+                });
+
+                lock (_lock)
+                {
+                    DeviceModels.Clear();
+                    int index = 1;
+                    foreach (var m in models)
+                    {
+                        if (m == null) continue;
+                        m.IsLive = false;
+                        m.Index = index++;
+                        DeviceModels.Add(m);
+                    }
+                }
+            });
 
             // Check ADB online (parallel, background, outside lock)
             await Task.Run(() => CheckAllDevicesAdbOnline());
 
-            lock (_lock)
+            await Task.Run(() =>
             {
-                RestoreDeviceState();
-                SaveDeviceState();
-            }
+                lock (_lock)
+                {
+                    RestoreDeviceState();
+                    SaveDeviceState();
+                }
+            });
+
+            // Health-check (internet/app/lang/...) KHÔNG fire ở đây nữa — caller (ucManagerDevices)
+            // sẽ chạy ConnectAll trước, fail-fast 10s, rồi mới start health-check cho các máy
+            // ATX live. Lý do: user muốn thấy lỗi "Không connect được ATX" ngay, không bị status
+            // "<OK>Internet|<FAIL>App Fb|..." từ health-check ghi đè trong khi ATX đang treo.
         }
 
         /// <summary>
@@ -310,6 +332,7 @@ namespace Sunny.Subdy.Common.Services
 
                 // Add only truly new devices (serial not in list)
                 var existingSerials = new HashSet<string>(DeviceModels.Select(d => d.Serial));
+                var newlyAdded = new List<DeviceModel>();
                 foreach (var serial in adbSerials)
                 {
                     if (string.IsNullOrWhiteSpace(serial) || existingSerials.Contains(serial)) continue;
@@ -323,8 +346,22 @@ namespace Sunny.Subdy.Common.Services
                         model.Index = DeviceModels.Count + 1;
                         DeviceModels.Add(model);
                         existingSerials.Add(serial);
+                        newlyAdded.Add(model);
                     }
                     catch { }
+                }
+
+                // Device vừa được phát hiện online lần đầu / vừa khôi phục kết nối: chạy health-check nền.
+                foreach (var dev in newlyAdded)
+                {
+                    DeviceHealthCheckService.StartAsync(dev);
+                }
+                foreach (var dev in snapshot)
+                {
+                    if (dev.IsAdbOnline && dev.Status == "Đã khôi phục kết nối")
+                    {
+                        DeviceHealthCheckService.StartAsync(dev);
+                    }
                 }
 
                 return anyChanged;
@@ -376,6 +413,87 @@ namespace Sunny.Subdy.Common.Services
                         device.IsLive = false;
                         device.TypeColor = 1; // red
                         device.Status = "Kết nối thất bại";
+                    }
+                }));
+            }
+            await Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// Auto-connect ATX cho TẤT CẢ device đang ADB online (không cần checkbox).
+        /// Gọi khi LoadDevices xong để cột "Live" hiển thị đầy đủ trạng thái ngay,
+        /// đỡ phải bắt user bấm "Kết nối" thủ công chỉ để xem.
+        /// Failure → IsLive=false, IsRowEnabled=false (UI disable row).
+        /// </summary>
+        // Timeout cứng cho bước connect ATX của mỗi device khi user mở tab / bấm Tải lại.
+        // Yêu cầu: nếu ~10s mà ATX không lên thì coi như fail và báo lỗi ngay, không
+        // để user chờ vô định khi máy bị tắt USB-debug / chưa cài com.github.uiautomator / port chiếm.
+        private const int ATX_CONNECT_TIMEOUT_MS = 10_000;
+
+        public static async Task ConnectAll(string? type = null)
+        {
+            AutomationType automationType = AutomationTypeResolver.Parse(type ?? CurrentAutomationType);
+            string resolvedType = AutomationTypeResolver.Normalize(automationType);
+            try { AutomationEnvironmentService.EnsureWindowsReady(automationType); } catch { }
+
+            // Snapshot ngay để tránh race khi list bị refresh giữa chừng.
+            var targets = DeviceModels.Where(d => d != null
+                                              && !string.IsNullOrEmpty(d.Serial)
+                                              && d.IsAdbOnline)
+                                      .ToList();
+
+            var tasks = new List<Task>(targets.Count);
+            foreach (var device in targets)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    bool atxOk = false;
+                    try
+                    {
+                        ADBClient client = new ADBClient(device);
+
+                        // Race connect ATX vs timeout 10s. EnsureDeviceReady + Connect là blocking
+                        // (nhiều adb shell + http probe), nên đẩy vào Task.Run để có thể abort sớm.
+                        var connectTask = Task.Run(() =>
+                        {
+                            AutomationEnvironmentService.EnsureDeviceReadyAsync(client, automationType)
+                                .GetAwaiter().GetResult();
+                            return client.Connect(resolvedType);
+                        });
+
+                        var winner = await Task.WhenAny(connectTask, Task.Delay(ATX_CONNECT_TIMEOUT_MS));
+                        if (winner == connectTask)
+                        {
+                            // Connect xong trong hạn → lấy kết quả thật.
+                            atxOk = await connectTask;
+                            // ADBClient.Connect đã set IsLive=true + TypeColor=2 khi thành công.
+                            if (!atxOk)
+                            {
+                                device.IsLive = false;
+                                device.TypeColor = 1;
+                                device.Status = "Không connect được ATX";
+                            }
+                        }
+                        else
+                        {
+                            // Timeout — connect vẫn còn chạy nền (best-effort, không cancel được),
+                            // nhưng UI báo lỗi luôn để user biết máy này không khả dụng.
+                            device.IsLive = false;
+                            device.TypeColor = 1;
+                            device.Status = $"Không connect được ATX (quá {ATX_CONNECT_TIMEOUT_MS / 1000}s)";
+                        }
+                    }
+                    catch
+                    {
+                        device.IsLive = false;
+                        device.TypeColor = 1;
+                        device.Status = "Không connect được ATX";
+                    }
+                    finally
+                    {
+                        // Row enabled = vừa có internet vừa ATX live.
+                        // HasInternet được DeviceHealthCheckService set (chạy nền song song).
+                        device.IsRowEnabled = device.HasInternet && device.IsLive;
                     }
                 }));
             }

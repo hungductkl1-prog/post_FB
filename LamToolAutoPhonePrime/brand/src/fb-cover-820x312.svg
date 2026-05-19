@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 312" width="820" height="312" role="img" aria-label="AutoGoLike — Tool auto chính thức Golike">
+  <title>AutoGoLike Facebook cover</title>
+  <rect width="820" height="312" fill="#d3ff3c"/>
+  <g fill="#0a0a0a" opacity="0.08">
+    <circle cx="40" cy="40" r="4"/>
+    <circle cx="80" cy="40" r="4"/>
+    <circle cx="120" cy="40" r="4"/>
+    <circle cx="40" cy="80" r="4"/>
+    <circle cx="80" cy="80" r="4"/>
+    <circle cx="780" cy="272" r="4"/>
+    <circle cx="740" cy="272" r="4"/>
+    <circle cx="780" cy="232" r="4"/>
+  </g>
+  <g transform="translate(60 96)">
+    <g transform="rotate(-4 60 60)">
+      <rect x="0" y="0" width="120" height="120" rx="26" fill="#0a0a0a"/>
+      <text x="60" y="89" text-anchor="middle"
+            font-family="'Space Grotesk','Archivo Black','Inter',system-ui,-apple-system,sans-serif"
+            font-weight="800" font-size="66" fill="#d3ff3c"
+            letter-spacing="-3">GL</text>
+    </g>
+  </g>
+  <g transform="translate(210 0)">
+    <text x="0" y="158"
+          font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
+          font-weight="800" font-size="60" fill="#0a0a0a"
+          letter-spacing="-2">AutoGoLike</text>
+    <text x="3" y="188"
+          font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
+          font-weight="500" font-size="14" fill="#0a0a0a"
+          letter-spacing="2.5">BY GOLIKE · OFFICIAL</text>
+    <text x="0" y="226"
+          font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
+          font-weight="600" font-size="20" fill="#0a0a0a"
+          letter-spacing="-0.5">Tool auto chính thức — cày job 24/7</text>
+  </g>
+  <text x="780" y="294" text-anchor="end"
+        font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
+        font-weight="600" font-size="14" fill="#0a0a0a"
+        letter-spacing="0.8">auto.golike.net</text>
+</svg>

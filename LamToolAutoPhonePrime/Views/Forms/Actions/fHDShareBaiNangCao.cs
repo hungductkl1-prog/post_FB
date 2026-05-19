@@ -19,6 +19,7 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
         {
             InitializeComponent();
             FontUtil.ApplyFontToAllControls(this);
+            LamToolAutoPhonePrime.Utils.Design.FormResponsiveHelper.MakeScrollable(this);
             ckbVanBan.CheckedChanged += ckbDefault_CheckedChanged;
             ckbShareBaiLenNhom.CheckedChanged += ckbDefault_CheckedChanged;
             ckbInteract.CheckedChanged += ckbDefault_CheckedChanged;

@@ -46,5 +46,20 @@ namespace LamToolAutoPhonePrime.Utils.Design
         // ── DataGrid row state ─────────────────────────────────
         public static readonly Color RowHover    = Color.FromArgb(245, 250, 255);
         public static readonly Color RowSelected = Color.FromArgb(230, 244, 255);
+
+        // ── Device / Job states ────────────────────────────────
+        public static readonly Color StateRunning    = Color.FromArgb(82, 196, 26);    // success green
+        public static readonly Color StateIdle       = Color.FromArgb(140, 140, 140);  // gray-7
+        public static readonly Color StateError      = Color.FromArgb(255, 77, 79);    // error red
+        public static readonly Color StateCooldown   = Color.FromArgb(250, 173, 20);   // warning amber
+        public static readonly Color StateWaitingOtp = Color.FromArgb(22, 119, 255);   // info blue
+        public static readonly Color StateBanned     = Color.FromArgb(38, 38, 38);     // gray-10
+
+        // ── Sidebar states ─────────────────────────────────────
+        public static readonly Color SidebarBg          = Color.White;
+        public static readonly Color SidebarItemHover   = Color.FromArgb(245, 247, 250);
+        public static readonly Color SidebarItemActive  = Color.FromArgb(230, 244, 255); // primary-1
+        public static readonly Color SidebarAccent      = Color.FromArgb(22, 119, 255);  // border-left accent
+        public static readonly Color SidebarGroupLabel  = Color.FromArgb(140, 140, 140); // gray-7
     }
 }

@@ -78,7 +78,7 @@ namespace LamToolAutoPhonePrime
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
-            windowBar.Cursor = Cursors.Hand;
+            windowBar.Cursor = Cursors.Default;
             windowBar.DividerMargin = 1;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
@@ -370,15 +370,16 @@ namespace LamToolAutoPhonePrime
             // 
             // pContent
             // 
+            pContent.AutoScroll = true;
             pContent.BackColor = Color.FromArgb(236, 240, 241);
             pContent.Dock = DockStyle.Fill;
             pContent.Location = new Point(281, 35);
             pContent.Name = "pContent";
             pContent.Size = new Size(1019, 710);
             pContent.TabIndex = 8;
-            // 
+            //
             // fMain
-            // 
+            //
             BackColor = Color.FromArgb(245, 247, 250);
             ClientSize = new Size(1500, 800);
             Controls.Add(pContent);
@@ -388,7 +389,8 @@ namespace LamToolAutoPhonePrime
             Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             ForeColor = Color.Black;
             FormBorderStyle = FormBorderStyle.None;
-            MinimumSize = new Size(1500, 750);
+            KeyPreview = true;
+            MinimumSize = new Size(1280, 720);
             Mode = TAMode.Dark;
             Name = "fMain";
             ShowIcon = false;

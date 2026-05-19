@@ -367,10 +367,21 @@ namespace Sunny.Subd.Core.Facebook
             if (_settingGeneral.GetBooleanValue("checkBox4", false))
             {
                 int retryCount = _settingGeneral.GetIntType("numericUpDown1", 1);
+                bool triedJoinWifi = false;
                 for (int i = 0; i < retryCount; i++)
                 {
                     if (await IsInternetAsync())
                         return true;
+
+                    // Mất mạng → nếu user đã cấu hình ssid/pass cho serial này thì
+                    // join wifi qua adb-join-wifi rồi thử lại. Chỉ chạy 1 lần để
+                    // tránh spam install/launch APK trong vòng lặp.
+                    if (!triedJoinWifi)
+                    {
+                        triedJoinWifi = true;
+                        if (await TryJoinConfiguredWifiAsync() && await IsInternetAsync())
+                            return true;
+                    }
                 }
 
                 SetStatus($"Reboot khi mất mạng quá {retryCount} lần", 2);
@@ -378,7 +389,37 @@ namespace Sunny.Subd.Core.Facebook
                 return false;
             }
 
-            return await IsInternetAsync();
+            if (await IsInternetAsync()) return true;
+
+            // Single-attempt branch: nếu fail và có ssid/pass cấu hình → thử join và re-check.
+            return await TryJoinConfiguredWifiAsync() && await IsInternetAsync();
+        }
+
+        // Đọc wifi-credentials.json theo serial, dùng adb-join-wifi để thiết bị
+        // tự kết nối vào ssid/pass người dùng đã cấu hình. Trả về true nếu đã
+        // gửi lệnh thành công (chưa xác minh internet — caller sẽ IsInternetAsync lại).
+        private async Task<bool> TryJoinConfiguredWifiAsync()
+        {
+            try
+            {
+                var serial = _client.Device?.Serial;
+                if (string.IsNullOrEmpty(serial)) return false;
+                var cred = WifiCredentialsStore.GetBySerial(serial);
+                if (cred == null || string.IsNullOrEmpty(cred.UserName)) return false;
+
+                SetStatus($"Kết nối lại Wifi '{cred.UserName}'…", 2);
+                var wifi = new AdbJoinWifiService(_client);
+                bool sent = await wifi.ConnectToWifiNetwork(cred.UserName, cred.Password);
+                if (!sent) return false;
+
+                await Task.Delay(5000);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Warning($"[TryJoinConfiguredWifi] {ex.Message}");
+                return false;
+            }
         }
 
         // Kết nối thiết bị

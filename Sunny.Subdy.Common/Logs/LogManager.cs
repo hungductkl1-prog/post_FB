@@ -4,10 +4,58 @@ using System.Text;
 
 namespace Sunny.Subdy.Common.Logs
 {
+    public enum LogLevel { Info, Debug, Warning, Error, Success }
+
+    public class LogEntry
+    {
+        public DateTime Timestamp { get; set; }
+        public LogLevel Level { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
     public static class LogManager
     {
         private static readonly string BaseLogPath = Path.Combine(AppContext.BaseDirectory, "logs");
         public static List<string> LogRegsiner = new List<string>();
+
+        /// <summary>Live UI sink — UI subscribes để hiển thị log realtime trong console panel.</summary>
+        public static event Action<LogEntry>? Emitted;
+
+        private static void Emit(LogLevel level, string message)
+        {
+            try
+            {
+                Emitted?.Invoke(new LogEntry
+                {
+                    Timestamp = DateTime.Now,
+                    Level     = level,
+                    Message   = message,
+                });
+            }
+            catch { /* UI handler không được làm gãy logging core */ }
+        }
+
+        public static void Warning(string message)
+        {
+            var sb = new StringBuilder();
+            string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            sb.AppendLine($"------------------ {timestamp} ----------------------------");
+            sb.AppendLine($"Message   : {message}");
+            sb.AppendLine();
+            WriteLog("warning", sb.ToString());
+            Emit(LogLevel.Warning, message);
+        }
+
+        public static void Success(string message)
+        {
+            var sb = new StringBuilder();
+            string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            sb.AppendLine($"------------------ {timestamp} ----------------------------");
+            sb.AppendLine($"Message   : {message}");
+            sb.AppendLine();
+            WriteLog("success", sb.ToString());
+            Emit(LogLevel.Success, message);
+        }
         private static void WriteLog(string nameLog, string message)
         {
             try
@@ -98,6 +146,7 @@ namespace Sunny.Subdy.Common.Logs
             }
 
             WriteLog("error", sb.ToString());
+            try { Emit(LogLevel.Error, exception?.Message ?? "(no message)"); } catch { }
         }
 
         public static void Info(string message)
@@ -108,6 +157,7 @@ namespace Sunny.Subdy.Common.Logs
             sb.AppendLine($"Message   : {message}");
             sb.AppendLine();
             WriteLog("info", sb.ToString());
+            Emit(LogLevel.Info, message);
         }
 
         public static void Debug(string message)
@@ -118,6 +168,7 @@ namespace Sunny.Subdy.Common.Logs
             sb.AppendLine($"Message   : {message}");
             sb.AppendLine();
             WriteLog("debug", sb.ToString());
+            Emit(LogLevel.Debug, message);
         }
     }
 }

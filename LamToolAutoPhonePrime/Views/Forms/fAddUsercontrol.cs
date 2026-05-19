@@ -30,6 +30,16 @@ namespace LamToolAutoPhonePrime.Views.Forms
             _control.Dock = DockStyle.Fill;
             panel1.Controls.Add(_control);
 
+            // Detach _control khỏi panel1 TRƯỚC khi dialog dispose, để Form.Dispose()
+            // không dispose lây sang ucManagerDevices (singleton dùng chung với fMain).
+            // Nếu không detach: caller dùng `using` hoặc GC chạy sau Close() sẽ làm
+            // toàn bộ control bị dispose → ObjectDisposedException ở lần dùng kế tiếp.
+            FormClosing += (_, __) =>
+            {
+                if (panel1.Controls.Contains(_control))
+                    panel1.Controls.Remove(_control);
+            };
+
             FontUtil.ApplyFontToAllControls(this);
 
             // Force button2 ("Bắt đầu") hiển thị khi dialog show — tránh trường hợp

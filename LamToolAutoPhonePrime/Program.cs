@@ -2,23 +2,14 @@
 using AutoAndroid;
 using DeviceId;
 using LamToolAutoPhonePrime.Utils;
-using LamToolAutoPhonePrime.Views;
 using LamToolAutoPhonePrime.Views.Forms;
 using Microsoft.Win32;
-using Sunny.Subdy.Common.API;
-using Sunny.Subdy.Common.API.Jobs;
 using Sunny.Subdy.Common.Helper;
-using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.Common.Models;
-using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using System.Drawing.Imaging;
-using System.Drawing.Text;
 using System.Net;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace LamToolAutoPhonePrime
 {
@@ -78,21 +69,6 @@ namespace LamToolAutoPhonePrime
                 Trace.TraceError("Environment check failed: " + ex);
             }
 
-            // Clean slate ADB: diệt mọi adb.exe zombie từ session khác (có thể đã
-            // được start dưới user thường, lock device khỏi context Admin của app).
-            // Sau đó start-server mới dưới quyền Admin để adb thực sự bind 5037 ổn định.
-            try
-            {
-                splash?.SetStatus("Đang khởi động ADB...");
-                ADBHelper.KillAllAdbProcesses();
-                Thread.Sleep(500);
-                ADBHelper.EnsureServerStarted();
-            }
-            catch (Exception ex)
-            {
-                Trace.TraceError("ADB clean slate failed: " + ex);
-            }
-
             splash?.SetStatus("Đang tải cấu hình giao diện...");
             Localization.Provider = new VietnameseLocalization();
 
@@ -102,37 +78,92 @@ namespace LamToolAutoPhonePrime
             SortableBindingList<Account>.OnBeforeRemove = ThrottledPropertyNotifier.Unregister;
             SortableBindingList<JobHistory>.OnBeforeRemove = ThrottledPropertyNotifier.Unregister;
 
-            // Load font sau khi init WinForms để tránh lỗi GDI+
+            // Font phải sync vì InitializeComponent của fMain dùng FamilyName ngay khi tạo control.
             splash?.SetStatus("Đang tải font...");
             FontUtil.LoadCustomFonts();
-            splash?.SetStatus("Đang khởi tạo thiết bị...");
-            Globals.DeviceId = new DeviceIdBuilder()
-                   .OnWindows(windows => windows.AddWindowsDeviceId())
-                   .ToString();
+
             // Gắn icon Golike cho toàn bộ form (cả dialog mở sau).
             AppIconHelper.Install();
 
-            // Auto-login nếu đã có cache: chạy ngầm (không hiện UI) để fMain có Globals.User
-            // mà không phải hỏi user. Nếu không có cache hoặc fail → user dùng tool ở chế độ
-            // chưa login; LoginGuard sẽ bật fLogin khi cần.
-            splash?.SetStatus("Đang đăng nhập tài khoản...");
-            try { TempLoginStorage.TryAutoLogin(); } catch (Exception ex) { Trace.TraceWarning("Auto-login skipped: " + ex); }
+            // Background I/O: DeviceId WMI + auto-login HTTP đều chậm nhưng KHÔNG cần
+            // xong trước khi fMain hiện. UI thread cứ tạo form, các task này finish async.
+            // - DeviceId: chỉ cần trước LicenseCheck (chạy trong fMain.LoadData).
+            // - TryAutoLogin: fMain_Load.UpdateUserInfo + LicenseCheck đều đợi via task.
+            //
+            // ADB: KHÔNG warm-up lúc startup. fMain load lên chưa get devices ngay,
+            // việc kill toàn bộ adb + start-server cold rất tốn (~2-3s) và còn làm chết
+            // các adb session khác user đang chạy. ADBHelper.GetDevices() đã có
+            // EnsureServerStarted() lazy nên lần đầu mở tab Thiết bị mới start-server.
+            // Giữ AdbReadyTask = completed task để các await Globals.AdbReadyTask hiện
+            // có (fMain.cs trong LoadDevices) vẫn chạy bình thường mà không NPE.
+            Globals.AdbReadyTask = Task.CompletedTask;
+
+            Globals.DeviceIdTask = Task.Run(() =>
+            {
+                try
+                {
+                    Globals.DeviceId = new DeviceIdBuilder()
+                        .OnWindows(windows => windows.AddWindowsDeviceId())
+                        .ToString();
+                }
+                catch (Exception ex) { Trace.TraceWarning("DeviceId build failed: " + ex); }
+            });
+
+            Globals.AutoLoginTask = Task.Run(() =>
+            {
+                try { TempLoginStorage.TryAutoLogin(); }
+                catch (Exception ex) { Trace.TraceWarning("Auto-login skipped: " + ex); }
+            });
 
             splash?.SetStatus("Đang mở giao diện...");
-            splash?.Close();
-            Application.Run(new fMain());
+
+            // Giữ splash đến khi fMain thực sự Shown (đã render frame đầu).
+            // Tạo fMain ở đây có thể mất vài giây (constructor + InitializeComponent),
+            // và fMain_Load tạo 4 UserControl đồng bộ trước await đầu tiên — nếu close
+            // splash trước Application.Run, user sẽ thấy màn hình trống ~10s như app cash.
+            var main = new fMain();
+            if (splash != null)
+            {
+                void OnMainShown(object? s, EventArgs e)
+                {
+                    main.Shown -= OnMainShown;
+                    try { splash.Close(); } catch { }
+                }
+                main.Shown += OnMainShown;
+            }
+            Application.Run(main);
         }
 
         public static bool IsEnvironmentReady()
         {
-          
             // Kiểm tra ADB tồn tại ở đường dẫn cố định
             if (!File.Exists(Path.Combine(ProcessHelper.ADBPath, "adb.exe")))
                 return false;
-            // Kiểm tra Node
-            if (!IsCommandAvailable("node --version"))
+            // Kiểm tra Node — ưu tiên tìm trong PATH (instant, không phải spawn process 5s).
+            // Fallback sang IsCommandAvailable khi không thấy trong PATH để xử lý trường
+            // hợp Node được install ở chỗ khác (PortableApps, scoop) nhưng vẫn invoke được.
+            if (!IsNodeInPath() && !IsCommandAvailable("node --version"))
                 return false;
             return true;
+        }
+
+        private static bool IsNodeInPath()
+        {
+            try
+            {
+                string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+                foreach (var dir in pathEnv.Split(Path.PathSeparator))
+                {
+                    if (string.IsNullOrWhiteSpace(dir)) continue;
+                    try
+                    {
+                        if (File.Exists(Path.Combine(dir, "node.exe"))) return true;
+                    }
+                    catch { }
+                }
+                return false;
+            }
+            catch { return false; }
         }
 
         private static bool IsCommandAvailable(string command)

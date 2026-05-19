@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="AutoGoLike — Tool auto chính thức Golike">
+  <title>AutoGoLike OG image</title>
+  <rect width="1200" height="630" fill="#d3ff3c"/>
+  <!-- decorative dots -->
+  <g fill="#0a0a0a" opacity="0.08">
+    <circle cx="80" cy="80" r="6"/>
+    <circle cx="140" cy="80" r="6"/>
+    <circle cx="200" cy="80" r="6"/>
+    <circle cx="80" cy="140" r="6"/>
+    <circle cx="140" cy="140" r="6"/>
+    <circle cx="80" cy="200" r="6"/>
+    <circle cx="1120" cy="550" r="6"/>
+    <circle cx="1060" cy="550" r="6"/>
+    <circle cx="1000" cy="550" r="6"/>
+    <circle cx="1120" cy="490" r="6"/>
+    <circle cx="1060" cy="490" r="6"/>
+    <circle cx="1120" cy="430" r="6"/>
+  </g>
+
+  <!-- Mark -->
+  <g transform="translate(120 200)">
+    <g transform="rotate(-4 100 100)">
+      <rect x="0" y="0" width="200" height="200" rx="44" fill="#0a0a0a"/>
+      <text x="100" y="148" text-anchor="middle"
+            font-family="'Space Grotesk','Archivo Black','Inter',system-ui,-apple-system,sans-serif"
+            font-weight="800" font-size="110" fill="#d3ff3c"
+            letter-spacing="-5">GL</text>
+    </g>
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(360 0)">
+    <text x="0" y="290"
+          font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
+          font-weight="800" font-size="104" fill="#0a0a0a"
+          letter-spacing="-3.5">AutoGoLike</text>
+    <text x="4" y="340"
+          font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
+          font-weight="500" font-size="22" fill="#0a0a0a"
+          letter-spacing="4">BY GOLIKE · OFFICIAL</text>
+  </g>
+
+  <!-- Tagline -->
+  <text x="120" y="490"
+        font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
+        font-weight="600" font-size="36" fill="#0a0a0a"
+        letter-spacing="-1">Tool auto chính thức Golike — cày job 24/7</text>
+  <text x="120" y="540"
+        font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
+        font-weight="500" font-size="26" fill="#0a0a0a" opacity="0.7"
+        letter-spacing="-0.5">AutoPhoneFarm (PC) · App Mobile (Android)</text>
+
+  <!-- URL bottom right -->
+  <text x="1080" y="600" text-anchor="end"
+        font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
+        font-weight="600" font-size="22" fill="#0a0a0a"
+        letter-spacing="1">auto.golike.net</text>
+</svg>
