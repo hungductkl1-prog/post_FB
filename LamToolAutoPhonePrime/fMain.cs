@@ -26,6 +26,7 @@ namespace LamToolAutoPhonePrime
         private DateTime _lastUiUpdate = DateTime.MinValue;
         private DateTime _lastHistoriesUpdate = DateTime.MinValue;
         private DateTime? _lastCheckUpdateTime;
+        private bool _updateConfirmOpen;
         private System.Windows.Forms.Panel _loadingOverlay;
         private Control _currentButton;
 
@@ -752,6 +753,10 @@ namespace LamToolAutoPhonePrime
         }
         private void CheckUpdateVersion()
         {
+            // Nếu modal Confirm cập nhật đang hiển thị thì skip — tránh đè notification
+            // và mở nhiều modal chồng nhau khi timer 5 phút tick lại.
+            if (_updateConfirmOpen) return;
+
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
             var (ok, vs, url) = LamToolClient.GetApiResponseAsync(Globals.DeviceId, Globals.NameApp, version);
 
@@ -772,15 +777,25 @@ namespace LamToolAutoPhonePrime
                 t.Stop();
                 t.Dispose();
                 if (this.IsDisposed) return;
-                if (AntdHelper.Confirm(this, "Cập nhật phiên bản",
-                        $"Đã có phiên bản [{vs}] mới nhất. Bạn có muốn cập nhật ngay bây giờ?"))
+                if (_updateConfirmOpen) return;
+
+                _updateConfirmOpen = true;
+                try
                 {
-                    this.Hide();
-                    using (var updateForm = new fUpdateAuto(url, version) { TopMost = true })
+                    if (AntdHelper.Confirm(this, "Cập nhật phiên bản",
+                            $"Đã có phiên bản [{vs}] mới nhất. Bạn có muốn cập nhật ngay bây giờ?"))
                     {
-                        updateForm.ShowDialog(this);
+                        this.Hide();
+                        using (var updateForm = new fUpdateAuto(url, version) { TopMost = true })
+                        {
+                            updateForm.ShowDialog(this);
+                        }
+                        Environment.Exit(0);
                     }
-                    Environment.Exit(0);
+                }
+                finally
+                {
+                    _updateConfirmOpen = false;
                 }
             };
             t.Start();
