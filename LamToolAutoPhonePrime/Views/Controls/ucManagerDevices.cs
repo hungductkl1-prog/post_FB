@@ -32,6 +32,11 @@ namespace Sunny.Subdy.UI.View.Pages
         private static readonly Color _grayOffline = Color.FromArgb(160, 160, 160);
         private System.Windows.Forms.Timer? _saveCheckedTimer;
         private bool _rightPanelCollapsed;
+
+        // Chỉ ràng buộc Row.ReadOnly theo IsRowEnabled khi đang hiển thị trong dialog
+        // "Chọn thiết bị" (fAddUsercontrol/SelectDevices). Ở page Quản lý thiết bị độc
+        // lập, user được tick tự do mọi row (kể cả Internet đỏ / ATX fail).
+        private bool _enforceRowEnabled;
         private int _savedSplitterDistance;
 
         // Persistent binding objects — never replaced, only refilled
@@ -180,8 +185,9 @@ namespace Sunny.Subdy.UI.View.Pages
                 if (row.DataBoundItem is not DeviceModel dev) return;
 
                 bool enabled = dev.IsRowEnabled;
-                if (row.ReadOnly != !enabled) row.ReadOnly = !enabled;
-                if (!enabled && dev.Checked) dev.Checked = false;
+                bool readOnly = _enforceRowEnabled && !enabled;
+                if (row.ReadOnly != readOnly) row.ReadOnly = readOnly;
+                if (_enforceRowEnabled && !enabled && dev.Checked) dev.Checked = false;
             };
 
             // Default IsRowEnabled=false ngay từ lúc bind → row mới phải set ReadOnly=true
@@ -196,8 +202,9 @@ namespace Sunny.Subdy.UI.View.Pages
                     var row = dataGridView1.Rows[idx];
                     if (row.DataBoundItem is not DeviceModel dev) continue;
                     bool enabled = dev.IsRowEnabled;
-                    if (row.ReadOnly != !enabled) row.ReadOnly = !enabled;
-                    if (!enabled && dev.Checked) dev.Checked = false;
+                    bool readOnly = _enforceRowEnabled && !enabled;
+                    if (row.ReadOnly != readOnly) row.ReadOnly = readOnly;
+                    if (_enforceRowEnabled && !enabled && dev.Checked) dev.Checked = false;
                 }
             };
 
@@ -263,7 +270,9 @@ namespace Sunny.Subdy.UI.View.Pages
                     return;
                 }
 
-                if (!d.IsRowEnabled)
+                // Chỉ chặn IsRowEnabled khi đang ở dialog SelectDevices. Ở page Quản lý
+                // thiết bị độc lập, tick tự do mọi row kể cả Internet đỏ / ATX fail.
+                if (_enforceRowEnabled && !d.IsRowEnabled)
                 {
                     if (d.Checked) d.Checked = false;
                     return;
@@ -277,6 +286,27 @@ namespace Sunny.Subdy.UI.View.Pages
                     _ => d.Checked
                 };
             });
+        }
+
+        /// <summary>
+        /// Vào "selection mode" khi mở dialog fAddUsercontrol("SelectDevices"):
+        /// bỏ chọn toàn bộ + bật ràng buộc Row.ReadOnly theo IsRowEnabled (row không
+        /// đủ điều kiện ATX/Internet không tick được). Khi đóng dialog phải gọi
+        /// <see cref="EndSelectionMode"/> để tắt ràng buộc, tránh ảnh hưởng page
+        /// Quản lý thiết bị độc lập (nơi user được tick tự do).
+        /// </summary>
+        public void BeginSelectionMode()
+        {
+            _enforceRowEnabled = true;
+            BulkUpdateChecked(d => d.Checked = false);
+            ApplyRowEnabledState();
+        }
+
+        /// <summary>Thoát selection mode: bỏ ràng buộc Row.ReadOnly, mở khoá tick tự do.</summary>
+        public void EndSelectionMode()
+        {
+            _enforceRowEnabled = false;
+            ApplyRowEnabledState();
         }
 
         /// <summary>
@@ -1308,9 +1338,10 @@ namespace Sunny.Subdy.UI.View.Pages
                 var row = dataGridView1.Rows[i];
                 if (row.DataBoundItem is not DeviceModel dev) continue;
                 bool enabled = dev.IsRowEnabled;
-                if (row.ReadOnly != !enabled) row.ReadOnly = !enabled;
-                // Nếu disabled mà đang Checked → uncheck (chống chạy job trên máy fail).
-                if (!enabled && dev.Checked) dev.Checked = false;
+                // Chỉ chặn tick (ReadOnly + auto-uncheck) khi đang ở dialog SelectDevices.
+                bool readOnly = _enforceRowEnabled && !enabled;
+                if (row.ReadOnly != readOnly) row.ReadOnly = readOnly;
+                if (_enforceRowEnabled && !enabled && dev.Checked) dev.Checked = false;
             }
         }
 
@@ -1658,12 +1689,15 @@ namespace Sunny.Subdy.UI.View.Pages
                 // Điều kiện bắt buộc để tick được Checked = IsRowEnabled (ATX connected && HasInternet).
                 // Phải batch qua BulkUpdateChecked, nếu không mỗi ForEach gây ListChanged → grid
                 // repaint từng row → UI đơ vài giây khi có nhiều thiết bị.
+                // Ở page Quản lý thiết bị độc lập (_enforceRowEnabled=false): tick tự do
+                // mọi row. Chỉ trong dialog SelectDevices mới chặn theo IsRowEnabled
+                // (ATX live + có internet).
                 if (text == "Tất cả")
-                    BulkUpdateChecked(d => d.Checked = d.IsRowEnabled);
+                    BulkUpdateChecked(d => d.Checked = !_enforceRowEnabled || d.IsRowEnabled);
                 else if (text == "Bôi đen")
                 {
                     var selected = new HashSet<DeviceModel>(GetSelectedDevices());
-                    BulkUpdateChecked(d => d.Checked = selected.Contains(d) && d.IsRowEnabled);
+                    BulkUpdateChecked(d => d.Checked = selected.Contains(d) && (!_enforceRowEnabled || d.IsRowEnabled));
                 }
                 else if (text == "Bỏ chọn bôi đen")
                 {

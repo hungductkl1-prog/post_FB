@@ -1203,13 +1203,27 @@ namespace LamToolAutoPhonePrime.Views.Controls
             uc.button2.Enabled = true;
             uc.button2.BringToFront();
 
+            // Bỏ chọn toàn bộ + bật ràng buộc IsRowEnabled chỉ trong phạm vi dialog
+            // SelectDevices: row không đủ điều kiện (mất internet hoặc ATX fail)
+            // không tick được. Page Quản lý thiết bị đứng độc lập vẫn tick tự do.
+            uc.BeginSelectionMode();
+
             // Refresh DataGridView để load đúng trạng thái checkbox
             uc.dataGridView1.Refresh();
 
             DialogResult dialogResult;
-            using (var f = new fAddUsercontrol("SelectDevices", _platform, uc))
+            try
             {
-                dialogResult = f.ShowDialog(_form);
+                using (var f = new fAddUsercontrol("SelectDevices", _platform, uc))
+                {
+                    dialogResult = f.ShowDialog(_form);
+                }
+            }
+            finally
+            {
+                // Thoát selection mode dù dialog đóng kiểu gì (OK/Cancel/Exception)
+                // → page Quản lý thiết bị sau đó không bị chặn tick.
+                uc.EndSelectionMode();
             }
 
             // Reparent + restore layout trong 1 batch (SuspendLayout) để tránh
