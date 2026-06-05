@@ -40,7 +40,7 @@ namespace LamToolAutoPhonePrime.Views
             }), shouldExit: false);
             _scriptContext.FixMissingIds();
             _scriptContext.PurgeFarmXu(); // Xoá sạch kịch bản FarmXu legacy.
-            _scriptContext.RemapLegacyFarmXuVipName(); // "Farm-Xu-VIP" → "Làm Job Golike"
+            _scriptContext.RemapLegacyFarmXuVipName(); // "Farm-Xu-VIP" → "Làm Job QN"
             RemapLegacyFarmXuAccounts();
             if (_platform == Sunny.Subdy.Common.Models.PlatformModel.Facebook
                 || _platform == Sunny.Subdy.Common.Models.PlatformModel.Instagram
@@ -54,7 +54,7 @@ namespace LamToolAutoPhonePrime.Views
         }
 
         /// <summary>
-        /// Account legacy NameScript = "FarmXu" hoặc "Farm-Xu-VIP" → remap sang tên mới ("Làm Job Golike").
+        /// Account legacy NameScript = "FarmXu" hoặc "Farm-Xu-VIP" → remap sang tên mới ("Làm Job QN").
         /// Idempotent.
         /// </summary>
         private void RemapLegacyFarmXuAccounts()
@@ -96,8 +96,8 @@ namespace LamToolAutoPhonePrime.Views
                 var script = _scriptContext.GetById(guid);
                 if (script != null && string.Equals(script.Name, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase))
                 {
-                    // "Làm Job Golike" không còn popup token riêng — token lấy từ phiên login Golike.
-                    AntdUI.Message.info(this, "\"Làm Job Golike\" dùng token đăng nhập Golike, không cần cấu hình thêm.", autoClose: 3);
+                    // "Làm Job QN" không còn popup token riêng — token lấy từ phiên login QN.
+                    AntdUI.Message.info(this, "\"Làm Job QN\" dùng token đăng nhập QN, không cần cấu hình thêm.", autoClose: 3);
                     return;
                 }
                 fChiTietKichBan form = new fChiTietKichBan(guid);

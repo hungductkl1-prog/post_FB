@@ -257,7 +257,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             select8.DropDownArrow = true;
             select8.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
             select8.ForeColor = Color.Black;
-            select8.Items.AddRange(new object[] { "Golike.net", "Tuongtaccheo.com", "Traodoisub.com", "Vipig.net" });
+            select8.Items.AddRange(new object[] { "QN.net", "Tuongtaccheo.com", "Traodoisub.com", "Vipig.net" });
             select8.List = true;
             select8.ListAutoWidth = true;
             select8.LocalizationPlaceholderText = "Select.{id}";

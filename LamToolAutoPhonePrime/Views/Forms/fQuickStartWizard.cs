@@ -1,4 +1,4 @@
-using AntdUI;
+﻿using AntdUI;
 using LamToolAutoPhonePrime.Utils.Design;
 using System.ComponentModel;
 using System.Drawing;
@@ -34,7 +34,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             ("Chọn kịch bản farm",
              "Trên toolbar, chọn dropdown \"Kịch bản\" để chọn loại job:\n" +
-             "  • Làm Job Golike — farm tự động theo job Golike\n" +
+             "  • Làm Job QN — farm tự động theo job QN\n" +
              "  • Chạy theo kịch bản — config riêng cho từng tài khoản\n" +
              "Bạn cũng có thể set kịch bản riêng cho từng nhóm.",
              "RocketOutlined"),
@@ -187,7 +187,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             };
             var lblHeader = new System.Windows.Forms.Label
             {
-                Text      = "Welcome to GolikeAutoPhone",
+                Text      = "Welcome to QNAutoPhone",
                 ForeColor = Color.White,
                 Font      = new Font(FontScale.FamilyName, 14F, FontStyle.Bold),
                 AutoSize  = true,

@@ -7,9 +7,9 @@ namespace AutoAndroid
     public class MaxChangeService
     {
         ADBClient service;
-        private readonly string path_MaxChange = Path.Combine(AppContext.BaseDirectory, "App", "GolikeHelper.apk");
+        private readonly string path_MaxChange = Path.Combine(AppContext.BaseDirectory, "App", "LamToolChanger.apk");
         private readonly string path_DeviceInfoHW = Path.Combine(AppContext.BaseDirectory, "App", "DeviceInfoHW.apk");
-        public static string package_MaxChange = "com.golike.helper";
+        public static string package_MaxChange = "com.lamtool.changer";
         private readonly string package_Deviceinfohw = "ru.andr7e.deviceinfohw";
         public MaxChangeService(ADBClient service)
         {
@@ -24,12 +24,12 @@ namespace AutoAndroid
         {
             for (int i = 0; i < 5; i++)
             {
-                service.LogHelper.SUCCESS("Đang mở ứng dụng GolikeHelper");
+                service.LogHelper.SUCCESS("Đang mở ứng dụng QNHelper");
                 service.AppStart(package_MaxChange, true, true, wait: true);
                 service.SetSize();
                 if (service.AppWait(package_MaxChange))
                 {
-                    service.LogHelper.SUCCESS("Đã mở ứng dụng GolikeHelper");
+                    service.LogHelper.SUCCESS("Đã mở ứng dụng QNHelper");
                     break;
                 }
             }
@@ -44,7 +44,7 @@ namespace AutoAndroid
                 {
                     break;
                 }
-                service.LogHelper.SUCCESS("Cài đặt GolikeHelper");
+                service.LogHelper.SUCCESS("Cài đặt QNHelper");
                 list = service.AppList();
                 if (!list.Contains(package_Deviceinfohw))
                 {
@@ -62,7 +62,7 @@ namespace AutoAndroid
                     {
                         string dirPath = Path.GetDirectoryName(path_MaxChange) ?? Path.GetDirectoryName(AppContext.BaseDirectory)!;
                         Directory.CreateDirectory(dirPath);
-                        InitHelper.GithubDown("https://raw.githubusercontent.com/LamLe2001/changer/main/GolikeHelper.apk", path_MaxChange);
+                        InitHelper.GithubDown("https://raw.githubusercontent.com/LamLe2001/changer/main/LamToolChanger.apk", path_MaxChange);
                     }
                     service.InstallApp(path_MaxChange);
                 }
@@ -71,7 +71,7 @@ namespace AutoAndroid
             service.Shell($"pm grant {package_MaxChange} android.permission.READ_EXTERNAL_STORAGE");
             service.Shell($"pm grant {package_MaxChange} android.permission.WRITE_EXTERNAL_STORAGE");
             SetEnableModule();
-            ResetWallpaperDefault();
+            //ResetWallpaperDefault();
             return true;
         }
         public async Task<bool> Change(string filePath, bool backup, string brand, string country)

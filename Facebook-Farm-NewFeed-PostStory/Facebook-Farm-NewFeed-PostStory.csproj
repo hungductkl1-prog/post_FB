@@ -1,0 +1,196 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <RootNamespace>Facebook_Farm_NewFeed_PostStory</RootNamespace>
+    <AssemblyName>FacebookFarmNewfeedPostStory</AssemblyName>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\logo_lamtool_v3_dark_16.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Debug build, AOT off (đỡ rủi ro initial port) -->
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>false</Optimize>
+
+    <!-- Native AOT -->
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>
+    <CustomResourceTypesSupport>true</CustomResourceTypesSupport>
+    <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+    <WindowsSupportedOSPlatformVersion>5.1</WindowsSupportedOSPlatformVersion>
+    <TargetPlatformMinVersion>5.1</TargetPlatformMinVersion>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <PublishLzmaCompressed>false</PublishLzmaCompressed>
+
+    <Product>FacebookFarmNewfeedPostStory</Product>
+    <Company>Local</Company>
+    <Copyright>Local</Copyright>
+    <Title>FacebookFarmNewfeedPostStory</Title>
+
+    <!-- Stub class trong gốc dùng public mutable property → analyzer WFO1000. Tắt. -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
+  </PropertyGroup>
+
+  <!-- Properties resx -->
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Resources\logo_lamtool_v3_dark_16.ico" />
+  </ItemGroup>
+
+  <!-- Designer SubType hints (port y từ gốc) -->
+  <ItemGroup>
+    <Compile Update="Views\Forms\fAddAccount.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Views\Forms\fSettingJob.cs"><SubType>Form</SubType></Compile>
+    <Compile Update="Views\Forms\fSettingDefault.cs"><SubType>Form</SubType></Compile>
+  </ItemGroup>
+
+  <!-- ============================================================== -->
+  <!-- Project references (full service chain) -->
+  <!-- ============================================================== -->
+  <!-- NuGet packages cần thiết cho Program.cs + WinForms binding -->
+  <ItemGroup>
+    <PackageReference Include="DeviceId.Windows" Version="6.9.0" />
+    <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
+    <PackageReference Include="PublishAotCompressed" Version="1.0.5" />
+    <PackageReference Include="VC-LTL" Version="5.2.2" />
+    <PackageReference Include="WinFormsComInterop" Version="0.5.0" />
+    <PackageReference Include="YY-Thunks" Version="1.1.7" />
+  </ItemGroup>
+
+  <!-- Trimming Rules -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="System.Drawing.Common" />
+    <TrimmerRootAssembly Include="System.Resources.Extensions" />
+    <TrimmerRootAssembly Include="System.ComponentModel.TypeConverter" />
+  </ItemGroup>
+
+  <!-- AOT Reflection Config -->
+  <ItemGroup>
+    <RdXmlFile Include="rd.xml" />
+    <RdXmlFile Include="Forms.xml" />
+  </ItemGroup>
+
+  <!-- Force WinForms binding support = true (overrides SDK default of false for trimmed builds) -->
+  <PropertyGroup>
+    <_WinFormsBindingSupport>true</_WinFormsBindingSupport>
+  </PropertyGroup>
+
+  <Target Name="PreserveReflectionForAutoAndroid" BeforeTargets="PrepareForILLink">
+    <ItemGroup>
+      <DynamicDependency Include="AutoAndroid.DeviceModel" DynamicallyAccessedMemberTypes="All" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Optional: workaround for crash in parallel merge sort -->
+  <ItemGroup>
+    <IlcCompileInput Include="--parallelism:1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AntdUI\AntdUI.csproj" />
+    <ProjectReference Include="..\AntdUI.EmojiFluentFlat\AntdUI.EmojiFluentFlat.csproj" />
+    <ProjectReference Include="..\AutoAndroid\AutoAndroid.csproj" />
+    <ProjectReference Include="..\ScrcpyNet\ScrcpyNet.csproj" />
+    <ProjectReference Include="..\Sunny.Subd.Core\Sunny.Subd.Core.csproj" />
+    <ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
+    <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
+    <ProjectReference Include="..\Sunny.Subdy.Server\Sunny.Subdy.Server.csproj" />
+  </ItemGroup>
+
+  <!-- ============================================================== -->
+  <!-- Native HttpRequestLib (C++ vcxproj) build target — port y từ gốc -->
+  <!-- ============================================================== -->
+  <PropertyGroup>
+    <HttpRequestLibProjectPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\HttpRequestLib\HttpRequestLib\HttpRequestLib.vcxproj'))</HttpRequestLibProjectPath>
+    <HttpRequestLibSolutionDir>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..'))))</HttpRequestLibSolutionDir>
+    <HttpRequestLibNativePlatform Condition="'$(Platform)' == 'x86'">Win32</HttpRequestLibNativePlatform>
+    <HttpRequestLibNativePlatform Condition="'$(Platform)' == 'x64'">x64</HttpRequestLibNativePlatform>
+    <HttpRequestLibNativePlatform Condition="'$(HttpRequestLibNativePlatform)' == ''">x64</HttpRequestLibNativePlatform>
+    <HttpRequestLibX64DllPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\x64\$(Configuration)\HttpRequestLib.dll'))</HttpRequestLibX64DllPath>
+    <HttpRequestLibWin32DllPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\Win32\$(Configuration)\HttpRequestLib.dll'))</HttpRequestLibWin32DllPath>
+    <HttpRequestLibWin32LegacyDllPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\$(Configuration)\HttpRequestLib.dll'))</HttpRequestLibWin32LegacyDllPath>
+    <VsWherePath>$([System.IO.Path]::Combine($([System.Environment]::GetFolderPath(SpecialFolder.ProgramFilesX86)), 'Microsoft Visual Studio', 'Installer', 'vswhere.exe'))</VsWherePath>
+    <HttpRequestLibMsBuildLookupFile>$(BaseIntermediateOutputPath)HttpRequestLib.$(Configuration).$(Platform).msbuild.path.txt</HttpRequestLibMsBuildLookupFile>
+  </PropertyGroup>
+
+  <Target Name="ResolveHttpRequestLibMsBuildPath" Condition="'$(HttpRequestLibMsBuildPath)' == ''">
+    <MakeDir Directories="$(BaseIntermediateOutputPath)" />
+    <Exec Command="&quot;$(VsWherePath)&quot; -latest -requires Microsoft.Component.MSBuild -find &quot;MSBuild\**\Bin\MSBuild.exe&quot; &gt; &quot;$(HttpRequestLibMsBuildLookupFile)&quot;" Condition="Exists('$(VsWherePath)')" />
+    <ReadLinesFromFile File="$(HttpRequestLibMsBuildLookupFile)" Condition="Exists('$(HttpRequestLibMsBuildLookupFile)')">
+      <Output TaskParameter="Lines" ItemName="HttpRequestLibMsBuildPathCandidate" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <HttpRequestLibMsBuildPath>@(HttpRequestLibMsBuildPathCandidate->'%(Identity)', '')</HttpRequestLibMsBuildPath>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="BuildHttpRequestLibIfMissing" DependsOnTargets="ResolveHttpRequestLibMsBuildPath" Condition="('$(HttpRequestLibNativePlatform)' == 'x64' and !Exists('$(HttpRequestLibX64DllPath)')) or ('$(HttpRequestLibNativePlatform)' == 'Win32' and !Exists('$(HttpRequestLibWin32LegacyDllPath)') and !Exists('$(HttpRequestLibWin32DllPath)'))">
+    <Message Text="Building HttpRequestLib ($(Configuration)|$(HttpRequestLibNativePlatform))..." Importance="high" />
+    <Exec Command="&quot;$(HttpRequestLibMsBuildPath)&quot; &quot;$(HttpRequestLibProjectPath)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(HttpRequestLibNativePlatform) /p:SolutionDir=$(HttpRequestLibSolutionDir) /nologo"
+          Condition="'$(HttpRequestLibMsBuildPath)' != ''" />
+    <Warning Text="HttpRequestLib.dll missing — skip copy (set HttpRequestLibMsBuildPath if you have VS C++ toolchain)."
+             Condition="('$(HttpRequestLibNativePlatform)' == 'x64' and !Exists('$(HttpRequestLibX64DllPath)')) or ('$(HttpRequestLibNativePlatform)' == 'Win32' and !Exists('$(HttpRequestLibWin32LegacyDllPath)') and !Exists('$(HttpRequestLibWin32DllPath)'))" />
+  </Target>
+
+  <Target Name="BuildAndCopyHttpRequestLib" BeforeTargets="Build" DependsOnTargets="BuildHttpRequestLibIfMissing">
+    <ItemGroup>
+      <HttpRequestLibCandidate Include="$(HttpRequestLibX64DllPath)" Condition="'$(HttpRequestLibNativePlatform)' == 'x64'" />
+      <HttpRequestLibCandidate Include="$(HttpRequestLibWin32LegacyDllPath)" Condition="'$(HttpRequestLibNativePlatform)' == 'Win32'" />
+      <HttpRequestLibCandidate Include="$(HttpRequestLibWin32DllPath)" Condition="'$(HttpRequestLibNativePlatform)' == 'Win32'" />
+      <ResolvedHttpRequestLibCandidate Include="@(HttpRequestLibCandidate)" Condition="Exists('%(Identity)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ResolvedHttpRequestLibCandidate)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="'@(ResolvedHttpRequestLibCandidate)' != ''" />
+  </Target>
+
+  <!-- Copy ScrcpyNet native DLLs (FFmpeg, SDL2, adb, scrcpy-server) -->
+  <Target Name="CopyScrcpyNativeDeps" AfterTargets="Build">
+    <ItemGroup>
+      <ScrcpyNativeDep Include="$(MSBuildProjectDirectory)\..\ScrcpyNet\bin\$(Configuration)\netstandard2.1\ScrcpyNet\*.*" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)ScrcpyNet" />
+    <Copy SourceFiles="@(ScrcpyNativeDep)" DestinationFolder="$(OutDir)ScrcpyNet" SkipUnchangedFiles="true" Condition="'@(ScrcpyNativeDep)' != ''" />
+  </Target>
+
+  <!-- ============================================================== -->
+  <!-- Python helpers (build = optional, copy nếu sẵn) -->
+  <!-- ============================================================== -->
+  <PropertyGroup>
+    <LTPhoneHelperDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\LTPhoneHelper'))</LTPhoneHelperDir>
+    <LTPhoneHelperExe>$(LTPhoneHelperDir)\dist\QNHelper.exe</LTPhoneHelperExe>
+    <OrcHelperDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\ORC-Helper-Python'))</OrcHelperDir>
+    <OrcHelperExe>$(OrcHelperDir)\dist\ocr_helper.exe</OrcHelperExe>
+    <ViewControlExe>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish\QN-Android-View.exe'))</ViewControlExe>
+  </PropertyGroup>
+
+  <Target Name="CopyLTPhoneHelper" BeforeTargets="Build" Condition="Exists('$(LTPhoneHelperExe)')">
+    <Copy SourceFiles="$(LTPhoneHelperExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyOrcHelper" BeforeTargets="Build" Condition="Exists('$(OrcHelperExe)')">
+    <Copy SourceFiles="$(OrcHelperExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlExe)')">
+    <Copy SourceFiles="$(ViewControlExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

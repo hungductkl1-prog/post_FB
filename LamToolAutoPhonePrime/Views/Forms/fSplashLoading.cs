@@ -1,4 +1,4 @@
-using LamToolAutoPhonePrime.Utils;
+﻿using LamToolAutoPhonePrime.Utils;
 using LamToolAutoPhonePrime.Utils.Design;
 using System.Drawing.Drawing2D;
 
@@ -24,7 +24,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             ShowInTaskbar = true;
             TopMost = true;
             DoubleBuffered = true;
-            Text = "GolikeAutoPhone";
+            Text = "QNAutoPhone";
 
             try { Icon = AppIconHelper.AppIcon; } catch { }
 
@@ -40,7 +40,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             var lblTitle = new System.Windows.Forms.Label
             {
                 AutoSize = false,
-                Text = "GolikeAutoPhone",
+                Text = "QNAutoPhone",
                 Font = new Font(FontScale.FamilyName, 14F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(40, 40, 40),
                 TextAlign = ContentAlignment.MiddleCenter,

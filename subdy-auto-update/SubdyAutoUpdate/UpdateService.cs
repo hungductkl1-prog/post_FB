@@ -1,12 +1,12 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace SubdyAutoUpdate;
 
 internal static class UpdateService
 {
-    private const string MainExeName = "GolikePhoneFarm.exe";
-    private const string MainProcessName = "GolikePhoneFarm";
+    private const string MainExeName = "QNPhoneFarm.exe";
+    private const string MainProcessName = "QNPhoneFarm";
 
     public static string AppDir => AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
     public static string MainExePath => Path.Combine(AppDir, MainExeName);
@@ -28,7 +28,7 @@ internal static class UpdateService
         }
     }
 
-    // ── Lấy version hiện tại của GolikePhoneFarm.exe ───────────────────────
+    // ── Lấy version hiện tại của QNPhoneFarm.exe ───────────────────────
 
     public static string GetLocalVersion()
     {

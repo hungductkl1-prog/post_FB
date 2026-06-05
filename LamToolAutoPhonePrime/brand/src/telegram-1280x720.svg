@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-label="AutoGoLike — Tool auto chính thức Golike">
-  <title>AutoGoLike Telegram banner</title>
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720" role="img" aria-label="AutoQN — Tool auto chính thức QN">
+  <title>AutoQN Telegram banner</title>
   <rect width="1280" height="720" fill="#0a0a0a"/>
   <g fill="#d3ff3c" opacity="0.10">
     <circle cx="80" cy="80" r="6"/>
@@ -29,13 +29,13 @@
   <text x="640" y="540" text-anchor="middle"
         font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
         font-weight="800" font-size="78" fill="#ffffff"
-        letter-spacing="-2.5">AutoGoLike</text>
+        letter-spacing="-2.5">AutoQN</text>
   <text x="640" y="585" text-anchor="middle"
         font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
         font-weight="500" font-size="20" fill="#d3ff3c"
-        letter-spacing="4">BY GOLIKE · OFFICIAL</text>
+        letter-spacing="4">BY QN · OFFICIAL</text>
   <text x="640" y="640" text-anchor="middle"
         font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
         font-weight="500" font-size="24" fill="#ffffff" opacity="0.7"
-        letter-spacing="-0.5">Tool auto chính thức Golike — auto.golike.net</text>
+        letter-spacing="-0.5">Tool auto chính thức QN — auto.qn.net</text>
 </svg>

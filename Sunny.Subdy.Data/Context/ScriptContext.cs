@@ -105,7 +105,7 @@ namespace Sunny.Subdy.Data.Context
         }
 
         /// <summary>
-        /// Đổi tên script legacy "Farm-Xu-VIP" → "Làm Job Golike".
+        /// Đổi tên script legacy "Farm-Xu-VIP" → "Làm Job QN".
         /// Nếu đã tồn tại bản mới cùng platform thì xoá bản legacy để tránh trùng.
         /// Idempotent.
         /// </summary>
@@ -152,10 +152,10 @@ namespace Sunny.Subdy.Data.Context
     {
         // FarmXu (không VIP) đã bỏ — giữ const để so sánh legacy cho đến khi remap xong.
         public const string FarmXu = "FarmXu";
-        // Tên hiển thị mới của script Golike (đổi từ "Farm-Xu-VIP" → "Làm Job Golike").
+        // Tên hiển thị mới của script QN (đổi từ "Farm-Xu-VIP" → "Làm Job QN").
         // Const cũ giữ lại để remap account legacy đã persist với tên cũ.
         public const string FarmXuVipLegacy = "Farm-Xu-VIP";
-        public const string FarmXuVip = "Làm Job Golike";
+        public const string FarmXuVip = "Làm Job QN";
 
         public static bool IsBuiltIn(string name) =>
             string.Equals(name, FarmXuVip, StringComparison.OrdinalIgnoreCase)

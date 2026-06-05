@@ -37,13 +37,13 @@
 	  <Version>$(CurrentTime)</Version>
 	  <AssemblyVersion>$(CurrentTime)</AssemblyVersion>
 	  <FileVersion>$(CurrentTime)</FileVersion>
-	  <AssemblyName>GolikePhoneFarm</AssemblyName>
-	  <Product>GolikePhoneFarm</Product>
-	  <Company>Golike</Company>
-	  <Copyright>Golike</Copyright>
-	  <PackageId>GolikePhoneFarm</PackageId>
-	  <Title>GolikePhoneFarm</Title>
-	  <PackageProjectUrl>https://golike.net/</PackageProjectUrl>
+	  <AssemblyName>QNPhoneFarm</AssemblyName>
+	  <Product>QNPhoneFarm</Product>
+	  <Company>QN</Company>
+	  <Copyright>QN</Copyright>
+	  <PackageId>QNPhoneFarm</PackageId>
+	  <Title>QNPhoneFarm</Title>
+	  <PackageProjectUrl>https://qn.net/</PackageProjectUrl>
 	  <ApplicationIcon>Resources\logo_lamtool_v3_dark_16.ico</ApplicationIcon>
 	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -201,21 +201,21 @@
 		<Warning Text="ScrcpyNet native DLLs not found. Build ScrcpyNet project first." Condition="'@(ScrcpyNativeDep)' == ''" />
 	</Target>
 
-	<!-- Build GolikeHelper (Python PyInstaller) và copy vào output -->
+	<!-- Build QNHelper (Python PyInstaller) và copy vào output -->
 	<PropertyGroup>
 		<LTPhoneHelperDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\LTPhoneHelper'))</LTPhoneHelperDir>
-		<LTPhoneHelperExe>$(LTPhoneHelperDir)\dist\GolikeHelper.exe</LTPhoneHelperExe>
+		<LTPhoneHelperExe>$(LTPhoneHelperDir)\dist\QNHelper.exe</LTPhoneHelperExe>
 	</PropertyGroup>
 
 	<Target Name="BuildLTPhoneHelper" BeforeTargets="Build">
-		<Message Text="Building GolikeHelper..." Importance="high" />
+		<Message Text="Building QNHelper..." Importance="high" />
 		<Exec Command="python build.py" WorkingDirectory="$(LTPhoneHelperDir)" IgnoreExitCode="true" Condition="Exists('$(LTPhoneHelperDir)\build.py')" />
-		<Warning Text="GolikeHelper.exe not found after build. Skipping copy." Condition="!Exists('$(LTPhoneHelperExe)')" />
+		<Warning Text="QNHelper.exe not found after build. Skipping copy." Condition="!Exists('$(LTPhoneHelperExe)')" />
 	</Target>
 
 	<Target Name="CopyLTPhoneHelper" AfterTargets="BuildLTPhoneHelper" BeforeTargets="Build" Condition="Exists('$(LTPhoneHelperExe)')">
 		<Copy SourceFiles="$(LTPhoneHelperExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-		<Message Text="Copied GolikeHelper.exe to $(OutDir)." Importance="high" />
+		<Message Text="Copied QNHelper.exe to $(OutDir)." Importance="high" />
 	</Target>
 
 	<!-- Build ORC-Helper-Python (PyInstaller onefile) và copy vào output -->
@@ -238,18 +238,18 @@
 	<!-- Build ViewControl (AOT standalone .exe) và copy vào output -->
 	<PropertyGroup>
 		<ViewControlProjectPath>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\ViewControl.csproj'))</ViewControlProjectPath>
-		<ViewControlExe>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish\Golike-Android-View.exe'))</ViewControlExe>
+		<ViewControlExe>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish\QN-Android-View.exe'))</ViewControlExe>
 	</PropertyGroup>
 
 	<Target Name="BuildViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlProjectPath)')">
 		<Message Text="Building ViewControl..." Importance="high" />
 		<Exec Command="dotnet publish &quot;$(ViewControlProjectPath)&quot; -r win-x64 -c Release --output &quot;$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\View-Control\bin\publish'))&quot; /p:PublishAot=false /p:PublishSingleFile=true /p:SelfContained=true /p:IncludeNativeLibrariesForSelfExtract=true /nologo" IgnoreExitCode="true" />
-		<Warning Text="Golike-Android-View.exe not found after build. Skipping copy." Condition="!Exists('$(ViewControlExe)')" />
+		<Warning Text="QN-Android-View.exe not found after build. Skipping copy." Condition="!Exists('$(ViewControlExe)')" />
 	</Target>
 
 	<Target Name="CopyViewControl" AfterTargets="BuildViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlExe)')">
 		<Copy SourceFiles="$(ViewControlExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-		<Message Text="Copied Golike-Android-View.exe to $(OutDir)." Importance="high" />
+		<Message Text="Copied QN-Android-View.exe to $(OutDir)." Importance="high" />
 	</Target>
 
 	<!--

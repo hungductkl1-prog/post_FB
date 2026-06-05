@@ -134,34 +134,47 @@ namespace ScrcpyNet
             }
         }
 
-        public List<AVPacket> Decode(byte[] data,int length, long pts = -1)
+        public List<IntPtr> Decode(byte[] data,int length, long pts = -1)
         {
             fixed (byte* dataPtr = data)
             {
                 byte* ptr = dataPtr;
                 int dataSize = length;
-              
-                var packs = new List<AVPacket>();
-                while (dataSize > 0)
+
+                // Trả về IntPtr (AVPacket*) thay vì AVPacket struct để giữ ownership rõ ràng.
+                // Consumer phải gọi av_packet_free trên mỗi pointer sau khi xử lý xong.
+                var packs = new List<IntPtr>();
+
+                // Reuse 1 packet duy nhất cho parser — av_parser_parse2 chỉ ghi data/size,
+                // không tự cấp buffer. Sau khi parse xong 1 packet hoàn chỉnh ta clone ra.
+                AVPacket* parserPacket = ffmpeg.av_packet_alloc();
+                try
                 {
-                    AVPacket* packet = ffmpeg.av_packet_alloc();
-                 
-                    int ret = ffmpeg.av_parser_parse2(parser, ctx, &packet->data, &packet->size, ptr, dataSize, pts != -1 ? pts : ffmpeg.AV_NOPTS_VALUE, ffmpeg.AV_NOPTS_VALUE, 0);
-
-                    if (ret < 0)
-                        throw new Exception("Error while parsing.");
-
-                    ptr += ret;
-                    dataSize -= ret;
-
-                    if (packet->size != 0)
+                    while (dataSize > 0)
                     {
-                        var pack = ffmpeg.av_packet_clone(packet);
-                        ffmpeg.av_free(packet);
-                        packs.Add(*pack);
-                    }
+                        int ret = ffmpeg.av_parser_parse2(parser, ctx, &parserPacket->data, &parserPacket->size, ptr, dataSize, pts != -1 ? pts : ffmpeg.AV_NOPTS_VALUE, ffmpeg.AV_NOPTS_VALUE, 0);
 
+                        if (ret < 0)
+                            throw new Exception("Error while parsing.");
+
+                        ptr += ret;
+                        dataSize -= ret;
+
+                        if (parserPacket->size != 0)
+                        {
+                            // Clone tạo packet mới + ref data → caller sở hữu, phải free
+                            AVPacket* cloned = ffmpeg.av_packet_clone(parserPacket);
+                            if (cloned != null)
+                                packs.Add((IntPtr)cloned);
+                        }
+                    }
                 }
+                finally
+                {
+                    // av_packet_free vừa unref data (parser không ref nhưng phòng hờ) vừa free struct
+                    ffmpeg.av_packet_free(&parserPacket);
+                }
+
                 return packs;
             }
         }
@@ -169,47 +182,67 @@ namespace ScrcpyNet
 
 
         public event Action<AVFrame> NewFrameEvent;
-        public void DecodePacket(AVPacket packet)
+        public void DecodePacket(IntPtr packetPtr)
         {
-           int ret = ffmpeg.avcodec_send_packet(ctx, &packet);
-
-            if (ret != ffmpeg.AVERROR(ffmpeg.EAGAIN))
+            if (packetPtr == IntPtr.Zero) return;
+            AVPacket* packet = (AVPacket*)packetPtr;
+            try
             {
-                if (ret < 0)
+                int ret = ffmpeg.avcodec_send_packet(ctx, packet);
+
+                if (ret != ffmpeg.AVERROR(ffmpeg.EAGAIN))
                 {
-                    byte[] errorMessageBytes = new byte[512];
-                    fixed (byte* ptr = errorMessageBytes)
+                    if (ret < 0)
                     {
-                        ffmpeg.av_strerror(ret, ptr, (ulong)errorMessageBytes.Length);
-                        string errorMessage = new((sbyte*)ptr, 0, errorMessageBytes.Length - 1, Encoding.ASCII);
-                        log.Error("Error sending a packet for decoding. {@ErrorMessage}", errorMessage);
-                    }
-
-                    return;
-                }
-
-                while (ret >= 0)
-                {
-                    ret = ffmpeg.avcodec_receive_frame(ctx, frame);
-
-                    if (ret == ffmpeg.AVERROR(ffmpeg.EAGAIN) || ret == ffmpeg.AVERROR(ffmpeg.AVERROR_EOF))
-                        return;
-
-                    if (this.NewFrameEvent != null)
-                    {
-                        this.NewFrameEvent(*frame);
-                        ffmpeg.av_frame_unref(frame);
-                        ffmpeg.av_packet_unref(&packet);
-                    }
-                    else
-                    {
-                        var frameData = this.GetFrameData(*frame);
-                        if (frameData!=null)
+                        byte[] errorMessageBytes = new byte[512];
+                        fixed (byte* ptr = errorMessageBytes)
                         {
-                            this.OnFrame?.Invoke(this.Scrcpy,frameData);
+                            ffmpeg.av_strerror(ret, ptr, (ulong)errorMessageBytes.Length);
+                            string errorMessage = new((sbyte*)ptr, 0, errorMessageBytes.Length - 1, Encoding.ASCII);
+                            log.Error("Error sending a packet for decoding. {@ErrorMessage}", errorMessage);
+                        }
+                        return;
+                    }
+
+                    while (ret >= 0)
+                    {
+                        ret = ffmpeg.avcodec_receive_frame(ctx, frame);
+
+                        if (ret == ffmpeg.AVERROR(ffmpeg.EAGAIN) || ret == ffmpeg.AVERROR(ffmpeg.AVERROR_EOF))
+                            return;
+
+                        if (ret < 0)
+                            return;
+
+                        try
+                        {
+                            if (this.NewFrameEvent != null)
+                            {
+                                this.NewFrameEvent(*frame);
+                            }
+                            else
+                            {
+                                var frameData = this.GetFrameData(*frame);
+                                if (frameData != null)
+                                {
+                                    this.OnFrame?.Invoke(this.Scrcpy, frameData);
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            // PHẢI unref mỗi frame nhận được (avcodec_receive_frame ref data của frame),
+                            // nếu không buffer YUV (vài MB / frame) sẽ tích đến khi GC chạy → 24GB RAM.
+                            ffmpeg.av_frame_unref(frame);
                         }
                     }
                 }
+            }
+            finally
+            {
+                // Luôn free packet — cho dù send thành công hay lỗi, packet đã được clone từ Decode()
+                // và caller sở hữu. Không free ở đây = leak buffer H264.
+                ffmpeg.av_packet_free(&packet);
             }
         }
 

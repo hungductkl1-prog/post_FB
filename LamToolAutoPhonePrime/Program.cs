@@ -41,7 +41,7 @@ namespace LamToolAutoPhonePrime
                 splash?.SetStatus("Đang kiểm tra môi trường...");
                 if (!IsEnvironmentReady())
                 {
-                    splash?.SetStatus("Đang cài đặt môi trường (GolikeHelper)...");
+                    splash?.SetStatus("Đang cài đặt môi trường (QNHelper)...");
                     RunLTPhoneHelper();
 
                     // Re-check sau khi helper kết thúc. Nếu vẫn chưa ready
@@ -52,7 +52,7 @@ namespace LamToolAutoPhonePrime
                         splash?.Close();
                         MessageBox.Show(
                             "Cài đặt môi trường chưa hoàn tất.\n" +
-                            "Vui lòng chạy GolikeHelper.exe (Right-click > Run as administrator) rồi thử lại.",
+                            "Vui lòng chạy QNHelper.exe (Right-click > Run as administrator) rồi thử lại.",
                             "Thiếu môi trường",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Warning);
@@ -82,7 +82,7 @@ namespace LamToolAutoPhonePrime
             splash?.SetStatus("Đang tải font...");
             FontUtil.LoadCustomFonts();
 
-            // Gắn icon Golike cho toàn bộ form (cả dialog mở sau).
+            // Gắn icon QN cho toàn bộ form (cả dialog mở sau).
             AppIconHelper.Install();
 
             // Background I/O: DeviceId WMI + auto-login HTTP đều chậm nhưng KHÔNG cần
@@ -194,12 +194,12 @@ namespace LamToolAutoPhonePrime
         public static void RunLTPhoneHelper()
         {
             string helperPath = Path.Combine(
-                AppContext.BaseDirectory, "GolikeHelper.exe");
+                AppContext.BaseDirectory, "QNHelper.exe");
 
             if (!File.Exists(helperPath))
             {
                 MessageBox.Show(
-                    "Môi trường chưa được cài đặt.\nVui lòng chạy GolikeHelper.exe để thiết lập.",
+                    "Môi trường chưa được cài đặt.\nVui lòng chạy QNHelper.exe để thiết lập.",
                     "Thiếu môi trường",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
@@ -214,29 +214,6 @@ namespace LamToolAutoPhonePrime
             };
             using var p = Process.Start(psi);
             p?.WaitForExit(10 * 60 * 1000); // tối đa 10 phút
-        }
-
-        public static bool IsVCppInstalled(string arch)
-        {
-            try
-            {
-                RegistryView view = arch.Equals("x64", StringComparison.OrdinalIgnoreCase) ? RegistryView.Registry64 : RegistryView.Registry32;
-                string keyPath = $@"SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\{arch}";
-                using (var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view))
-                using (var key = baseKey.OpenSubKey(keyPath))
-                {
-                    if (key == null) return false;
-                    object val = key.GetValue("Installed");
-                    if (val is int intVal) return intVal == 1;
-                    if (val is string strVal && int.TryParse(strVal, out int parsed)) return parsed == 1;
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                Trace.TraceWarning("Failed to read registry for VCpp: " + ex);
-                return false;
-            }
         }
 
         public static void RestartApp()
@@ -261,109 +238,8 @@ namespace LamToolAutoPhonePrime
             }
         }
 
-        public static void CheckAndInstallVCpp()
-        {
-            bool is64 = Environment.Is64BitOperatingSystem;
-
-            if (is64)
-            {
-                if (!IsVCppInstalled("x64"))
-                {
-                    string url = "https://aka.ms/vs/17/release/vc_redist.x64.exe";
-                    string file = Path.Combine(Path.GetTempPath(), "vc_redist.x64.exe");
-                    DownloadFile(url, file);
-                    InstallVCpp(file);
-                    TryDeleteFileQuiet(file);
-                    RestartApp();
-                }
-            }
-            else
-            {
-                if (!IsVCppInstalled("x86"))
-                {
-                    string url = "https://aka.ms/vs/17/release/vc_redist.x86.exe";
-                    string file = Path.Combine(Path.GetTempPath(), "vc_redist.x86.exe");
-                    DownloadFile(url, file);
-                    InstallVCpp(file);
-                    TryDeleteFileQuiet(file);
-                    RestartApp();
-                }
-            }
-        }
-
-        public static void InstallVCpp(string installerPath)
-        {
-            if (string.IsNullOrWhiteSpace(installerPath) || !File.Exists(installerPath))
-                throw new FileNotFoundException("Installer not found", installerPath);
-            var psi = new ProcessStartInfo
-            {
-                FileName = installerPath,
-                Arguments = "/install /quiet /norestart",
-                UseShellExecute = true,
-                Verb = "runas",
-                WindowStyle = ProcessWindowStyle.Hidden
-            };
-
-            using (var p = Process.Start(psi))
-            {
-                if (p != null)
-                {
-                    p.WaitForExit(5 * 60 * 1000);
-                }
-            }
-        }
-
-        public static void DownloadFile(string url, string filePath)
-        {
-            try
-            {
-                using (var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10)))
-                {
-                    DownloadFileAsync(url, filePath, cts.Token).GetAwaiter().GetResult();
-                }
-            }
-            catch (Exception ex)
-            {
-                TryDeleteFileQuiet(filePath);
-                throw new InvalidOperationException($"Failed to download '{url}' to '{filePath}'", ex);
-            }
-        }
-
-        private static async Task DownloadFileAsync(string url, string filePath, CancellationToken cancellationToken)
-        {
-            using (var handler = new HttpClientHandler()
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-            })
-            using (var client = new HttpClient(handler, disposeHandler: true) { Timeout = TimeSpan.FromMinutes(10) })
-            using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false))
-            {
-                response.EnsureSuccessStatusCode();
-
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath) ?? Path.GetTempPath());
-
-                using (var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
-                using (var destination = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
-                {
-                    await source.CopyToAsync(destination, 81920, cancellationToken).ConfigureAwait(false);
-                }
-            }
-        }
-
-        private static void TryDeleteFileQuiet(string path)
-        {
-            try
-            {
-                if (File.Exists(path))
-                    File.Delete(path);
-            }
-            catch
-            {
-            }
-        }
-
         private const string StartupRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
-        private static string StartupAppName => Application.ProductName ?? "GolikePhoneFarm";
+        private static string StartupAppName => Application.ProductName ?? "QNPhoneFarm";
 
         public static bool IsStartupEnabled()
         {

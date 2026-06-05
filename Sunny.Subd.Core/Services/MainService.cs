@@ -130,10 +130,10 @@ namespace Sunny.Subd.Core.Services
         }
         public async Task ExtractAndUpdateAuthenticationInfoAsync()
         {
-            if (string.IsNullOrEmpty(_account.FullName) && _platform == PlatformModel.Facebook)
-            {
-                _account.FullName = _client.GetFacebookFullName(_account.Uid);
-            }
+            //if (string.IsNullOrEmpty(_account.FullName) && _platform == PlatformModel.Facebook)
+            //{
+            //    _account.FullName = _client.GetFacebookFullName(_account.Uid);
+            //}
             if (!_client.IsRoot()) return;
             _sate = "Lấy thông tin xác thực";
             if (string.IsNullOrEmpty(_account.Cookie) || string.IsNullOrEmpty(_account.Token))
@@ -314,7 +314,7 @@ namespace Sunny.Subd.Core.Services
             SetStatus($"Loại: [{proxyType}] - [{proxy}]", 2);
             if (!string.IsNullOrEmpty(proxy))
             {
-                _client.ConnectProxy(proxy);
+                _client.ConnectProxyADB(proxy);
             }
             int timeDelay = _settingGeneral.GetIntType("numericUpDown3", 10);
             await DelayMessageAsync(timeDelay, "Đợi {time} giây kết nối.", 2);
@@ -836,7 +836,7 @@ namespace Sunny.Subd.Core.Services
                     _client.LogHelper.SUCCESS("Đã hoàn thành!");
                     break;
                 }
-
+                _client.DisconetProxyADB();
                 // Auto-reconnect wifi nếu host mất internet (throttled 30s).
                 // Chỉ guard, không block luôn nếu wifi config rỗng.
                 try
@@ -898,7 +898,7 @@ namespace Sunny.Subd.Core.Services
                     _account.Uid_Email = index == 1 ? _account.Email : _account.Uid;
                     _account.Uid_Email ??= _account.Email ?? _account.Uid;
 
-                    await _facebookService.Login(_client, _account, _ct, 180, this);
+                    await _facebookService.Login(_client, _account, _ct, 400, this);
 
                     _sate = "Đợi sau đăng nhập";
                     if (_settingGeneral.GetBooleanValue("checkBox11", true))
@@ -913,7 +913,7 @@ namespace Sunny.Subd.Core.Services
                     _sate = "Thực hiện kịch bản";
                     if (_platform == PlatformModel.Facebook)
                     {
-                        // Legacy ("FarmXu", "Farm-Xu-VIP") đã đổi tên hiển thị → "Làm Job Golike".
+                        // Legacy ("FarmXu", "Farm-Xu-VIP") đã đổi tên hiển thị → "Làm Job QN".
                         // Match cả tên cũ để account legacy chưa migrate vẫn chạy được.
                         if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
                             || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
@@ -932,7 +932,7 @@ namespace Sunny.Subd.Core.Services
                     }
                     else if (_platform == PlatformModel.Instagram || _platform == PlatformModel.Threads)
                     {
-                        // Mirror Facebook flow: script "Làm Job Golike" → SpamXuHandler (Golike API).
+                        // Mirror Facebook flow: script "Làm Job QN" → SpamXuHandler (QN API).
                         // Các kịch bản custom IG → InstagramFarming.
                         if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
                             || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)

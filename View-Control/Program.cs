@@ -1,4 +1,4 @@
-using AutoAndroid;
+﻿using AutoAndroid;
 using FFmpeg.AutoGen;
 using LamToolAutoPhonePrime;
 using SharpAdbClient;
@@ -91,7 +91,7 @@ internal static class Program
         {
             MessageBox.Show(
                 "Không thể tải scrcpy-server.jar.\nVui lòng kiểm tra kết nối mạng rồi thử lại.",
-                "Golike Android View",
+                "QN Android View",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             return;
@@ -107,8 +107,8 @@ internal static class Program
         if (deviceIds.Count == 0)
         {
             MessageBox.Show(
-                "Cách dùng:\n  Golike-Android-View.exe <mã thiết bị>\n  Golike-Android-View.exe <mã thiết bị 1>,<mã thiết bị 2>,...\n  Golike-Android-View.exe <mã thiết bị 1> <mã thiết bị 2> ...",
-                "Golike Android View",
+                "Cách dùng:\n  QN-Android-View.exe <mã thiết bị>\n  QN-Android-View.exe <mã thiết bị 1>,<mã thiết bị 2>,...\n  QN-Android-View.exe <mã thiết bị 1> <mã thiết bị 2> ...",
+                "QN Android View",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
             return;

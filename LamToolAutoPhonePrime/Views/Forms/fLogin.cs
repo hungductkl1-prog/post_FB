@@ -42,8 +42,8 @@ namespace LamToolAutoPhonePrime.Views.Forms
             {
                 User user = SubdyClient.Login(txt_search.Text.Trim(), input1.Text.Trim());
                 // Lấy thêm pending coin ngay sau login để hiện cùng số dư.
-                string access_token = SubdyClient.GetTokenAutoGolike(txt_search.Text.Trim(), input1.Text.Trim());
-                user.Token_Golike =access_token;
+                string access_token = SubdyClient.GetTokenAutoQN(txt_search.Text.Trim(), input1.Text.Trim());
+                user.Token_QN =access_token;
                 try
                 {
                   
@@ -88,7 +88,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             }
             catch (Exception ex)
             {
-                AntdUI.Notification.warn(this, "Golike Thông Báo", "Không thể mở link: " + ex.Message, AntdUI.TAlignFrom.TR, Font);
+                AntdUI.Notification.warn(this, "QN Thông Báo", "Không thể mở link: " + ex.Message, AntdUI.TAlignFrom.TR, Font);
             }
         }
 
@@ -194,9 +194,9 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
                 try
                 {
-                    user.Token_Golike = SubdyClient.GetTokenAutoGolike(cached.Username.Trim(), cached.Password.Trim());
+                    user.Token_QN = SubdyClient.GetTokenAutoQN(cached.Username.Trim(), cached.Password.Trim());
                 }
-                catch { /* token-golike có thể fail nhưng login chính vẫn dùng được */ }
+                catch { /* token-qn có thể fail nhưng login chính vẫn dùng được */ }
 
                 try
                 {

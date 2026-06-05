@@ -6,19 +6,25 @@ using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 
+using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
+
 namespace LamToolAutoPhonePrime.Views.Forms.Actions
 {
     public partial class fHDTuongTacNewfeed : Form
     {
+        private const string ActionType = FacebookFarmingType.HDTuongTacNewfeed;
+
         private string scriptId;
         private string actionId;
         private ConfigHelper jsonConfig;
         private ScriptActionContext _context;
+
         public fHDTuongTacNewfeed(string scriptId, string actionId = "")
         {
             InitializeComponent();
             FontUtil.ApplyFontToAllControls(this);
             LamToolAutoPhonePrime.Utils.Design.FormResponsiveHelper.MakeScrollable(this);
+
             checkBox1.CheckedChanged += ckbDefault_CheckedChanged;
             ckbInteract.CheckedChanged += ckbDefault_CheckedChanged;
             ckbShareWall.CheckedChanged += ckbDefault_CheckedChanged;
@@ -27,21 +33,17 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
             radioButton3.CheckedChanged += ckbDefault_CheckedChanged;
             radioButton2.CheckedChanged += ckbDefault_CheckedChanged;
             ckbAnh.CheckedChanged += ckbDefault_CheckedChanged;
+
             _context = new ScriptActionContext();
             this.scriptId = scriptId;
             this.actionId = actionId;
+
             string configJson = "";
             if (string.IsNullOrEmpty(actionId))
             {
-                var index = _context.GetCountName(FacebookFarmingType.DictionariesAction[FacebookFarmingType.HDXemReel]);
-                if (index == 0)
-                {
-                    txtTenHanhDong.Text = FacebookFarmingType.DictionariesAction[FacebookFarmingType.HDXemReel];
-                }
-                else
-                {
-                    txtTenHanhDong.Text = $"{FacebookFarmingType.DictionariesAction[FacebookFarmingType.HDXemReel]} ({(index)})";
-                }
+                var actionName = FacebookFarmingType.DictionariesAction[ActionType];
+                var index = _context.GetCountName(actionName);
+                txtTenHanhDong.Text = index == 0 ? actionName : $"{actionName} ({index})";
                 btnSave.Text = "Thêm";
             }
             else
@@ -51,12 +53,14 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                 configJson = action?.Json ?? "";
                 btnSave.Text = "Lưu";
             }
+
             jsonConfig = new ConfigHelper(this, configJson);
             btnCancel.Click += btnCancel_Click;
             btnSave.Click += btnSave_Click;
             btn_setting.Click += btnCancel_Click;
             LoadEnable();
         }
+
         private void LoadEnable()
         {
             SubdyHelper.UpdateItemCount(txtComments, lblStatus);
@@ -72,6 +76,7 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
         {
             LoadEnable();
         }
+
         private void btnCancel_Click(object sender, EventArgs e)
         {
             Close();
@@ -85,24 +90,25 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                 AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng nhập tên hành động!");
                 return;
             }
-            string configJson = jsonConfig.GetJsonString();
 
+            string configJson = jsonConfig.GetJsonString();
             if (string.IsNullOrEmpty(actionId))
             {
                 if (CommonMethod.ShowConfirmWarning("Bạn có muốn thêm hành động mới?"))
                 {
                     var scriptAction = _context.GetByScriptId(Guid.Parse(scriptId));
-                    var index = (scriptAction != null && scriptAction.Count > 0) ? scriptAction.Max(a => a.ByOrder) + 1 : 1;
+                    var index = scriptAction != null && scriptAction.Count > 0 ? scriptAction.Max(a => a.ByOrder) + 1 : 1;
                     var action = new ScriptAction
                     {
                         Id = Guid.NewGuid(),
                         Name = actionName,
-                        Type = FacebookFarmingType.HDXemReel,
+                        Type = ActionType,
                         Json = configJson,
                         Platform = PlatformModel.Facebook,
                         ScriptId = Guid.Parse(scriptId),
                         ByOrder = index
                     };
+
                     if (_context.Add(action))
                     {
                         DialogResult = DialogResult.OK;
@@ -110,19 +116,18 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                     }
                     else
                     {
-                        AntdHelper.NotifyError(this, "Thao tác thất bại", "Thêm thất bại, vui lòng thử lại sau!");
+                        AntdHelper.NotifyError(this, "Thao tác thất bại", "Thêm thất bại, vui lòng thử lại sau!");
                     }
                 }
             }
-            else // cập nhật
+            else
             {
                 if (CommonMethod.ShowConfirmWarning("Bạn có muốn cập nhật hành động?"))
                 {
-                    var scriptAction = _context.GetByScriptId(Guid.Parse(scriptId));
-                    var index = (scriptAction != null && scriptAction.Count > 0) ? scriptAction.Max(a => a.ByOrder) + 1 : 1;
                     var action = _context.GetById(Guid.Parse(actionId));
                     action.Name = actionName;
                     action.Json = configJson;
+
                     if (_context.Update(action))
                     {
                         DialogResult = DialogResult.OK;
@@ -130,12 +135,11 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
                     }
                     else
                     {
-                        AntdHelper.NotifyError(this, "Thao tác thất bại", "Cập nhật thất bại, vui lòng thử lại sau!");
+                        AntdHelper.NotifyError(this, "Thao tác thất bại", "Cập nhật thất bại, vui lòng thử lại sau!");
                     }
                 }
             }
         }
-
 
         private void txtLines_TextChanged(object sender, EventArgs e)
         {
@@ -144,10 +148,10 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
 
         private void button1_Click(object sender, EventArgs e)
         {
-            System.Windows.Forms.FolderBrowserDialog f = new System.Windows.Forms.FolderBrowserDialog();
-            if (f.ShowDialog() == DialogResult.OK)
+            using var dialog = new System.Windows.Forms.FolderBrowserDialog();
+            if (dialog.ShowDialog() == DialogResult.OK)
             {
-                txtPathAnh.Text = f.SelectedPath;
+                txtPathAnh.Text = dialog.SelectedPath;
             }
         }
     }

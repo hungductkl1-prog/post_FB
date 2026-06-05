@@ -266,13 +266,13 @@ namespace Sunny.Subdy.Data.Models
             }
         }
 
-        // IsRowEnabled = chỉ bật khi cả Live (ATX/Appium connected) + HasInternet (ping ok).
-        // ADB online không tính vào điều kiện vì IsLive đã yêu cầu ATX up trên thiết bị
-        // (kéo theo ADB phải online). Tự recompute khi 1 trong 2 nguồn đổi để UI/checkbox
-        // luôn nhất quán mà không cần caller nhớ gọi lại bằng tay sau mỗi probe nền.
+        // Project mới: chỉ cần Live (ATX/Appium connected) là tick được — bỏ
+        // ràng buộc HasInternet vì DeviceHealthCheckService không còn chạy ở lần
+        // load đầu, để HasInternet=false sẽ khoá toàn bộ row trong dialog
+        // "Chọn thiết bị". Internet (nếu mất) sẽ được WifiAutoConnect xử lý lúc chạy.
         private void RecomputeRowEnabled()
         {
-            IsRowEnabled = _isLive && _hasInternet;
+            IsRowEnabled = _isLive;
         }
 
         /// <summary>

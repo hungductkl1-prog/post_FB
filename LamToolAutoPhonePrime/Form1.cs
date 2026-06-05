@@ -312,7 +312,7 @@ namespace LamToolAutoPhonePrime
             Controls.Add(_loadingOverlay);
             _loadingOverlay.BringToFront();
 
-            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Golike Phone Farm xin chào!" };
+            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "QN Phone Farm xin chào!" };
 
             _loadingCts = new CancellationTokenSource();
             var token = _loadingCts.Token;

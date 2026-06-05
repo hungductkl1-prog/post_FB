@@ -27,7 +27,6 @@ namespace Sunny.Subd.Core.Utils
              "//*[@text=\"Type the text\"]",
              "//*[contains(@content-desc, \"confirm you're human to use your account\")]",
              $"//*[contains(@text, \"Record a video of yourself\")]",
-             $"//*[contains(@text, \"Enter the characters you see\")]",
              $"//*[contains(@text, \"Vietnam (+84)\")]",
              $"//*[contains(@text, \"United States of America (+1)\")]",
              $"//*[contains(@text, \"Type the text\")]",
@@ -102,9 +101,11 @@ namespace Sunny.Subd.Core.Utils
           "//*[@content-desc=\"Continue\"]",
           "//*[@text=\"Continue\"]",
           "//*[@text=\"Close app\"]",
+          "//*[@text=\"SAVE\"]",
       });
             _xpathGroups.TryAdd(XpathType.TowFA, new List<string>
       {
+           "//*[@content-desc=\"Check your email\"]",
           "//*[@text=\"Check your notifications on another device\"]",
           $"//*[contains(@text, \"Generate a code from your authentication app and enter it to log in\")]",
           $"//*[contains(@text, \"Check your notifications on another device\")]",

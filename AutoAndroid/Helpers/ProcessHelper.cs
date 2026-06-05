@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -8,7 +8,7 @@ namespace AutoAndroid
     public class ProcessHelper
     {
         public const int MaxConcurrentCmdProcesses = 20;
-        public static string ADBPath = "C:\\GolikeHelper\\sdk\\platform-tools\\";
+        public static string ADBPath = "C:\\QNHelper\\sdk\\platform-tools\\";
         private static readonly SemaphoreSlim CmdSemaphore = new SemaphoreSlim(MaxConcurrentCmdProcesses, MaxConcurrentCmdProcesses);
 
         public sealed class CommandExecutionResult

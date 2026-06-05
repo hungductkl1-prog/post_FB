@@ -93,7 +93,7 @@ namespace LamToolAutoPhonePrime
             windowBar.SubGap = 1;
             windowBar.SubText = "v18.12.08.2025";
             windowBar.TabIndex = 7;
-            windowBar.Text = "Golike Phone Farm";
+            windowBar.Text = "QN Phone Farm";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
             // 
@@ -355,7 +355,7 @@ namespace LamToolAutoPhonePrime
             label4.Name = "label4";
             label4.Size = new Size(91, 23);
             label4.TabIndex = 10;
-            label4.Text = "Golike.net";
+            label4.Text = "QN.net";
             // 
             // pictureBox2
             // 

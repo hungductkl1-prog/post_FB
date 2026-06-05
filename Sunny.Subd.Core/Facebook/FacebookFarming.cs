@@ -1,5 +1,4 @@
-﻿using AutoAndroid;
-using System.Text.Json.Nodes;
+using AutoAndroid;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Services;
 using Sunny.Subd.Core.Utils;
@@ -13,8 +12,10 @@ using Sunny.Subdy.Data.Models;
 using System;
 using System.Data;
 using System.Diagnostics;
+using System.IO.Packaging;
 using System.Linq;
 using System.Runtime;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using File = System.IO.File;
@@ -160,10 +161,11 @@ namespace Sunny.Subd.Core.Facebook
                 }
                 catch
                 {
-                    
+
                 }
-                
+                await _mainService.ExtractAndUpdateAuthenticationInfoAsync();
             }
+      
         }
 
         public async Task StartAction(ScriptAction action)
@@ -339,10 +341,10 @@ namespace Sunny.Subd.Core.Facebook
                     case FacebookFarmingType.HDNhanTinBanBe:
                         break;
                     case FacebookFarmingType.HDUpAvatar:
-                        HDUpAvatar(0, "", jsonHelper, action.Name);
+                        await HDUpAvatar(jsonHelper, action);
                         break;
                     case FacebookFarmingType.HDUpCover:
-                        HDUpCover(0, "", jsonHelper, action.Name);
+                        await HDUpCover(jsonHelper, action);
                         break;
                     case FacebookFarmingType.HDNghiGiaiLao:
                         HDNghiGiaiLao(0, "", jsonHelper, action.Name);
@@ -406,7 +408,7 @@ namespace Sunny.Subd.Core.Facebook
 
                 if (extension.SubdyEnum == SubdyEnum.LogOut)
                 {
-                    await _mainService._facebookService.Login(_client, _account, _mainService._ct, 180, _mainService);
+                    await _mainService._facebookService.Login(_client, _account, _mainService._ct, 400, _mainService);
                 }
                 error = $"Thất bại ({extension.Message})";
                 if (extension.SubdyEnum != SubdyEnum.JobFail)
@@ -417,28 +419,13 @@ namespace Sunny.Subd.Core.Facebook
             }
             finally
             {
-                await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown2", 5), _configKichBan.GetIntType("numericUpDown1", 30)), $"Đã chạy hành động {action.Name}.{error}." + " Đợi {time} giây để qua hành động tiếp theo...", 2);
+                await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown2", 5), _configKichBan.GetIntType("numericUpDown1", 15)), $"Đã chạy hành động {action.Name}.{error}." + " Đợi {time} giây để qua hành động tiếp theo...", 2);
                 _mainService.SetStatus($"Đã chạy xong hành động {action.Name} - {error} ", 0);
             }
 
 
 
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         private void SetStatusAccount(int accountId, string status, int delay = 0)
         {
@@ -904,136 +891,179 @@ namespace Sunny.Subd.Core.Facebook
 
             return countPost;
         }
-        public int HDUpCover(int accountId, string statusPrefix, JsonHelper jsonHelper, string actionName)
+        public async Task<int> HDUpCover(JsonHelper settings, ScriptAction action)
         {
-            bool flag = false;
-            string path = jsonHelper.GetValuesFromInputString("txtPathFolder");
-            bool flag2 = jsonHelper.GetBooleanValue("ckbXoaAnhDaDung");
-            if (Directory.GetFiles(path).Length != 0)
+            int targetCount = 1;
+            int delayFrom = settings.GetIntType("nudKhoangCachFrom", 5);
+            int delayTo = settings.GetIntType("nudKhoangCachTo", 10);
+
+            int successCount = 0;
+            int failCount = 0;
+
+            while (!_mainService._ct.IsCancellationRequested)
             {
-                string text = statusPrefix + "Đang" + " " + actionName + ": ";
-                SetStatusAccount(accountId, text + "Đang chạy...");
+                if (successCount >= targetCount) break;
+
+                int result = await HDUpCoverOld(0, "", settings, action.Name);
+                if (result == 1)
+                {
+                    successCount++;
+                }
+                else
+                {
+                    failCount++;
+                }
+
+                if (successCount < targetCount)
+                {
+                    int delay = SubdyHelper.RandomValue(delayFrom, delayTo + 1);
+                    await Task.Delay(delay * 1000);
+                }
+            }
+
+            return successCount;
+        }
+
+        public async Task<int> HDUpCoverOld(int accountId, string statusPrefix, JsonHelper jsonHelper, string actionName)
+        {
+            bool isSuccess = false;
+            string folderPath = jsonHelper.GetValue("txtPathFolder");
+            bool shouldDeleteUsedPhoto = jsonHelper.GetBooleanValue("ckbXoaAnhDaDung");
+
+            if (Directory.GetFiles(folderPath).Length != 0)
+            {
+                string status = statusPrefix + "Đang" + " " + actionName + ": ";
+                SetStatusAccount(accountId, status + "Đang chạy...");
                 try
                 {
-                    int num = 0;
-                    int num2 = 3;
-                    int num3 = 0;
-                    int num4 = 6;
-                    while (OpenFacebookLink(accountId, text, "fb://profile_edit"))
+                    int photoDisabledCount = 0;
+                    int maxPhotoDisabled = 3;
+                    int tapToRetryCount = 0;
+                    int maxTapToRetry = 6;
+
+                    while (OpenFacebookLink(accountId, status, "fb://profile_edit"))
                     {
-                        string text2 = "";
-                        if (flag2)
+                        string photoPath = "";
+                        if (shouldDeleteUsedPhoto)
                         {
                             lock (D739380E)
                             {
-                                text2 = (from B392998A in Directory.GetFiles(path)
-                                         orderby Guid.NewGuid()
-                                         select B392998A).FirstOrDefault();
-                                if (string.IsNullOrEmpty(text2))
+                                photoPath = Directory.GetFiles(folderPath)
+                                    .OrderBy(_ => Guid.NewGuid())
+                                    .FirstOrDefault();
+                                if (string.IsNullOrEmpty(photoPath))
                                 {
                                     break;
                                 }
-                                UploadMediaFiles(new List<string> { text2 });
-                                SubdyHelper.DeleteFile(text2);
-                                goto IL_0163;
+                                UploadMediaFiles(new List<string> { photoPath });
+                                SubdyHelper.DeleteFile(photoPath);
+                                goto SelectPhoto;
                             }
                         }
-                        text2 = (from CF89B124 in Directory.GetFiles(path)
-                                 orderby Guid.NewGuid()
-                                 select CF89B124).FirstOrDefault();
-                        if (!string.IsNullOrEmpty(text2))
+                        photoPath = Directory.GetFiles(folderPath)
+                            .OrderBy(_ => Guid.NewGuid())
+                            .FirstOrDefault();
+
+                        if (!string.IsNullOrEmpty(photoPath))
                         {
-                            UploadMediaFiles(new List<string> { text2 });
-                            goto IL_0163;
+                            UploadMediaFiles(new List<string> { photoPath });
+                            goto SelectPhoto;
                         }
                         break;
-                    IL_0163:
-                        string text3 = "";
-                        int tickCount = Environment.TickCount;
-                        bool flag3 = false;
+
+                    SelectPhoto:
+                        string xmlSource = "";
+                        int startTick = Environment.TickCount;
+                        bool photoSelected = false;
                         do
                         {
-                            text3 = _client.GetXMLSource();
-                            string text4 = _client.FindElement(text3, new List<string>
-    {
-        "//android.widget.ProgressBar",
-        "//*[@text='Tap to retry']",
-        "//*[contains(@content-desc,'cover photo')]",
-        "//android.widget.Button[@text='ALLOW']",
-        "//android.view.ViewGroup[@content-desc='SAVE']",
-        "//*[@content-desc='Photo']",
-        "//*[@content-desc='Photo. Disabled.']"
-    }, 1);
+                            xmlSource = _client.GetXMLSource();
+                            string foundXPath = _client.FindElement(xmlSource, new List<string> {
+                        "//*[@class='android.widget.ProgressBar']",
+                        "//*[@text='Tap to retry']",
+                        "//*[contains(@content-desc,'cover photo')]",
+                        "//*[@text='ALLOW' or @content-desc='ALLOW']",
+                        "//*[@text='SAVE' or @content-desc='SAVE']",
+                        "(//*[contains(@content-desc, 'Photo taken') or contains(@text, 'Photo taken')])[1]",
+                        "//*[@content-desc='Photo. Disabled.']"
+                    }, 1);
 
-                            if (text4 == "//android.widget.ProgressBar")
+                            if (foundXPath == "//*[@content-desc='Photo. Disabled.']")
                             {
-                                SetStatusAccount(accountId, text + "Loading...");
-                            }
-                            else if (text4 == "//*[@text='Tap to retry']")
-                            {
-                                if (num3 >= num4)
-                                    break;
-
-                                num3++;
-                                ScrollScreen(-1);
-                            }
-                            else if (text4 == "//*[@content-desc='Photo']")
-                            {
-                                var list = _client.FindBounds("", text4, 1);
-                                if (list.Count > 1)
-                                    list = list.GetRange(0, list.Count - 1);
-
-                                string selectedPhoto = list.OrderBy(_ => Guid.NewGuid()).FirstOrDefault();
-                                var point = new RectangleArea(selectedPhoto).GetCenterPoint();
-                                _client.Click(point.X, point.Y);
-                                flag3 = true;
-                            }
-                            else if (text4 == "//*[@content-desc='Photo. Disabled.']")
-                            {
-                                if (num >= num2)
-                                    break;
-
-                                num++;
-                                _client.ElementWithAttributes("//*[@content-desc='Back']", 1, text3);
-                            }
-                            else if (text4 == "//android.view.ViewGroup[@content-desc='SAVE']" ||
-                                     text4 == "//android.widget.Button[@text='ALLOW']" ||
-                                     text4.Contains("cover photo") && flag3)
-                            {
-                                if (text4.Contains("cover photo") && flag3)
+                                if (photoDisabledCount >= maxPhotoDisabled)
                                 {
-                                    flag = true;
+                                    goto EndMethod;
+                                }
+                                photoDisabledCount++;
+                                _client.ElementWithAttributes("//*[@content-desc='Back']", 1, xmlSource);
+                                goto WaitLoop;
+                            }
+                            else if (foundXPath.Contains("cover photo"))
+                            {
+                                goto SaveCover;
+                            }
+                            else if (foundXPath == "//*[@text='ALLOW' or @content-desc='ALLOW']" ||
+                                     foundXPath == "//*[@text='SAVE' or @content-desc='SAVE']")
+                            {
+                                goto SaveCover;
+                            }
+                            else if (foundXPath == "//*[@class='android.widget.ProgressBar']")
+                            {
+                                SetStatusAccount(accountId, status + "Loading...");
+                            }
+                            else if (foundXPath == "//*[@text='Tap to retry']")
+                            {
+                                if (tapToRetryCount >= maxTapToRetry)
+                                {
                                     break;
                                 }
-
-                                SetStatusAccount(accountId, text + "Tap " + text4 + "...");
-                                _client.ElementWithAttributes(text4, 1, text3);
+                                tapToRetryCount++;
+                                ScrollScreen(-1);
+                            }
+                            else if (foundXPath == "(//*[contains(@content-desc, 'Photo taken') or contains(@text, 'Photo taken')])[1]")
+                            {
+                                var photoElements = _client.FindBounds("", foundXPath, 1);
+                                if (photoElements.Count > 1)
+                                {
+                                    photoElements = photoElements.GetRange(0, photoElements.Count - 1);
+                                }
+                                string selectedPhoto = photoElements.OrderBy(_ => Guid.NewGuid()).FirstOrDefault();
+                                var point = new RectangleArea(selectedPhoto).GetCenterPoint();
+                                _client.Click(point.X, point.Y);
+                                photoSelected = true;
                             }
                             else
                             {
-                                SetStatusAccount(accountId, text + "Scroll...");
-                                if (ScrollScreen())
-                                {
-                                    //switch (method_22(E0BC9408, accountId, text))
-                                    //{
-                                    //    case 0: break; // continue
-                                    //    case 1: goto EndLoop; // exit loop
-                                    //}
-                                }
+                                SetStatusAccount(accountId, status + "Scroll...");
+                                await _mainService._facebookService.HanderAccount(_client, _account, 5, _mainService._ct, _mainService);
                             }
+                            goto WaitLoop;
 
+                        SaveCover:
+                            if (!(foundXPath.Contains("cover photo") && photoSelected))
+                            {
+                                SetStatusAccount(accountId, status + "Tap " + foundXPath + "...");
+                                _client.ElementWithAttributes(foundXPath, 1, xmlSource);
+                                goto WaitLoop;
+                            }
+                            isSuccess = true;
+                            break;
+
+                        WaitLoop:
                             _client.Delay(2);
-
-                        } while (Environment.TickCount - tickCount < 300_000);
-
-                    EndLoop:;
+                            continue;
+                        }
+                        while (Environment.TickCount - startTick < 300000);
+                        break;
+                    EndMethod:;
                     }
                 }
                 catch
                 {
+                    // Optionally log error here
                 }
             }
-            return flag ? 1 : 0;
+            return isSuccess ? 1 : 0;
         }
         public int HDSpamNhom(int accountId, string statusPrefix, JsonHelper jsonHelper, string actionName, string dataKey)
         {
@@ -3008,10 +3038,14 @@ namespace Sunny.Subd.Core.Facebook
         }
         public async Task<int> HDTuongTacNewfeed(JsonHelper settings, ScriptAction action)
         {
-            int totalSeconds = SubdyHelper.RandomValue(settings.GetIntType("numericUpDown2"), settings.GetIntType("numericUpDown1"));
+            // Thời gian lướt tổng (giây) — dùng numericUpDown2 (from) đến numericUpDown1 (to)
+            int totalFrom = Math.Max(1, settings.GetIntType("numericUpDown2", 60));
+            int totalTo = Math.Max(totalFrom, settings.GetIntType("numericUpDown1", 300));
+            int totalSeconds = SubdyHelper.RandomValue(totalFrom, totalTo);
 
-            int delayFrom = settings.GetIntType("nudTimeFrom");
-            int delayTo = settings.GetIntType("nudTimeTo");
+            // Thời gian dừng giữa mỗi lần action — dùng chính dải tổng để không phụ thuộc trường đã bỏ
+            int delayFrom = Math.Max(1, settings.GetIntType("nudTimeFrom", 10));
+            int delayTo = Math.Max(delayFrom, settings.GetIntType("nudTimeTo", 30));
 
 
             bool shouldInteract = settings.GetBooleanValue("ckbInteract");
@@ -3057,8 +3091,11 @@ namespace Sunny.Subd.Core.Facebook
             bool shouldShareWall = settings.GetBooleanValue("ckbShareWall");
             int shareCount = SubdyHelper.RandomValue(settings.GetIntType("nudShareWallFrom", 1), settings.GetIntType("nudShareWallTo", 1));
 
+            // Bỏ tính năng gửi lời mời kết bạn/follow — không còn trong UI mới
             bool follow = settings.GetBooleanValue("checkBox1");
-            int followCount = SubdyHelper.RandomValue(settings.GetIntType("nudTuKhoaFrom", 1), settings.GetIntType("nudTuKhoaTo", 1));
+            int followCount = follow
+                ? SubdyHelper.RandomValue(settings.GetIntType("nudTuKhoaFrom", 1), settings.GetIntType("nudTuKhoaTo", 1))
+                : 0;
 
             bool shouldComment = settings.GetBooleanValue("ckbComment");
             int commentCount = SubdyHelper.RandomValue(settings.GetIntType("nudCommentFrom", 1), settings.GetIntType("nudCommentTo", 1));
@@ -3073,10 +3110,10 @@ namespace Sunny.Subd.Core.Facebook
             int tickCount = Environment.TickCount;
             while (!_mainService._ct.IsCancellationRequested)
             {
-                await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayTo, delayFrom), $"Xem bài viết, đợi {{time}}s...", 2);
+                await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayFrom, delayTo), $"Xem bài viết, đợi {{time}}s...", 2);
                 if (follow && followCount > 0)
                 {
-                    if (_client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"People you may know\"]", "//*[@text=\"People you may know\"]", }, 1))
+                    if (_client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"People you may know\"]", "//*[@text=\"People you may know\"]", }, 1, click: false))
                     {
                         var message = TapAddFriendAndFollow();
                         await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(3, 7), $"{message}, đợi {{time}}s...", 2);
@@ -3126,7 +3163,7 @@ namespace Sunny.Subd.Core.Facebook
                         }
                         content = SubdyHelper.SpinText(content);
                     }
-                    if (settings.GetBooleanValue("ckbAnh") && _data.ContainsKey($"{action.Id}_txtPathAnh") && _data[$"{action.Id}_txtComments"].Any())
+                    if (settings.GetBooleanValue("ckbAnh") && _data.ContainsKey($"{action.Id}_txtPathAnh") && _data[$"{action.Id}_txtPathAnh"].Any())
                     {
                         lock (Globals.Lock)
                         {
@@ -3154,7 +3191,7 @@ namespace Sunny.Subd.Core.Facebook
                 {
                     break;
                 }
-                ScrollScreen(1, 2);
+                ScrollScreen(1, SubdyHelper.RandomValue(5, 30), SubdyHelper.RandomValue(200, 800));
             }
             int result = 0;
             return result;
@@ -3165,6 +3202,10 @@ namespace Sunny.Subd.Core.Facebook
             if (string.IsNullOrEmpty(xpath))
             {
                 return "Không tìm thấy nút thêm bạn bè/theo dõi...";
+            }
+            if (!_client.ElementWithAttributes(xpath, 3))
+            {
+                return "Khong thao tac duoc nut them ban be/theo doi...";
             }
             if (xpath.Contains("Follow"))
             {
@@ -4050,7 +4091,40 @@ namespace Sunny.Subd.Core.Facebook
             }
             return 0;
         }
-        public int HDUpAvatar(int accountId, string statusPrefix, JsonHelper settings, string actionName)
+        public async Task<int> HDUpAvatar(JsonHelper settings, ScriptAction action)
+        {
+            int targetCount = 1;
+            int delayFrom = settings.GetIntType("nudKhoangCachFrom", 5);
+            int delayTo = settings.GetIntType("nudKhoangCachTo", 10);
+
+            int successCount = 0;
+            int failCount = 0;
+
+            while (!_mainService._ct.IsCancellationRequested)
+            {
+                if (successCount >= targetCount) break;
+
+                int result = await HDUpAvatarOld(0, "", settings, action.Name);
+                if (result == 1)
+                {
+                    successCount++;
+                }
+                else
+                {
+                    failCount++;
+                }
+
+                if (successCount < targetCount)
+                {
+                    int delay = SubdyHelper.RandomValue(delayFrom, delayTo + 1);
+                    await Task.Delay(delay * 1000);
+                }
+            }
+
+            return successCount;
+        }
+
+        public async Task<int> HDUpAvatarOld(int accountId, string statusPrefix, JsonHelper settings, string actionName)
         {
             bool isSuccess = false;
             string folderPath = settings.GetValue("txtPathFolder");
@@ -4105,12 +4179,13 @@ namespace Sunny.Subd.Core.Facebook
                         {
                             xmlSource = _client.GetXMLSource();
                             string foundXPath = _client.FindElement(xmlSource, new List<string> {
-                        "//android.widget.ProgressBar",
+                        "//*[@class='android.widget.ProgressBar']",
                         "//*[@text='Tap to retry']",
                         "//*[@content-desc='Profile picture, Button']",
-                        "//android.widget.Button[@text='ALLOW']",
-                        "//android.view.ViewGroup[@content-desc='SAVE']",
+                        "//*[@text='ALLOW' or @content-desc='ALLOW']",
+                        "//*[@text='SAVE' or @content-desc='SAVE']",
                         "//*[@content-desc='Photo']",
+                        "(//*[contains(@content-desc, 'Photo taken') or contains(@text, 'Photo taken')])[1]",
                         "//*[@content-desc='Photo. Disabled.']"
                     }, 1);
 
@@ -4128,12 +4203,12 @@ namespace Sunny.Subd.Core.Facebook
                             {
                                 goto SaveAvatar;
                             }
-                            else if (foundXPath == "//android.widget.Button[@text='ALLOW']" ||
-                                     foundXPath == "//android.view.ViewGroup[@content-desc='SAVE']")
+                            else if (foundXPath == "//*[@text='ALLOW' or @content-desc='ALLOW']" ||
+                                     foundXPath == "//*[@text='SAVE' or @content-desc='SAVE']")
                             {
                                 goto SaveAvatar;
                             }
-                            else if (foundXPath == "//android.widget.ProgressBar")
+                            else if (foundXPath == "//*[@class='android.widget.ProgressBar']")
                             {
                                 SetStatusAccount(accountId, status + "Loading...");
                             }
@@ -4146,7 +4221,7 @@ namespace Sunny.Subd.Core.Facebook
                                 tapToRetryCount++;
                                 ScrollScreen(-1);
                             }
-                            else if (foundXPath == "//*[@content-desc='Photo']")
+                            else if (foundXPath == "(//*[contains(@content-desc, 'Photo taken') or contains(@text, 'Photo taken')])[1]")
                             {
                                 var photoElements = _client.FindBounds("", foundXPath, 1);
                                 if (photoElements.Count > 1)
@@ -4160,25 +4235,14 @@ namespace Sunny.Subd.Core.Facebook
                             }
                             else
                             {
-                                if (_client.ElementWithAttributes("//android.widget.TextView[@text='CAMERA ROLL']", 1, xmlSource, false) &&
+                                if (_client.ElementWithAttributes("//*[@text='CAMERA ROLL' or @content-desc='CAMERA ROLL']", 1, xmlSource, false) &&
                                     !_client.ElementWithAttributes("//*[@content-desc='Live camera']", 1, xmlSource, false))
                                 {
                                     _client.ElementWithAttributes("//*[@content-desc='Back']", 5, xmlSource);
                                 }
                                 else
                                 {
-                                    SetStatusAccount(accountId, status + "Scroll...");
-                                    if (ScrollScreen())
-                                    {
-                                        switch (Login())
-                                        {
-                                            case 0:
-                                                goto WaitLoop;
-                                            case 1:
-                                                goto EndMethod;
-                                        }
-                                        break;
-                                    }
+                                    await _mainService._facebookService.HanderAccount(_client, _account, 5, _mainService._ct, _mainService);
                                 }
                             }
                             goto WaitLoop;
@@ -4755,9 +4819,20 @@ namespace Sunny.Subd.Core.Facebook
             {
                 string status = statusPrefix + "Đang " + actionName + ": ";
                 SetStatusAccount(accountId, status + "Đang chạy...");
-                bool enable2FA = settings.GetIntType("typeOnOff2FA") == 1;
-                int ifAlreadyHas2FA = settings.GetIntType("neuDaCo2FA");
-                bool disable2FA = settings.GetIntType("typeOnOff2FA") == 0;
+                // Ưu tiên đọc theo control mới (radio button). Fallback sang dạng cũ typeOnOff2FA/neuDaCo2FA nếu chưa có.
+                bool enable2FA = settings.GetBooleanValue("rbBat2FA");
+                bool disable2FA = settings.GetBooleanValue("rbTat2FA");
+                if (!enable2FA && !disable2FA)
+                {
+                    enable2FA = settings.GetIntType("typeOnOff2FA") == 1;
+                    disable2FA = settings.GetIntType("typeOnOff2FA") == 0;
+                }
+                // 0 = Sẽ không bật 2FA, 1 = Giữ 2FA cũ và thêm 2FA mới, 2 = Xóa 2FA cũ và thêm 2FA mới
+                int ifAlreadyHas2FA;
+                if (settings.GetBooleanValue("rbXoa2FACu")) ifAlreadyHas2FA = 2;
+                else if (settings.GetBooleanValue("rbGiu2FACu")) ifAlreadyHas2FA = 1;
+                else if (settings.GetBooleanValue("F12647B1")) ifAlreadyHas2FA = 0;
+                else ifAlreadyHas2FA = settings.GetIntType("neuDaCo2FA");
                 int tapToRetryCount = 0;
                 int maxTapToRetry = 6;
 
@@ -7653,24 +7728,43 @@ namespace Sunny.Subd.Core.Facebook
         {
             // Lấy mật khẩu hiện tại từ cấu hình
             //   method_117(accountId, "cId");
-            string oldPassword = "";
+            string oldPassword = (_account?.Password ?? "").Trim();
             if (string.IsNullOrEmpty(oldPassword))
             {
-                return 1;
+                status = 3;
+                throw new SubdyExtension(SubdyEnum.JobFail, "Khong co mat khau hien tai trong tai khoan.");
             }
 
-            // Sinh mật khẩu mới theo cấu hình
+            // Sinh mật khẩu mới theo cấu hình. UI mới: rbMatKhauRandom + nudInteractFrom (số ký tự), A12E5D8C + txtMatKhauChiDinh (1 mật khẩu chỉ định).
             string newPassword = "";
-            if (settings.GetIntType("typeMatKhau") == 0)
+            bool useRandom = settings.GetBooleanValue("rbMatKhauRandom");
+            bool useChiDinh = settings.GetBooleanValue("A12E5D8C");
+            if (!useRandom && !useChiDinh)
             {
-                newPassword = SubdyHelper.RandomString(length: 10);
+                // Fallback dạng cũ
+                useRandom = settings.GetIntType("typeMatKhau") == 0;
+                useChiDinh = !useRandom;
+            }
+            if (useRandom)
+            {
+                int passwordLength = settings.GetIntType("nudInteractFrom", 10);
+                if (passwordLength < 6) passwordLength = 10;
+                newPassword = SubdyHelper.RandomString(length: passwordLength);
             }
             else
             {
-                var passwordList = settings.GetValuesList("txtMatKhau");
-                string candidate = passwordList.OrderBy(x => Guid.NewGuid()).FirstOrDefault();
+                string candidate = (settings.GetValue("txtMatKhauChiDinh") ?? "").Trim();
                 if (string.IsNullOrEmpty(candidate))
-                    return 1;
+                {
+                    // Fallback đọc danh sách mật khẩu cũ
+                    var passwordList = settings.GetValuesList("txtMatKhau");
+                    candidate = passwordList?.OrderBy(x => Guid.NewGuid()).FirstOrDefault() ?? "";
+                }
+                if (string.IsNullOrEmpty(candidate))
+                {
+                    status = 4;
+                    throw new SubdyExtension(SubdyEnum.JobFail, "Chua cau hinh mat khau moi.");
+                }
 
                 if (candidate.Contains("*"))
                 {
@@ -7687,9 +7781,19 @@ namespace Sunny.Subd.Core.Facebook
                     newPassword = candidate;
                 }
             }
+            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+            {
+                status = 4;
+                throw new SubdyExtension(SubdyEnum.JobFail, "Mat khau moi phai co it nhat 6 ky tu.");
+            }
+            if (newPassword == oldPassword)
+            {
+                newPassword += SubdyHelper.RandomString(length: 1);
+            }
 
-            int timeout = settings.GetIntType("nudTimeOut", 30);
-            bool logoutOldDevices = settings.GetBooleanValue("ckbDangXuatThietBiCu");
+            // UI mới dùng B197EAA2 cho "Đăng xuất thiết bị cũ"; vẫn giữ fallback tên cũ ckbDangXuatThietBiCu
+            bool useAccountCenter = settings.GetBooleanValue("ckbAccountCenter");
+            bool logoutOldDevices = settings.GetBooleanValue("B197EAA2") || settings.GetBooleanValue("ckbDangXuatThietBiCu");
             string statusText = statusPrefix + "Đang " + actionName + ": ";
             SetStatusAccount(accountId, statusText + "Đang chạy...");
             status = 2;
@@ -7697,7 +7801,12 @@ namespace Sunny.Subd.Core.Facebook
             int maxRetryScroll = 6;
 
             // Mở trang đổi mật khẩu Facebook
-            while (OpenFacebookLink(accountId, statusText, "fb://security_settings"))
+            //string changePasswordLink = useAccountCenter
+            //    ? "fb://facewebmodal/f?href=https://accountscenter.facebook.com/password_and_security/password/change/"
+            //    : "fb://security_settings";
+            string changePasswordLink = "am start -n com.facebook.katana/.IntentUriHandler \"fb://facewebmodal/f?href=https://accountscenter.facebook.com/password_and_security/password/change/\"";
+            _client.Shell(changePasswordLink);
+            _client.Delay(3);
             {
                 string xmlSource = "";
                 int editCount = 0;
@@ -7707,10 +7816,38 @@ namespace Sunny.Subd.Core.Facebook
                 while (Environment.TickCount - tickStart < 300000 && !done)
                 {
                     xmlSource = _client.GetXMLSource();
+                    if (ContainsAnyKeyword(xmlSource, "Your old password was incorrectly typed", "The password you entered was incorrect", "Incorrect password", "Enter a valid password and try again"))
+                    {
+                        status = 3;
+                        done = true;
+                        break;
+                    }
+                    if (ContainsAnyKeyword(xmlSource, "Password must differ from old password", "same as your old password"))
+                    {
+                        status = 5;
+                        done = true;
+                        break;
+                    }
+                    if (ContainsAnyKeyword(xmlSource, "Password changed", "Your password has been changed", "changed your password"))
+                    {
+                        status = 1;
+                        _account.Password = newPassword;
+                        new AccountContext().Update(_account);
+                        done = true;
+                        break;
+                    }
                     string foundElement = _client.FindElement(xmlSource, new List<string> {
                 "//android.widget.EditText",
-                "//*[@text='Change password' or @content-desc='Change password']",
+                "//*[contains(@text,'Facebook')]",
+                "//*[contains(@text,'Password and security')]",
+                "//*[contains(@content-desc,'Password and security')]",
+                "//*[@text='Change password']",
+                "//*[@content-desc='Change password']",
+                "//*[contains(@text,'Change password')]",
+                "//*[contains(@content-desc,'Change password')]",
                 "//*[@text='Log out of other devices?']",
+                "//*[contains(@text,'Log out of other devices')]",
+                "//*[contains(@text,\"WHERE YOU'RE LOGGED IN\")]",
                 "//*[@text='Log out']",
                 "//android.widget.ProgressBar",
                 "//*[@text='Tap to retry']"
@@ -7718,7 +7855,13 @@ namespace Sunny.Subd.Core.Facebook
 
                     switch (foundElement)
                     {
-                        case "//*[@text='Change password' or @content-desc='Change password']":
+                        case "//*[contains(@text,'Facebook')]":
+                        case "//*[contains(@text,'Password and security')]":
+                        case "//*[contains(@content-desc,'Password and security')]":
+                        case "//*[@text='Change password']":
+                        case "//*[@content-desc='Change password']":
+                        case "//*[contains(@text,'Change password')]":
+                        case "//*[contains(@content-desc,'Change password')]":
                         case "//*[@text='Log out']":
                             SetStatusAccount(accountId, statusText + "Tap " + foundElement + "...");
                             _client.ElementWithAttributes(foundElement, 1, xmlSource);
@@ -7744,8 +7887,11 @@ namespace Sunny.Subd.Core.Facebook
                             break;
 
                         case "//*[@text='Log out of other devices?']":
+                        case "//*[contains(@text,'Log out of other devices')]":
+                        case "//*[contains(@text,\"WHERE YOU'RE LOGGED IN\")]":
                             status = 1;
-                            // method_114(accountId, "cPassword", newPassword, "pass");
+                            _account.Password = newPassword;
+                            new AccountContext().Update(_account);
                             if (_client.ElementWithAttributes("//*[@text=\"WHERE YOU'RE LOGGED IN\"]", 1, xmlSource, false))
                             {
                                 if (!_client.ElementWithAttributes("//*[@text='Log out of all sessions']", 1, xmlSource, false))
@@ -7763,6 +7909,7 @@ namespace Sunny.Subd.Core.Facebook
                                     while (!foundLogoutAll);
                                 }
                                 _client.ElementWithAttributes("//*[@text='Log out of all sessions']", 1, xmlSource);
+                                done = true;
                             }
                             else
                             {
@@ -7771,6 +7918,7 @@ namespace Sunny.Subd.Core.Facebook
                                     _client.ElementWithAttributes("//*[@text='stay logged in']", 1, xmlSource);
                                     _client.Delay(2);
                                     _client.ElementWithAttributes("//*[@text='Continue']", 1, xmlSource);
+                                    done = true;
                                 }
                                 else
                                 {
@@ -7809,7 +7957,13 @@ namespace Sunny.Subd.Core.Facebook
                                 _client.Delay(1);
                                 _client.SendTextSlow("(//android.widget.EditText)[3]", newPassword);
                                 _client.Delay(1);
-                                _client.ElementWithAttributes("//*[@text='Save changes' or @content-desc='Update Password']", 10, xmlSource);
+                                if (!_client.ElementWithAttributes("//*[contains(@text,'Save changes')]", 3, xmlSource)
+                                    && !_client.ElementWithAttributes("//*[contains(@content-desc,'Save changes')]", 3, xmlSource)
+                                    && !_client.ElementWithAttributes("//*[contains(@text,'Update Password')]", 3, xmlSource)
+                                    && !_client.ElementWithAttributes("//*[contains(@content-desc,'Update Password')]", 3, xmlSource))
+                                {
+                                    _client.ATX.Press(PressKey.Enter);
+                                }
                             }
                             break;
 
@@ -7827,9 +7981,20 @@ namespace Sunny.Subd.Core.Facebook
                     }
                     _client.Delay(2);
                 }
-                break; // Chỉ chạy một lần cho mỗi lần mở link
             }
-            return 1;
+            if (status == 1)
+            {
+                return 1;
+            }
+            if (status == 3)
+            {
+                throw new SubdyExtension(SubdyEnum.JobFail, "Mat khau hien tai khong dung.");
+            }
+            if (status == 5)
+            {
+                throw new SubdyExtension(SubdyEnum.JobFail, "Mat khau moi trung hoac qua giong mat khau cu.");
+            }
+            throw new SubdyExtension(SubdyEnum.JobFail, "Doi mat khau that bai.");
         }
         public int HDDanhGiaPage(int accountId, string statusPrefix, JsonHelper settings, string contentKey, string actionName)
         {
@@ -8923,593 +9088,476 @@ namespace Sunny.Subd.Core.Facebook
         }
         public async Task<int> HDDangStory(JsonHelper settings, ScriptAction action)
         {
-            int soLuongBaiViet = SubdyHelper.RandomValue(settings.GetIntType("C913DC8A"), settings.GetIntType("F391713F") + 1);
-            int delayFrom = settings.GetIntType("nudKhoangCachFrom");
-            int delayTo = settings.GetIntType("nudKhoangCachTo");
+            int targetCount = SubdyHelper.RandomValue(settings.GetIntType("C913DC8A", 1), settings.GetIntType("F391713F", 3) + 1);
+            int delayFrom = settings.GetIntType("nudKhoangCachFrom", 5);
+            int delayTo = settings.GetIntType("nudKhoangCachTo", 10);
 
-            bool isText = settings.GetBooleanValue("checkBox5");
+            bool isText = settings.GetBooleanValue("rbDangText");
+            bool isMedia = settings.GetBooleanValue("rbDangAnhVideo");
+            bool isMusic = settings.GetBooleanValue("rbDangNhac");
+            if (!isText && !isMedia && !isMusic) isText = true;
+
+            int postType = isText ? 0 : (isMusic ? 1 : 2);
+
             bool deleteContent = settings.GetBooleanValue("ckbXoaNguyenLieuDaDung");
-
-            bool isMedia = settings.GetBooleanValue("checkBox6");
-
+            bool removeContent = !settings.GetBooleanValue("checkBox1");
             bool deleteMedia = settings.GetBooleanValue("checkBox4");
 
-            bool isMusic = settings.GetBooleanValue("checkBox7");
             bool musicRandom = settings.GetBooleanValue("radioButton3");
             List<string> musicKeyword = settings.GetValuesList("textBox1");
+            List<string> musicQueue = new List<string>(musicKeyword);
 
-
-
-
-            int countPost = 1;
-            int refail = 0;
-
-            //while (!_mainService._ct.IsCancellationRequested)
-            //{
-            //    if (countPost > soLuongBaiViet) break;
-
-            //    string medias = "";
-            //    string content = string.Empty;
-            //    string link = string.Empty;
-            //    List<string> hastag = new List<string>();
-            //    if (isText && _data.ContainsKey($"{action.Id}_txtLinks") && _data[$"{action.Id}_txtLinks"].Any())
-            //    {
-            //        lock (Globals.Lock)
-            //        {
-            //            content = SubdyHelper.GetStringRandom(_data[$"{action.Id}_txtLinks"]);
-            //            if (!settings.GetBooleanValue("checkBox1"))
-            //            {
-            //                _data[$"{action.Id}_txtLinks"].Remove(content);
-            //            }
-            //            if (deleteContent)
-            //            {
-            //                var context = new ScriptActionContext();
-            //                settings.DeleteValue("txtLinks", content);
-            //                action.Json = settings.GetJsonString();
-            //                context.Update(action);
-            //            }
-            //        }
-            //    }
-
-            //    lock (Globals.Lock)
-            //    {
-            //        if (_data.ContainsKey($"{action.Id}_txtPathAnh") && _data[$"{action.Id}_txtPathAnh"].Any())
-            //        {
-
-            //            medias = SubdyHelper.GetStringRandom(_data[$"{action.Id}_txtPathAnh"]);
-            //            if (deleteMedia)
-            //            {
-            //                _data[$"{action.Id}_txtPathAnh"].Remove(medias);
-            //            }
-            //        }
-            //    }
-            //    if (!File.Exists(medias)) continue;
-            //    try
-            //    {
-            //        _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Upload media...", 2);
-            //        UploadMediaFiles(new List<string> { medias });
-            //        OpenFacebookTimeline();
-            //        int tickCount = Environment.TickCount;
-            //        int num6 = 300;
-            //        while (!_mainService._ct.IsCancellationRequested)
-            //        {
-            //            string xml = _client.GetXMLSource();
-            //            string xpath = _client.FindElement(xml, new List<string> {
-            //                "//*[@content-desc=\"Reel\"]",
-            //                "//*[@content-desc=\"Create reel\"]",
-            //                "//*[@content-desc=\"Share now\"]"
-            //            }, 1);
-            //            string text4;
-            //            switch (xpath)
-            //            {
-            //                case "//*[@content-desc=\"Reel\"]":
-            //                    _mainService.SetStatus("Tap " + xpath + "...", 2);
-            //                    _client.ElementWithAttributes(xpath, 5, xml);
-            //                    break;
-            //                default:
-            //                    _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), Scroll...", 2);
-            //                    if (ScrollScreen(1, 1))
-            //                    {
-            //                        //  kiem tra dang nhap
-            //                        int num7 = Login();
-            //                        if (num7 == 1 || num7 == 0)
-            //                        {
-            //                            break;
-            //                        }
-            //                        return countPost;
-            //                    }
-            //                    break;
-            //                case "//*[@content-desc=\"Share now\"]":
-            //                    {
-            //                        _client.ElementWithAttributes("//*[@class='android.widget.EditText']");
-            //                        _client.Delay(3);
-            //                        _client.ADBKeyboardService.ClearInputWithADBKeyboard();
-            //                        if (!string.IsNullOrEmpty(content))
-            //                        {
-            //                            _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Đăng text...", 2);
-            //                            content = SubdyHelper.SpinText(content);
-            //                            _client.Delay(2);
-
-            //                            _client.ADBKeyboardService.Input(content, false);
-            //                            _client.Delay(2);
-            //                            _client.ADB.Shell("input keyevent 62");
-            //                            _client.Delay(2);
-            //                            if (isHastag && hastag.Any())
-            //                            {
-            //                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + "Nhập hastag...", 2);
-            //                                foreach (var item in hastag)
-            //                                {
-            //                                    string text = "";
-            //                                    if (!item.StartsWith("#"))
-            //                                    {
-            //                                        text = "#";
-            //                                    }
-            //                                    text += item;
-            //                                    bool check = false;
-            //                                    foreach (char c in item)
-            //                                    {
-            //                                        _client.ADBKeyboardService.Input(c.ToString(), false);
-            //                                        var nodes = _client.FindElementsNotToLower(0, "", "//node[contains(@class, 'android.widget.Button') and @content-desc and string-length(@content-desc) > 0 and " +
-            //                       $"contains(translate(@content-desc, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{text}') and " +
-            //                       $"contains(translate(@content-desc, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'posts') and " +
-            //                       "@visible-to-user='true']");
-            //                                        if (!nodes.Any())
-            //                                        {
-            //                                            continue;
-            //                                        }
-            //                                        var info = _client.ExtractNodeInfo(nodes.FirstOrDefault().OuterXml);
-            //                                        if (!info.ContainsKey("bounds")) continue;
-            //                                        var point = new RectangleArea(info["bounds"]).RandomPoint();
-            //                                        _client.Click(point.X, point.Y);
-            //                                        _client.ADB.Shell("input keyevent 62");
-            //                                        check = true;
-            //                                        break;
-            //                                    }
-            //                                    if (!check)
-            //                                    {
-            //                                        for (int i = 0; i < text.Length; i++)
-            //                                        {
-            //                                            _client.ATX.Press(PressKey.Delete);
-            //                                        }
-            //                                    }
-            //                                }
-            //                            }
-            //                        }
-            //                        if (_client.ElementWithAttributes("//android.view.View[@text=\"Friends\"]"))
-            //                        {
-            //                            _client.ElementWithAttributes("//*[@content-desc=\"Public\"]", 10);
-            //                            _client.ElementWithAttributes("//*[@content-desc=\"Done\"]", 10);
-            //                        }
-            //                        _client.ElementWithAttributes("//*[@content-desc='Share now'][@enabled='true']");
-            //                        int tickCount1 = Environment.TickCount;
-            //                        await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(3, 6), $"({countPost}/{soLuongBaiViet}), Tap Post, " + "đợi" + " {time}s...", 2);
-            //                        while (!_mainService._ct.IsCancellationRequested)
-            //                        {
-            //                            if (ContainsAnyKeyword("", "android.widget.ProgressBar", "Row showing that your post is", "Sharing", "Uploading", "Finishing up", "Updating", "Posting"))
-            //                            {
-            //                                break;
-            //                            }
-            //                            if (Environment.TickCount - tickCount1 < 30 * 1000)
-            //                            {
-            //                                continue;
-            //                            }
-            //                            break;
-            //                        }
-            //                        _mainService.SetStatus($"({countPost}/{soLuongBaiViet})" + "đợi" + " reel success...", 2);
-            //                        if (WaitForPostComplete(300))
-            //                        {
-            //                            if (isComment)
-            //                            {
-            //                                _mainService.SetStatus($"({countPost}/{soLuongBaiViet}), " + " Bình luận ...", 2);
-            //                                tickCount1 = Environment.TickCount;
-            //                                while (!_mainService._ct.IsCancellationRequested)
-            //                                {
-            //                                    if (!_client.ElementWithAttributes("//*[@content-desc=\"Share\"]", 5, "", false))
-            //                                    {
-            //                                        ScrollScreen(-1);
-            //                                    }
-            //                                    else
-            //                                    {
-            //                                        string imageComment = "";
-            //                                        string comment = string.Empty;
-            //                                        if (_data.ContainsKey($"{action.Id}_txtComments"))
-            //                                        {
-            //                                            lock (Globals.Lock)
-            //                                            {
-            //                                                var contents = _data[$"{action.Id}_txtComments"];
-            //                                                if (contents.Any())
-            //                                                {
-            //                                                    comment = SubdyHelper.GetStringRandom(contents);
-            //                                                    if (!settings.GetBooleanValue("checkBox5"))
-            //                                                    {
-            //                                                        contents.Remove(content);
-            //                                                        _data[$"{action.Id}_txtComments"] = contents;
-            //                                                    }
-            //                                                    if (settings.GetBooleanValue("checkBox4"))
-            //                                                    {
-            //                                                        var context = new ScriptActionContext();
-            //                                                        settings.DeleteValue("txtComments", content);
-            //                                                        action.Json = settings.GetJsonString();
-            //                                                        context.Update(action);
-            //                                                    }
-            //                                                }
-
-            //                                            }
-            //                                            comment = SubdyHelper.SpinText(comment);
-            //                                        }
-            //                                        lock (Globals.Lock)
-            //                                        {
-            //                                            var images = _data[$"{action.Id}_txtPathImageComment"];
-            //                                            imageComment = SubdyHelper.GetStringRandom(images);
-            //                                            if (isDeleteMediaComment)
-            //                                            {
-            //                                                _data[$"{action.Id}_txtPathImageComment"].Remove(imageComment);
-            //                                            }
-            //                                        }
-            //                                        if (!string.IsNullOrEmpty(comment) || File.Exists(imageComment))
-            //                                        {
-            //                                            List<string> reactionTypes = new List<string> { "Like", "Love", "Care", "Haha" };
-            //                                            TapReaction(SubdyHelper.GetStringRandom(reactionTypes));
-            //                                            string message = await CommentAction(comment, imageComment, isNeuBatComment, isFollowerComment);
-            //                                            await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(3, 7), $"{message}, đợi {{time}}s...", 2);
-            //                                            if (isDeleteMediaComment)
-            //                                            {
-            //                                                File.Delete(imageComment);
-            //                                            }
-            //                                            break;
-            //                                        }
-            //                                        break;
-            //                                    }
-            //                                    if (Environment.TickCount - tickCount1 < 30 * 1000)
-            //                                    {
-            //                                        continue;
-            //                                    }
-            //                                    break;
-            //                                }
-            //                            }
-
-            //                            await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayFrom, delayTo), $"({countPost}/{soLuongBaiViet}), " + "đợi" + " {time}s...", 2);
-            //                            countPost++;
-            //                        }
-            //                        break;
-            //                    }
-            //                case "//*[@content-desc=\"Create reel\"]":
-            //                    if (!_client.ElementWithAttributes("//*[contains(translate(@content-desc, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'video')]", 1, "", true))
-            //                    {
-            //                        break;
-            //                    }
-            //                    _client.ElementWithAttributes("//*[@content-desc=\"Next\"]");
-            //                    _client.Delay(10);
-            //                    break;
-            //            }
-            //            Thread.Sleep(1000);
-            //            if (Environment.TickCount - tickCount < num6 * 1000)
-            //            {
-            //                continue;
-            //            }
-            //            break;
-            //        }
-            //    }
-            //    finally
-            //    {
-
-            //    }
-            //}
-
-            return countPost;
-
-
-
-
-
-
-            int minStory = settings.GetIntType("nudSoLuongFrom");
-            int maxStory = settings.GetIntType("nudSoLuongTo");
-            int postType = settings.GetIntType("typeDang");
-            List<string> storyContents = settings.GetValuesList("txtNoiDung");
-            List<string> storyQueue = new List<string>();
-            bool useBackgroundText = settings.GetBooleanValue("ckbUseBackgroundText");
-            int musicType = settings.GetIntType("typeBaiHat");
-            bool useBackgroundMusic = settings.GetBooleanValue("ckbUseBackgroundNhac");
-            bool isImageStory = settings.GetBooleanValue("ckbAnh");
-            string imagePath = settings.GetValue("txtPathAnh");
-            bool removePostedImage = settings.GetBooleanValue("ckbXoaAnhDaDang");
-            string imageOnlyPath = settings.GetValue("txtChiDangAnhPathAnh");
-            bool removeImageOnlyPosted = settings.GetBooleanValue("ckbChiDangAnhXoaAnhDaDang");
-
-            if (useBackgroundMusic && isImageStory)
+            bool musicCoAnh = isMusic && settings.GetBooleanValue("ckbCoAnh");
+            bool deleteMusicAnh = settings.GetBooleanValue("ckbXoaAnhDaDang");
+            List<string> musicImagePool = new List<string>();
+            if (musicCoAnh)
             {
-                if (SubdyHelper.RandomValue(1, 100) % 2 == 0)
-                    useBackgroundMusic = false;
-                else
-                    isImageStory = false;
+                string musicImgFolder = settings.GetValue("txtPathAnhNhac");
+                if (Directory.Exists(musicImgFolder))
+                {
+                    musicImagePool = SubdyHelper.GetMedias(musicImgFolder);
+                }
             }
 
+            bool useBackground = settings.GetBooleanValue("ckbSuDungBackground");
+            bool tagNeuBat = settings.GetBooleanValue("ckbTagNeuBat");
+            bool tagMoiNguoi = settings.GetBooleanValue("ckbTagMoiNguoi");
+
             int successCount = 0;
-            string xmlSource = "";
-            string foundElement = "";
-            //try
-            //{
-            //    string statusText = statusPrefix + "Đang " + actionTitle + ": ";
-            //    int targetCount = SubdyHelper.RandomValue(minStory, maxStory + 1);
-            //    bool hasClickedAddToStory = false;
-            //    int retryIndex = 0;
-            //    while (retryIndex < targetCount + 5)
-            //    {
-            //        int notNowRetry = 0;
-            //        int notNowMax = 1;
-            //        while (successCount < targetCount)
-            //        {
-            //            SetStatusAccount(accountId, statusText + $"({successCount + 1}/{targetCount})...");
-            //            try
-            //            {
-            //                OpenFacebookTimeline();
-            //                int startTick = Environment.TickCount;
-            //                int timeoutSeconds = 300;
+            int refail = 0;
+            int failCount = 0;
+            UpdateStoryStats(successCount, failCount);
 
-            //                List<string> xpaths;
-            //                if (postType == 0)
-            //                {
-            //                    xpaths = new List<string>
-            //            {
-            //                "//*[@content-desc='Create a reel']/parent::*/parent::*/parent::*/parent::*/parent::*/child::*[1]/child::*[1]",
-            //                "//*[@content-desc='Add to story']",
-            //                "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
-            //                "//*[@content-desc='Start a Text story']",
-            //                "//*[@content-desc='Select background']",
-            //                "//*[contains(@content-desc,', background')]",
-            //                "//android.widget.EditText[@content-desc='Text field']",
-            //                "//*[@text='Privacy']",
-            //                "//*[@text='Public']",
-            //                "//android.widget.Button[@content-desc='Share']"
-            //            };
-            //                    if (!useBackgroundText)
-            //                    {
-            //                        xpaths.Remove("//*[@content-desc='Select background']");
-            //                        xpaths.Remove("//*[contains(@content-desc,', background')]");
-            //                    }
-            //                }
-            //                else if (postType == 1)
-            //                {
-            //                    xpaths = new List<string>
-            //            {
-            //                "//*[@content-desc='Create a reel']/parent::*/parent::*/parent::*/parent::*/parent::*/child::*[1]/child::*[1]",
-            //                "//*[@content-desc='Add to story']",
-            //                "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
-            //                "//*[@content-desc='Start a Music story']",
-            //                "(//*[@content-desc='Photo'])[last()]",
-            //                "//*[@content-desc='Select background']",
-            //                "//*[contains(@content-desc,', background')]",
-            //                "//*[@content-desc='Close background styles tray']",
-            //                "//android.widget.EditText[starts-with(@text,'Search music')]",
-            //                "//*[@content-desc='Song preview']",
-            //                "//*[@text='Done']",
-            //                "//*[@text='Privacy']",
-            //                "//*[@text='Public']",
-            //                "//android.widget.Button[@content-desc='Share']",
-            //                "//android.widget.ProgressBar"
-            //            };
-            //                    if (!useBackgroundMusic)
-            //                    {
-            //                        xpaths.Remove("//*[@content-desc='Select background']");
-            //                        xpaths.Remove("//*[contains(@content-desc,', background')]");
-            //                    }
-            //                    if (!isImageStory)
-            //                        xpaths.Remove("(//*[@content-desc='Photo'])[last()]");
-            //                }
-            //                else
-            //                {
-            //                    xpaths = new List<string>
-            //            {
-            //                "//*[@content-desc='Create a reel']/parent::*/parent::*/parent::*/parent::*/parent::*/child::*[1]/child::*[1]",
-            //                "//*[@content-desc='Add to story']",
-            //                "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
-            //                "//*[@content-desc='Photo' or @content-desc='Video']/*[@content-desc='Photo' or @content-desc='Video']",
-            //                "//*[@text='Privacy']",
-            //                "//*[@text='Public']",
-            //                "//android.widget.Button[@content-desc='Share']",
-            //                "//android.widget.ProgressBar"
-            //            };
-            //                    UploadMedia(accountId, statusText + $"({successCount + 1}/{targetCount}), ", _client, imageOnlyPath, 1, removeImageOnlyPosted);
-            //                }
+            while (!_mainService._ct.IsCancellationRequested)
+            {
+                if (successCount >= targetCount) break;
+                if (refail > 5) break;
 
-            //                do
-            //                {
-            //                    xmlSource = _client.GetXMLSource();
-            //                    foundElement = _client.FindElement(xmlSource, xpaths, 1);
+                string content = string.Empty;
+                if (isText && _data.ContainsKey($"{action.Id}_txtLinks") && _data[$"{action.Id}_txtLinks"].Any())
+                {
+                    lock (Globals.Lock)
+                    {
+                        content = SubdyHelper.GetStringRandom(_data[$"{action.Id}_txtLinks"]);
+                        if (removeContent)
+                        {
+                            _data[$"{action.Id}_txtLinks"].Remove(content);
+                        }
+                        if (deleteContent)
+                        {
+                            var context = new ScriptActionContext();
+                            settings.DeleteValue("txtLinks", content);
+                            action.Json = settings.GetJsonString();
+                            context.Update(action);
+                        }
+                    }
+                }
 
-            //                    // Xử lý từng element tương tự như trên
-            //                    switch (foundElement)
-            //                    {
-            //                        case "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*":
-            //                            if ((_client.GetAttributeValuesFromXmlNodes(xmlSource, "(" + foundElement + ")[1]", "content-desc").FirstOrDefault() ?? "").Contains("music"))
-            //                                _client.ElementWithAttributes("(" + foundElement + ")[last()]", 1, xmlSource);
-            //                            else
-            //                                _client.ElementWithAttributes("(" + foundElement + ")[1]", 1, xmlSource);
-            //                            break;
-            //                        case "//*[contains(@content-desc,', background')]":
-            //                            var backgrounds = _client.FindBounds(xmlSource, foundElement, 1);
-            //                            var point = new RectangleArea(backgrounds.OrderBy(_ => Guid.NewGuid()).First()).GetCenterPoint();
-            //                            _client.Click(point.X, point.Y);
-            //                            _client.Delay(2);
-            //                            _client.ElementWithAttributes("//*[@content-desc='Close background styles tray']", 1, xmlSource);
-            //                            break;
-            //                        case "(//*[@content-desc='Photo'])[last()]":
-            //                            SetStatusAccount(accountId, statusText + "Tap " + foundElement + "...");
-            //                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                            break;
-            //                        case "//android.widget.EditText[@content-desc='Text field']":
-            //                            if (storyQueue.Count == 0)
-            //                                storyQueue = new List<string>(storyContents);
-            //                            string storyText = storyQueue.OrderBy(_ => Guid.NewGuid()).FirstOrDefault();
-            //                            storyQueue.Remove(storyText);
-            //                            storyText = SubdyHelper.SpinText(storyText);
-            //                            if (!string.IsNullOrWhiteSpace(storyText))
-            //                            {
-            //                                _client.Delay(1);
-            //                                SetStatusAccount(accountId, statusText + $"({successCount + 1}/{targetCount}), Nhập dữ liệu...");
-            //                                _client.SendTextSlow(foundElement, storyText);
-            //                                _client.Delay(2);
-            //                                _client.ElementWithAttributes("(//android.widget.Button[@content-desc='Back']/parent::*/child::*)[last()]", 1, xmlSource);
-            //                            }
-            //                            break;
-            //                        case "//android.widget.Button[@content-desc='Share']":
-            //                            SetStatusAccount(accountId, statusText + "Tap " + foundElement + "...");
-            //                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                            _client.Delay(2);
-            //                            if (_client.ElementWithAttributes("//android.widget.Button[@text='NOT NOW']", 10, ""))
-            //                            {
-            //                                SetStatusAccount(accountId, statusText + $"({successCount + 1}/{targetCount}), Tap Post, đợi" + " {time}s...", SubdyHelper.RandomValue(3, 6));
-            //                            }
-            //                            SetStatusAccount(accountId, statusText + $"({successCount + 1}/{targetCount}), đợi" + " post success...");
-            //                            if (hasClickedAddToStory)
-            //                            {
-            //                                OpenFacebookTimeline();
-            //                                _client.Delay(3);
-            //                            }
-            //                            if (WaitForPostComplete(isImageStory ? 300 : 60))
-            //                            {
-            //                                successCount++;
-            //                                if (successCount < targetCount)
-            //                                    break;
-            //                                return successCount;
-            //                            }
-            //                            break;
-            //                        case "//*[@content-desc='Song preview']":
-            //                            if (isImageStory)
-            //                            {
-            //                                UploadMedia(accountId, statusText + $"({successCount + 1}/{targetCount}), ", _client, imagePath, 1, removePostedImage);
-            //                            }
-            //                            SetStatusAccount(accountId, statusText + $"({successCount + 1}/{targetCount}), Tap song...");
-            //                            point = new RectangleArea(_client.FindBounds(xmlSource, foundElement, 1).First()).GetCenterPoint();
-            //                            _client.Click(point.X - 500, point.Y);
-            //                            for (int i = 0; i < 60; i++)
-            //                            {
-            //                                _client.Delay(2);
-            //                                if (_client.GetXMLSource() != xmlSource)
-            //                                {
-            //                                    break;
-            //                                }
-            //                            }
-            //                            break;
-            //                        case "//android.widget.ProgressBar":
-            //                            SetStatusAccount(accountId, statusText + "Loading...");
-            //                            if (!WaitForPostComplete(60))
-            //                            {
-            //                                if (notNowRetry < notNowMax)
-            //                                {
-            //                                    notNowRetry++;
-            //                                    break;
-            //                                }
-            //                                return successCount;
-            //                            }
-            //                            break;
-            //                        case "//*[@content-desc='Start a Music story']":
-            //                            SetStatusAccount(accountId, statusText + "Tap " + foundElement + "...");
-            //                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                            break;
-            //                        case "//android.widget.EditText[starts-with(@text,'Search music')]":
-            //                            if (musicType == 1)
-            //                            {
-            //                                int searchAttempt = 0;
-            //                                int maxSearchAttempt = 3;
-            //                                do
-            //                                {
-            //                                    searchAttempt++;
-            //                                    if (searchAttempt <= maxSearchAttempt)
-            //                                    {
-            //                                        string musicText = "";
-            //                                        lock (dictionary_12)
-            //                                        {
-            //                                            if (dictionary_12[groupKey].Count == 0)
-            //                                            {
-            //                                                dictionary_12[groupKey] = new List<string>(dictionary_11[groupKey]);
-            //                                            }
-            //                                            musicText = dictionary_12[groupKey].OrderBy(_ => Guid.NewGuid()).First();
-            //                                            dictionary_12[groupKey].Remove(musicText);
-            //                                        }
-            //                                        musicText = SubdyHelper.SpinText(musicText);
-            //                                        if (!string.IsNullOrWhiteSpace(musicText))
-            //                                        {
-            //                                            _client.Delay(1, 2);
-            //                                            SetStatusAccount(accountId, statusText + $"({successCount + 1}/{targetCount}), Nhập dữ liệu...");
-            //                                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                                            _client.SendTextSlow(foundElement, musicText + " ");
-            //                                            _client.ATX.Press(PressKey.Delete);
-            //                                            _client.Delay(2);
-            //                                        }
-            //                                        continue;
-            //                                    }
-            //                                    postedCount = 2;
-            //                                    return successCount;
-            //                                }
-            //                                while (!_client.ElementWithAttributes("//*[@content-desc='Song preview']", 30, "", false));
-            //                            }
-            //                            else
-            //                            {
-            //                                _client.ElementWithAttributes("//*[@content-desc='Song preview']", 120, "", false);
-            //                            }
-            //                            break;
-            //                        case "//*[@text='Done']":
-            //                            SetStatusAccount(accountId, statusText + "Tap " + foundElement + "...");
-            //                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                            break;
-            //                        case "//*[@content-desc='Add to story']":
-            //                            hasClickedAddToStory = true;
-            //                            SetStatusAccount(accountId, statusText + "Tap " + foundElement + "...");
-            //                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                            break;
-            //                        case "//*[@text='Privacy']":
-            //                            _client.ElementWithAttributes("//*[@text='Public']", 60, "");
-            //                            SetStatusAccount(accountId, statusText + "Tap " + foundElement + "...");
-            //                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                            break;
-            //                        case "//*[@text='Public']":
-            //                            _client.ElementWithAttributes("//*[@text='CHANGE' or @text='SAVE']", 5, "");
-            //                            _client.ElementWithAttributes("//*[@content-desc='Back']", 1, xmlSource);
-            //                            WaitForPostComplete(60);
-            //                            break;
-            //                        case "//*[@content-desc='Close background styles tray']":
-            //                            _client.ElementWithAttributes(foundElement, 1, xmlSource);
-            //                            break;
-            //                    }
+                string mediaPath = string.Empty;
+                if (isMedia)
+                {
+                    lock (Globals.Lock)
+                    {
+                        if (_data.ContainsKey($"{action.Id}_txtPathAnh") && _data[$"{action.Id}_txtPathAnh"].Any())
+                        {
+                            mediaPath = SubdyHelper.GetStringRandom(_data[$"{action.Id}_txtPathAnh"]);
+                            if (deleteMedia)
+                            {
+                                _data[$"{action.Id}_txtPathAnh"].Remove(mediaPath);
+                            }
+                        }
+                    }
+                    if (string.IsNullOrEmpty(mediaPath) || !File.Exists(mediaPath))
+                    {
+                        refail++;
+                        failCount++;
+                        UpdateStoryStats(successCount, failCount);
+                        continue;
+                    }
+                }
 
-            //                    if (_client.ElementWithAttributes("//*[@content-desc='Stories']", 1, xmlSource, false))
-            //                    {
-            //                        RectangleArea rect = new RectangleArea(_client.FindBounds(xmlSource, "//*[@content-desc='Stories']", 1).FirstOrDefault());
-            //                        if (rect.Bottom - rect.Top < 200)
-            //                        {
-            //                            _client.Click(rect.GetCenterPoint().X, rect.GetCenterPoint().Y);
-            //                        }
-            //                    }
+                string musicImagePath = string.Empty;
+                if (isMusic && musicCoAnh)
+                {
+                    lock (Globals.Lock)
+                    {
+                        if (musicImagePool.Any())
+                        {
+                            musicImagePath = SubdyHelper.GetStringRandom(musicImagePool);
+                            if (deleteMusicAnh)
+                            {
+                                musicImagePool.Remove(musicImagePath);
+                            }
+                        }
+                    }
+                }
 
-            //                    SetStatusAccount(accountId, statusText + $"({successCount + 1}/{targetCount}), Scroll...");
-            //                    if (!ScrollScreen(-1))
-            //                    {
-            //                        break;
-            //                    }
-            //                    int loginResult = Login();
-            //                    if (loginResult != 1 && loginResult != 0)
-            //                    {
-            //                        return successCount;
-            //                    }
+                try
+                {
+                    List<string> fileMedia = new List<string>();
+                    _mainService.SetStatus($"({successCount + 1}/{targetCount}), Mở Facebook...", 2);
+                    if (isMedia)
+                    {
+                        _mainService.SetStatus($"({successCount + 1}/{targetCount}), Upload media...", 2);
+                        fileMedia.AddRange(UploadMediaFiles(new List<string> { mediaPath }));
+                    }
+                    else if (isMusic && musicCoAnh && !string.IsNullOrEmpty(musicImagePath) && File.Exists(musicImagePath))
+                    {
+                        _mainService.SetStatus($"({successCount + 1}/{targetCount}), Upload ảnh nhạc...", 2);
+                        fileMedia.AddRange(UploadMediaFiles(new List<string> { musicImagePath }));
+                    }
+                    OpenFacebookTimeline();
 
-            //                    if (!string.IsNullOrEmpty(foundElement))
-            //                    {
-            //                        xpaths.Remove(foundElement);
-            //                    }
-            //                    _client.Delay(2);
+                    int tickCount = Environment.TickCount;
+                    int timeoutSeconds = 300;
+                    bool hasClickedAddToStory = false;
+                    bool postSuccess = false;
+                    bool textFilled = false;
+                    bool musicSelected = false;
 
-            //                } while (Environment.TickCount - startTick < timeoutSeconds * 1000);
+                    List<string> xpaths;
+                    if (postType == 0)
+                    {
+                        xpaths = new List<string>
+                        {
+                            "//*[@content-desc='Add to story']",
+                            "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
+                            "//*[@class='androidx.recyclerview.widget.RecyclerView']/descendant::android.widget.Button[@clickable='true' and string-length(@content-desc)>0]",
+                            "//*[@content-desc='Start a Text story']",
+                            "//android.widget.EditText[@content-desc='Text field']",
+                            "//*[@text='Privacy' or @content-desc='Privacy']",
+                            "//*[@text='Public' or @content-desc='Public']",
+                            "//*[@class='android.widget.Button' and (starts-with(@text,'Share') or starts-with(@content-desc,'Share'))]"
+                        };
+                        if (useBackground)
+                        {
+                            xpaths.Insert(3, "//*[@content-desc='Select background']");
+                            xpaths.Insert(4, "//*[contains(@content-desc,', background')]");
+                            xpaths.Insert(5, "//*[@content-desc='Close background styles tray']");
+                        }
+                    }
+                    else if (postType == 1)
+                    {
+                        xpaths = new List<string>
+                        {
+                            "//*[@text='Create story' or @content-desc='Create story']",
+                            "//*[@content-desc='Add to story']",
+                            "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
+                            "//*[@class='androidx.recyclerview.widget.RecyclerView']/descendant::android.widget.Button[@clickable='true' and string-length(@content-desc)>0]",
+                            "//*[@content-desc='Start a Music story']",
+                             "//*[@text='Music' or @content-desc='Music']",
+                            "//*[@class='android.widget.EditText' and (starts-with(@text,'Search') or starts-with(@content-desc,'Search'))]",
+                            "//*[@content-desc='Song preview']",
+                            "//*[contains(@text, 'Settings') or contains(@content-desc, 'Settings')]",
+                            "//*[@text='Done']",
+                            "//*[@text='Privacy' or @content-desc='Privacy']",
+                            "//*[@text='Public' or @content-desc='Public']",
+                            "//*[@class='android.widget.Button' and (starts-with(@text,'Text') or starts-with(@content-desc,'Text'))]",
+                            "//*[@class='android.widget.Button' and (starts-with(@text,'Share') or starts-with(@content-desc,'Share'))]",
+                            "//*[@content-desc=\"Finishing up…\"]",
+                            "//android.widget.ProgressBar"
+                        };
+                        if (musicCoAnh)
+                        {
+                            xpaths.Insert(3, "(//*[contains(@content-desc, 'Photo taken on') or contains(@text, 'Photo taken on')])[1]");
+                            xpaths.Insert(3, "(//*[@content-desc='Photo'])[last()]");
+                        }
+                    }
+                    else
+                    {
+                        xpaths = new List<string>
+                        {
+                           "//*[@text='Create story' or @content-desc='Create story']",
+                            "//*[@content-desc='Add to story']",
+                            "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
+                            "//*[@content-desc='Photo' or @content-desc='Video']/*[@content-desc='Photo' or @content-desc='Video']",
+                            "//*[@text='Privacy' or @content-desc='Privacy']",
+                            "//*[@text='Public' or @content-desc='Public']",
+                            "//*[@class='android.widget.Button' and (starts-with(@text,'Share') or starts-with(@content-desc,'Share'))]",
+                            "//android.widget.ProgressBar"
+                        };
+                    }
+                    bool isFirstLoop = true;
+                    xpaths.AddRange(XpathManagerFacebook.Get(XpathType.NavigationButton));
+                    while (!_mainService._ct.IsCancellationRequested)
+                    {
+                        if (Environment.TickCount - tickCount >= timeoutSeconds * 1000) break;
 
-            //            }
-            //            catch { }
-            //            retryIndex++;
-            //        }
-            //        break;
-            //    }
-            //}
-            //catch { }
+                        string xmlSource = _client.GetXMLSource();
+
+                        string foundElement = _client.FindElement(xmlSource, xpaths, 1);
+
+
+                        switch (foundElement)
+                        {
+                            case "//*[@text='Create story' or @content-desc='Create story']":
+                            case "//*[@content-desc='Add to story']":
+                                hasClickedAddToStory = true;
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Add to story...", 2);
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                break;
+                            case var c when XpathManagerFacebook.Get(XpathType.NavigationButton).Contains(c):
+                                _client.ElementWithAttributes(c, 5);
+                                break;
+                            case "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*":
+                                {
+                                    var firstDesc = _client.GetAttributeValuesFromXmlNodes(xmlSource, "(" + foundElement + ")[1]", "content-desc").FirstOrDefault() ?? "";
+                                    if (firstDesc.ToLower().Contains("music"))
+                                        _client.ElementWithAttributes("(" + foundElement + ")[last()]", 1, xmlSource);
+                                    else
+                                        _client.ElementWithAttributes("(" + foundElement + ")[1]", 1, xmlSource);
+                                    break;
+                                }
+                            case "//*[@class='androidx.recyclerview.widget.RecyclerView']/descendant::android.widget.Button[@clickable='true' and string-length(@content-desc)>0]":
+                                {
+                                    var firstDesc = _client.GetAttributeValuesFromXmlNodes(xmlSource, "(" + foundElement + ")[1]", "content-desc").FirstOrDefault() ?? "";
+                                    if (firstDesc.ToLower().Contains("music"))
+                                        _client.ElementWithAttributes("(" + foundElement + ")[last()]", 1, xmlSource);
+                                    else
+                                        _client.ElementWithAttributes("(" + foundElement + ")[1]", 1, xmlSource);
+                                    break;
+                                }
+
+                            case "//*[@content-desc='Start a Text story']":
+                            case "//*[@content-desc='Start a Music story']":
+                            case "//*[@text='Music' or @content-desc='Music']":
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap {foundElement}...", 2);
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                break;
+
+                            case "//*[@content-desc='Select background']":
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                break;
+
+                            case "//*[contains(@content-desc,', background')]":
+                                {
+                                    var bgBounds = _client.FindBounds(xmlSource, foundElement, 1);
+                                    if (bgBounds.Any())
+                                    {
+                                        var bg = new RectangleArea(bgBounds.OrderBy(_ => Guid.NewGuid()).First()).GetCenterPoint();
+                                        _client.Click(bg.X, bg.Y);
+                                        _client.Delay(2);
+                                    }
+                                    _client.ElementWithAttributes("//*[@content-desc='Close background styles tray']", 1, xmlSource);
+                                    break;
+                                }
+
+                            case "//*[@content-desc='Close background styles tray']":
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                break;
+                            case "//*[@class='android.widget.Button' and (starts-with(@text,'Text') or starts-with(@content-desc,'Text'))]":
+                                {
+                                    if (isText && !hasClickedAddToStory)
+                                    {
+                                        _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap {foundElement}...", 2);
+                                        _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                        _mainService.SetStatus($"({successCount + 1}/{targetCount}), Nhập nội dung...", 2);
+                                        string spinText = SubdyHelper.SpinText(content);
+                                        _client.SendTextSlow("//*[@class='android.widget.EditText']", spinText);
+                                        _client.Delay(2);
+                                        _client.ElementWithAttributes("(//android.widget.Button[@content-desc='Back']/parent::*/child::*)[last()]", 1, xmlSource);
+                                        textFilled = true;
+                                    }
+                                    break;
+                                }
+
+                            case "//android.widget.EditText[@content-desc='Text field']":
+                                if (!textFilled && !string.IsNullOrWhiteSpace(content))
+                                {
+                                    _mainService.SetStatus($"({successCount + 1}/{targetCount}), Nhập nội dung...", 2);
+                                    string spinText = SubdyHelper.SpinText(content);
+                                    _client.SendTextSlow(foundElement, spinText);
+                                    _client.Delay(2);
+                                    _client.ElementWithAttributes("(//android.widget.Button[@content-desc='Back']/parent::*/child::*)[last()]", 1, xmlSource);
+                                    textFilled = true;
+                                }
+                                break;
+                            case "(//*[contains(@content-desc, 'Photo taken on') or contains(@text, 'Photo taken on')])[1]":
+                            case "(//*[@content-desc='Photo'])[last()]":
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chọn ảnh kèm nhạc...", 2);
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                break;
+
+                            case "//*[@class='android.widget.EditText' and (starts-with(@text,'Search') or starts-with(@content-desc,'Search'))]":
+                                if (!musicRandom && musicQueue.Any() && !musicSelected)
+                                {
+                                    int searchAttempt = 0;
+                                    while (searchAttempt < 3 && !_client.ElementWithAttributes("//*[@content-desc='Song preview']", 10, "", false))
+                                    {
+                                        searchAttempt++;
+                                        if (musicQueue.Count == 0) musicQueue = new List<string>(musicKeyword);
+                                        string musicText = musicQueue.OrderBy(_ => Guid.NewGuid()).FirstOrDefault() ?? "";
+                                        if (string.IsNullOrWhiteSpace(musicText)) break;
+                                        musicText = SubdyHelper.SpinText(musicText);
+
+                                        _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tìm nhạc: {musicText}...", 2);
+                                        _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                        _client.SendTextSlow(foundElement, musicText + " ");
+                                        _client.ATX.Press(PressKey.Enter);
+                                        _client.Delay(3);
+                                        if (_client.ElementWithAttributes("(//*[contains(@content-desc, 'Music Track') or contains(@text, 'Music Track')])[1]", 10, ""))
+                                        {
+                                            _client.Delay(3);
+                                            _client.ElementWithAttributes("//*[@text='Music' or @content-desc='Music']", 10, "");
+                                            _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chon kieu Album Art...", 2);
+                                            ClickRandomAlbumArtStyle();
+                                            _client.ElementWithAttributes("//*[@class='android.widget.Button' and (starts-with(@text,'Done') or starts-with(@content-desc,'Done'))]", 10, "");
+                                            _client.Delay(3);
+                                            MoveMusicStickerRandom();
+                                            break;
+                                        }
+                                    }
+                                    musicSelected = true;
+                                }
+                                else
+                                {
+                                    _client.ElementWithAttributes("//*[@content-desc='Song preview']", 120, "", false);
+                                    musicSelected = true;
+                                }
+                                break;
+
+                            case "//*[@content-desc='Song preview']":
+                                {
+                                    _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chọn bài hát...", 2);
+                                    var songBounds = _client.FindBounds(xmlSource, foundElement, 1);
+                                    if (songBounds.Any())
+                                    {
+                                        var songPt = new RectangleArea(songBounds.First()).GetCenterPoint();
+                                        _client.Click(Math.Max(songPt.X - 500, 50), songPt.Y);
+                                    }
+                                    for (int i = 0; i < 60; i++)
+                                    {
+                                        _client.Delay(2);
+                                        if (_client.GetXMLSource() != xmlSource) break;
+                                    }
+                                    _client.ElementWithAttributes("//*[@text='Music' or @content-desc='Music']", 10, "");
+                                    _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chon kieu Album Art...", 2);
+                                    ClickRandomAlbumArtStyle();
+                                    _client.ElementWithAttributes("//*[@class='android.widget.Button' and (starts-with(@text,'Done') or starts-with(@content-desc,'Done'))]", 10, "");
+                                    _client.Delay(3);
+                                    MoveMusicStickerRandom();
+                                    break;
+                                }
+                            case "//*[@content-desc=\"Share\"]":
+                            case "//*[@text='Done']":
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Done...", 2);
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                if (isMusic)
+                                {
+                                    _client.Delay(3);
+                                    MoveMusicStickerRandom();
+                                }
+                                break;
+                            case "//*[contains(@text, 'Settings') or contains(@content-desc, 'Settings')]":
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Public...", 2);
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                _client.Delay(2);
+                                _client.ElementWithAttributes("//*[@text='Privacy' or @content-desc='Privacy']", 10, "");
+                                _client.Delay(2);
+                                _client.ElementWithAttributes("//*[@text='Public' or @content-desc='Public']", 10, "");
+                                _client.Delay(2);
+                                _client.ElementWithAttributes(new List<string> { "//*[@text='SAVE' or @content-desc='SAVE']", "//*[@text='CHANGE' or @content-desc='CHANGE']", "//*[@text='CHANGE' or @text='SAVE'] or @content-desc='CHANGE'] or @content-desc='SAVE']" }, 5, xmlSource);
+                                _client.Delay(2);
+                                _client.ElementWithAttributes("//*[@content-desc='Back']", 10, "");
+                                _client.Delay(2);
+                                WaitForPostComplete(60);
+                                break;
+                            case "//*[@text='Privacy' or @content-desc='Privacy']":
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Public...", 2);
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                _client.Delay(2);
+                                _client.ElementWithAttributes("//*[@text='Public' or @content-desc='Public']", 10, "");
+                                _client.Delay(2);
+                                _client.ElementWithAttributes(new List<string> { "//*[@text='SAVE' or @content-desc='SAVE']", "//*[@text='CHANGE' or @content-desc='CHANGE']", "//*[@text='CHANGE' or @text='SAVE'] or @content-desc='CHANGE'] or @content-desc='SAVE']" }, 5, xmlSource);
+                                _client.Delay(2);
+                                _client.ElementWithAttributes("//*[@content-desc='Back']", 10, "");
+                                _client.Delay(2);
+                                WaitForPostComplete(60);
+                                break;
+
+                            case "//*[@text='Public' or @content-desc='Public']":
+                                _client.ElementWithAttributes("//*[@text='CHANGE' or @text='SAVE']", 5, "");
+                                _client.ElementWithAttributes("//*[@content-desc='Back']", 1, xmlSource);
+                                WaitForPostComplete(60);
+                                break;
+                            case "//*[@class='android.widget.Button' and (starts-with(@text,'Share') or starts-with(@content-desc,'Share'))]":
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Share...", 2);
+                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                _client.Delay(2);
+                                if (_client.ElementWithAttributes("//*[@class='android.widget.Button' and (starts-with(@text,'NOT NOW') or starts-with(@content-desc,'NOT NOW'))]", 10, ""))
+                                {
+                                    await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(3, 6), $"({successCount + 1}/{targetCount}), Đợi {{time}}s...", 2);
+                                }
+                                if (hasClickedAddToStory)
+                                {
+                                    OpenFacebookTimeline();
+                                    _client.Delay(3);
+                                }
+                                if (WaitForPostComplete(isMedia ? 300 : 60))
+                                {
+                                    successCount++;
+                                    postSuccess = true;
+
+                                }
+                                break;
+                            case "//*[@content-desc=\"Finishing up…\"]":
+                            case "//android.widget.ProgressBar":
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Loading...", 2);
+                                WaitForPostComplete(60);
+                                break;
+
+                            default:
+                                _mainService.SetStatus($"({successCount + 1}/{targetCount}), Scroll...", 2);
+                                _client.Delay(2);
+                                if (!_client.IsRunningApp(PlatformModel.Facebook))
+                                {
+                                    await _mainService._facebookService.HanderAccount(_client, _account, 60, _mainService._ct, _mainService);
+                                    isFirstLoop = false;
+                                }
+
+                                break;
+                        }
+
+                        if (postSuccess || !isFirstLoop) break;
+
+                        if (!string.IsNullOrEmpty(foundElement) && foundElement != "//android.widget.ProgressBar")
+                        {
+                            xpaths.Remove(foundElement);
+                        }
+                        _client.Delay(3);
+                    }
+
+                    if (postSuccess)
+                    {
+                        refail = 0;
+                        if (isMedia && deleteMedia && File.Exists(mediaPath))
+                        {
+                            try { File.Delete(mediaPath); } catch { }
+                        }
+                        if (isMusic && musicCoAnh && deleteMusicAnh && File.Exists(musicImagePath))
+                        {
+                            try { File.Delete(musicImagePath); } catch { }
+                        }
+                        UpdateStoryStats(successCount, failCount);
+                        await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayFrom, delayTo), $"({successCount}/{targetCount}), Đợi {{time}}s...", 2);
+                        DeleteMediaFiles(fileMedia);
+                    }
+                    else
+                    {
+                        refail++;
+                        failCount++;
+                        DeleteMediaFiles(fileMedia);
+                        UpdateStoryStats(successCount, failCount);
+                    }
+                }
+                catch
+                {
+                    refail++;
+                    failCount++;
+                    UpdateStoryStats(successCount, failCount);
+                }
+            }
+
             return successCount;
         }
         public int HDXoaSdt(int accountId, string statusPrefix, string actionTitle)
@@ -13521,17 +13569,20 @@ namespace Sunny.Subd.Core.Facebook
                 {
                     break;
                 }
-
-            // Kiểm tra trạng thái đăng nhập
-            //switch (CheckLoginStatus(fbController, accountId, statusPrefix))
-            //{
-            //    case 1: // đang login
-            //        break;
-            //    case 0: // login ok
-            //        return true;
-            //    default: // lỗi login
-            //        return false;
-            //}
+                if (link.Contains("profile_edit") && _client.ElementWithAttributes("//*[@text=\"Edit Profile\"]", 10, click: false))
+                {
+                    break;
+                }
+                // Kiểm tra trạng thái đăng nhập
+                //switch (CheckLoginStatus(fbController, accountId, statusPrefix))
+                //{
+                //    case 1: // đang login
+                //        break;
+                //    case 0: // login ok
+                //        return true;
+                //    default: // lỗi login
+                //        return false;
+                //}
             IL_015a:
                 _client.Shell("input keyevent 4");
                 _client.Delay(2);
@@ -13613,7 +13664,7 @@ namespace Sunny.Subd.Core.Facebook
             for (int i = 0; i < 5; i++)
             {
                 text = "";
-                string text2 = _client.FindElement("", new List<string> { "//*[@content-desc=\"POST\"]", "//*[@text=\"Create post\"]", "//*[contains(@content-desc, \"Home\")]", "//*[contains(@content-desc, \"Home, tab\")]" }, 3);
+                string text2 = _client.FindElement("", new List<string> { "//*[@content-desc=\"POST\"]", "//*[@text=\"Create post\"]", "//*[contains(@content-desc, \"Home, tab\")]", "//*[contains(@content-desc, \"Home, tab\")]" }, 3);
                 if (!(text2 == ""))
                 {
                     if (text2 == "//*[@content-desc=\"POST\"]" || text2 == "//*[@text=\"Create post\"]")
@@ -13774,26 +13825,149 @@ namespace Sunny.Subd.Core.Facebook
             }
             return true;
         }
+
+        private void UpdateStoryStats(int doneCount, int failCount)
+        {
+            try
+            {
+                if (_account == null)
+                {
+                    return;
+                }
+
+                _account.Note = $"Story: Done: {doneCount} - fail: {failCount}";
+                new AccountContext().Update(_account);
+            }
+            catch
+            {
+            }
+        }
+
+        private bool ClickRandomAlbumArtStyle(int timeoutSeconds = 10)
+        {
+            string albumArtXPath = "//*[@class='android.widget.Button' and contains(@content-desc,'Album Art') and (@index='2' or @index='3' or @index='4' or @index='5')]";
+            var albumArtBounds = _client.FindBounds("", albumArtXPath, timeoutSeconds);
+            if (!albumArtBounds.Any())
+            {
+                return false;
+            }
+
+            var point = new RectangleArea(albumArtBounds.OrderBy(_ => Guid.NewGuid()).First()).GetCenterPoint();
+            _client.Click(point.X, point.Y);
+            _client.Delay(1);
+            return true;
+        }
+
+        private bool MoveMusicStickerRandom(int timeoutSeconds = 10)
+        {
+            string musicStickerXPath = "//*[contains(@content-desc,'Music sticker') and not(contains(@content-desc,'preview'))]";
+            var sticker = GetSmallestBounds(musicStickerXPath, timeoutSeconds);
+            if (sticker == null)
+            {
+                return false;
+            }
+
+            var startPoint = sticker.GetCenterPoint();
+            var screen = _client.GetScreenResolution();
+            int stickerWidth = Math.Max(1, sticker.Right - sticker.Left);
+            int stickerHeight = Math.Max(1, sticker.Bottom - sticker.Top);
+            int minX = Math.Max(screen.X * 15 / 100, stickerWidth / 2 + 20);
+            int maxX = Math.Max(minX + 1, Math.Min(screen.X * 85 / 100, screen.X - stickerWidth / 2 - 20));
+            int minY = Math.Max(screen.Y * 25 / 100, stickerHeight / 2 + 20);
+            int maxY = Math.Max(minY + 1, Math.Min(screen.Y * 70 / 100, screen.Y - stickerHeight / 2 - 20));
+            int targetX = SubdyHelper.RandomValue(minX, maxX + 1);
+            int targetY = SubdyHelper.RandomValue(minY, maxY + 1);
+
+            //if (TryDragMusicSticker(startPoint.X, startPoint.Y, targetX, targetY)
+            //    && IsMusicStickerMoved(musicStickerXPath, startPoint.X, startPoint.Y))
+            //{
+            //    return true;
+            //}
+
+            _client.Shell("input", "swipe", startPoint.X.ToString(), startPoint.Y.ToString(), targetX.ToString(), targetY.ToString(), "1800");
+            _client.Delay(2);
+            return IsMusicStickerMoved(musicStickerXPath, startPoint.X, startPoint.Y);
+        }
+
+        private RectangleArea? GetSmallestBounds(string xpath, int timeoutSeconds = 1)
+        {
+            var bounds = _client.FindBounds("", xpath, timeoutSeconds);
+            if (!bounds.Any())
+            {
+                return null;
+            }
+
+            return bounds
+                .Select(x => new RectangleArea(x))
+                .Where(x => x.Right > x.Left && x.Bottom > x.Top)
+                .OrderBy(x => (x.Right - x.Left) * (x.Bottom - x.Top))
+                .FirstOrDefault();
+        }
+
+        private bool TryDragMusicSticker(int startX, int startY, int targetX, int targetY)
+        {
+            try
+            {
+                if (_client.ATX.Drag(startX, startY, targetX, targetY, 8))
+                {
+                    _client.Delay(2);
+                    return true;
+                }
+            }
+            catch
+            {
+            }
+
+            return false;
+        }
+
+        private bool IsMusicStickerMoved(string musicStickerXPath, int oldX, int oldY)
+        {
+            var sticker = GetSmallestBounds(musicStickerXPath);
+            if (sticker == null)
+            {
+                return false;
+            }
+
+            var newPoint = sticker.GetCenterPoint();
+            return Math.Abs(newPoint.X - oldX) > 25 || Math.Abs(newPoint.Y - oldY) > 25;
+        }
+
         internal List<string> UploadMediaFiles(List<string> files)
         {
             List<string> remoteFiles = new List<string>();
             _mainService.SetStatus("Uploading media files...", 2);
-            // Đảm bảo thư mục tồn tại trên thiết bị
+
             EnsureRemoteFolder("sdcard/dcim/camera");
             EnsureRemoteFolder("sdcard/pictures");
             EnsureRemoteFolder("sdcard/movies");
 
             foreach (string localFile in files)
             {
-                string extension = Path.GetExtension(localFile).TrimStart('.');
+                string extension = Path.GetExtension(localFile).TrimStart('.').ToLower();
                 string randomName = SubdyHelper.RandomString(length: 10).TrimEnd('.') + "." + extension;
                 string remotePath = $"/sdcard/pictures/{randomName}";
 
-                // Đẩy file lên thiết bị
-                _client.ADB.CMD($"push \"{localFile}\" \"{remotePath}\"", 300);
+                string mimeType = extension switch
+                {
+                    "jpg" or "jpeg" => "image/jpeg",
+                    "png" => "image/png",
+                    "mp4" => "video/mp4",
+                    "mov" => "video/quicktime",
+                    "gif" => "image/gif",
+                    _ => "image/jpeg"
+                };
 
-                // Gửi broadcast để Android quét media mới
-                _client.Shell($" am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d \"file://{remotePath}\"");
+                _client.Push(localFile, remotePath);
+
+                // Đồng bộ MediaStore — không cần mở app
+                _client.Shell($"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE " +
+                              $"-d \"file://{remotePath}\"");
+                _client.Shell($"content insert --uri content://media/external/images/media " +
+                              $"--bind _data:s:{remotePath} " +
+                              $"--bind mime_type:s:{mimeType} " +
+                              $"--bind title:s:{Path.GetFileNameWithoutExtension(localFile)}");
+
                 remoteFiles.Add(remotePath);
             }
             return remoteFiles;

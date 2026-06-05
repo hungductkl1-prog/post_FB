@@ -94,7 +94,7 @@
             windowBar.SubGap = 1;
             windowBar.SubText = "v18.12.08.2025";
             windowBar.TabIndex = 8;
-            windowBar.Text = "Golike Phone Farm";
+            windowBar.Text = "QN Phone Farm";
             windowBar.UseSystemStyleColor = true;
             windowBar.UseTextBold = false;
             // 

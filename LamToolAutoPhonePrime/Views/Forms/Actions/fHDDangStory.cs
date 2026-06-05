@@ -6,6 +6,7 @@ using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 
+using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
 namespace LamToolAutoPhonePrime.Views.Forms.Actions
 {
     public partial class fHDDangStory : Form
@@ -48,10 +49,15 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
         }
         private void LoadEnable()
         {
-            plVanBan.Enabled = checkBox5.Checked;
-            plAnh.Enabled = checkBox6.Checked;
-            panel3.Enabled = checkBox7.Checked;
-            panel2.Enabled = radioButton5.Checked;
+            // plAnh chỉ active khi chọn "Đăng ảnh/video"
+            plAnh.Enabled = rbDangAnhVideo.Checked;
+            // Khối Đăng nhạc (panel3 + ckbCoAnh + plAnhNhac) chỉ active khi chọn "Đăng nhạc"
+            panel3.Enabled = rbDangNhac.Checked;
+            ckbCoAnh.Enabled = rbDangNhac.Checked;
+            plAnhNhac.Enabled = rbDangNhac.Checked && ckbCoAnh.Checked;
+            // textarea "Danh sách bài hát" chỉ enable khi "Bài hát chỉ định"
+            panel2.Enabled = rbDangNhac.Checked && radioButton5.Checked;
+            // Cập nhật số dòng
             SubdyHelper.UpdateItemCount(txtLinks, D397662B);
             SubdyHelper.UpdateItemCount(textBox1, label5);
         }
@@ -136,6 +142,15 @@ namespace LamToolAutoPhonePrime.Views.Forms.Actions
             if (f.ShowDialog() == DialogResult.OK)
             {
                 txtPathAnh.Text = f.SelectedPath;
+            }
+        }
+
+        private void btnChonAnhNhac_Click(object sender, EventArgs e)
+        {
+            System.Windows.Forms.FolderBrowserDialog f = new System.Windows.Forms.FolderBrowserDialog();
+            if (f.ShowDialog() == DialogResult.OK)
+            {
+                txtPathAnhNhac.Text = f.SelectedPath;
             }
         }
     }

@@ -170,7 +170,7 @@ namespace Sunny.Subdy.Data.Context
             {
                 string paramName = $"@id{i}";
                 paramNames.Add(paramName);
-                parameters[paramName] = ids[i];
+                parameters[paramName] = ids[i].ToString();
             }
 
             string inClause = string.Join(", ", paramNames);

@@ -1,10 +1,10 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Reflection;
 
 namespace ViewControl;
 
 /// <summary>
-/// Tải logo Golike từ embedded resource và gắn vào Form Icon + AntdUI PageHeader.
+/// Tải logo QN từ embedded resource và gắn vào Form Icon + AntdUI PageHeader.
 /// Cache 1 lần để tránh decode PNG nhiều lần.
 /// </summary>
 internal static class AppBranding
@@ -13,7 +13,7 @@ internal static class AppBranding
     private static Icon? _logoIcon;
     private static readonly object _lock = new();
 
-    private const string PngResourceName = "ViewControl.Resources.logo_golike_auto_phone.png";
+        private const string PngResourceName = "ViewControl.Resources.logo_qn_auto_phone.png";
 
     public static Image? GetLogoImage()
     {

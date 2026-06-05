@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -15,12 +15,12 @@
     <TargetPlatformMinVersion>5.1</TargetPlatformMinVersion>
 
     <!-- Assembly info -->
-    <AssemblyName>Golike-Android-View</AssemblyName>
+    <AssemblyName>QN-Android-View</AssemblyName>
     <RootNamespace>ViewControl</RootNamespace>
-    <Product>Golike Android View</Product>
-    <Company>Golike</Company>
-    <Title>Golike Android View</Title>
-    <ApplicationIcon>Resources\golike_auto_phone.ico</ApplicationIcon>
+    <Product>QN Android View</Product>
+    <Company>QN</Company>
+    <Title>QN Android View</Title>
+    <ApplicationIcon>Resources\qn_auto_phone.ico</ApplicationIcon>
 
     <CustomResourceTypesSupport>true</CustomResourceTypesSupport>
 
@@ -141,8 +141,8 @@
 
   <!-- Embed PNG logo để load runtime cho windowBar.Icon + Form.Icon -->
   <ItemGroup>
-    <EmbeddedResource Include="Resources\logo_golike_auto_phone.png">
-      <LogicalName>ViewControl.Resources.logo_golike_auto_phone.png</LogicalName>
+    <EmbeddedResource Include="Resources\logo_qn_auto_phone.png">
+      <LogicalName>ViewControl.Resources.logo_qn_auto_phone.png</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 

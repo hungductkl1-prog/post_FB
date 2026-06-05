@@ -1,4 +1,4 @@
-using AntdUI;
+﻿using AntdUI;
 using DeviceId;
 using DeviceId.Windows;
 
@@ -47,7 +47,7 @@ public partial class MainForm : AntdUI.Window
         try
         {
             // ── Step 0: Kill ────────────────────────────────────────────────
-            GoStep(STEP_KILL, "Đang dừng GolikePhoneFarm...", -1);
+            GoStep(STEP_KILL, "Đang dừng QNPhoneFarm...", -1);
             await Task.Run(UpdateService.KillMainProcessIfRunning).ConfigureAwait(false);
             await Task.Delay(400).ConfigureAwait(false);
             FinishStep(STEP_KILL);
@@ -65,7 +65,7 @@ public partial class MainForm : AntdUI.Window
             if (string.IsNullOrWhiteSpace(_remoteVersion) || string.IsNullOrWhiteSpace(_updateUrl))
             {
                 ErrorStep(STEP_CHECK, "Không thể kết nối máy chủ");
-                ShowMsg(false, "Không thể kết nối tới máy chủ golike.net.\nKiểm tra kết nối mạng và thử lại.");
+                ShowMsg(false, "Không thể kết nối tới máy chủ qn.net.\nKiểm tra kết nối mạng và thử lại.");
                 return;
             }
 

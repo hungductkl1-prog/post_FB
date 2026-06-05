@@ -1,4 +1,4 @@
-using LamToolAutoPhonePrime;
+﻿using LamToolAutoPhonePrime;
 using ScrcpyNet;
 using Sunny.Subdy.Data.Models;
 using System.Reflection;
@@ -24,7 +24,7 @@ public partial class fMultiView : AntdUI.Window
     private void OnLoad(object? sender, EventArgs e)
     {
         AppBranding.ApplyTo(this, windowBar);
-        windowBar.Text = $"Golike Android View - 0/{devices.Count} thiết bị";
+        windowBar.Text = $"QN Android View - 0/{devices.Count} thiết bị";
 
         // Step 1: Add tất cả tile ngay lập tức (optimistic rendering)
         // Mỗi tile hiện placeholder — connect async sau
@@ -92,7 +92,7 @@ public partial class fMultiView : AntdUI.Window
                 tile.SetOverlayAlpha(sliderOpacity.Value);
                 int done = flowLayout.Controls.OfType<DeviceTile>()
                                               .Count(t => t.IsConnected);
-                windowBar.Text = $"Golike Android View - {done}/{devices.Count} thiết bị";
+                windowBar.Text = $"QN Android View - {done}/{devices.Count} thiết bị";
                 Program.LogLine($"[{serial}] AttachScrcpy done. {done}/{devices.Count} tiles connected");
             });
         }
@@ -193,7 +193,7 @@ public partial class fMultiView : AntdUI.Window
     {
         SyncEnabled = e.Value;
         int connected = flowLayout.Controls.OfType<DeviceTile>().Count(t => t.IsConnected);
-        windowBar.Text = $"Golike Android View - {connected}/{devices.Count} thiết bị" + (SyncEnabled ? "  •  Đồng bộ BẬT" : "");
+        windowBar.Text = $"QN Android View - {connected}/{devices.Count} thiết bị" + (SyncEnabled ? "  •  Đồng bộ BẬT" : "");
     }
 
     [System.Diagnostics.CodeAnalysis.DynamicDependency("DoubleBuffered", typeof(Control))]

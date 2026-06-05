@@ -1,9 +1,9 @@
-"""
-GolikeHelper - Tự động cài đặt môi trường cho GolikePhoneFarm
+﻿"""
+QNHelper - Tự động cài đặt môi trường cho QNPhoneFarm
 
 Thứ tự cài đặt:
   1. Visual C++ Redistributable (x64 + x86)
-  2. GolikeHelper (ADB)
+  2. QNHelper (ADB)
   3. Node.js
   4. Verify toàn bộ
 """
@@ -43,7 +43,7 @@ def main():
 
     print(f"\n{'#'*50}")
     print(f"  Xin chao {computer_name}")
-    print(f"  GolikeHelper - Cai dat moi truong tu dong")
+    print(f"  QNHelper - Cai dat moi truong tu dong")
     print(f"{'#'*50}")
 
     # Exe was built with uac_admin=True → UAC prompt fires before process starts.
@@ -51,7 +51,7 @@ def main():
     # fail-fast with non-zero exit code so parent C# process knows setup failed.
     if not is_admin():
         print(f"\n  {RED}[!] Khong co quyen Administrator.")
-        print(f"  Vui long chay GolikeHelper.exe voi quyen Admin (Right-click > Run as administrator).{RESET}")
+        print(f"  Vui long chay QNHelper.exe voi quyen Admin (Right-click > Run as administrator).{RESET}")
         input("\n  Nhan Enter de thoat...")
         sys.exit(1)
 
@@ -59,7 +59,7 @@ def main():
 
     steps = [
         ("Visual C++", setup_vcredist),
-        ("GolikeHelper (ADB)", setup_env),
+        ("QNHelper (ADB)", setup_env),
         ("Node.js", setup_node),
     ]
     total = len(steps)

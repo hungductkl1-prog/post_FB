@@ -1,10 +1,10 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Windows.Forms;
 
 namespace LamToolAutoPhonePrime.Utils
 {
     /// <summary>
-    /// Gắn icon Golike vào mọi Form — cả form chính lẫn dialog được mở sau đó.
+    /// Gắn icon QN vào mọi Form — cả form chính lẫn dialog được mở sau đó.
     /// Designer không set Form.Icon nên Windows hiển thị icon WinForms mặc định; helper này
     /// lấp chỗ đó bằng cách quét Application.OpenForms trong Idle loop.
     /// </summary>
@@ -18,7 +18,7 @@ namespace LamToolAutoPhonePrime.Utils
             get
             {
                 if (_cached != null) return _cached;
-                // Bitmap đã được swap nội dung sang logo Golike (Resources/logo_lamtool_v3_dark_16.png).
+                // Bitmap đã được swap nội dung sang logo QN (Resources/logo_lamtool_v3_dark_16.png).
                 var bmp = Properties.Resources.logo_lamtool_v3_dark_16;
                 var hicon = bmp.GetHicon();
                 _cached = Icon.FromHandle(hicon);

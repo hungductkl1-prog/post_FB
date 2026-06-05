@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
@@ -333,8 +333,8 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 {
                     throw new Exception(JsonNode.Parse(json!)!.AsObject()["message"].ToString());
                 }
-                var jGolike = JsonNode.Parse(json!)!.AsObject();
-                var dataToken = jGolike["data"];
+                var jQN = JsonNode.Parse(json!)!.AsObject();
+                var dataToken = jQN["data"];
                 if (dataToken == null || dataToken is not JsonArray)
                 {
                     throw new Exception("Dữ liệu job không hợp lệ.");
@@ -418,8 +418,8 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             return result;
         }
 
-        // ===================== Threads (Golike) =====================
-        // Mirror của AutoGolikeThreads/GolikeClient.java: list account / get job / complete / skip.
+        // ===================== Threads (QN) =====================
+        // Mirror của AutoQNThreads/QNClient.java: list account / get job / complete / skip.
 
 
         public async Task<List<JobModel>> GetThreadsJob(string username, string token)
@@ -443,11 +443,11 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                     throw new Exception(JsonNode.Parse(json!)!.AsObject()["message"]?.ToString() ?? "Unknown error");
                 }
 
-                var jGolike = JsonNode.Parse(json!)!.AsObject();
-                var dataToken = jGolike["data"];
+                var jQN = JsonNode.Parse(json!)!.AsObject();
+                var dataToken = jQN["data"];
                 if (dataToken == null)
                 {
-                    throw new Exception(jGolike["message"]?.ToString() ?? "Dữ liệu job không hợp lệ.");
+                    throw new Exception(jQN["message"]?.ToString() ?? "Dữ liệu job không hợp lệ.");
                 }
 
                 // Endpoint /threads/_private/get-jobs trả về schema phẳng:

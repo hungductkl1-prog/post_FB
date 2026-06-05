@@ -184,7 +184,7 @@ namespace Sunny.Subd.Core.Instagram
 
                 if (extension.SubdyEnum == SubdyEnum.LogOut)
                 {
-                    await _mainService._facebookService.Login(_client, _account, _mainService._ct, 180, _mainService);
+                    await _mainService._facebookService.Login(_client, _account, _mainService._ct, 400, _mainService);
                 }
                 error = $"Thất bại ({extension.Message})";
                 if (extension.SubdyEnum != SubdyEnum.JobFail)

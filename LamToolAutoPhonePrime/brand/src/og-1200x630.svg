@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="AutoGoLike — Tool auto chính thức Golike">
-  <title>AutoGoLike OG image</title>
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img" aria-label="AutoQN — Tool auto chính thức QN">
+  <title>AutoQN OG image</title>
   <rect width="1200" height="630" fill="#d3ff3c"/>
   <!-- decorative dots -->
   <g fill="#0a0a0a" opacity="0.08">
@@ -33,18 +33,18 @@
     <text x="0" y="290"
           font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
           font-weight="800" font-size="104" fill="#0a0a0a"
-          letter-spacing="-3.5">AutoGoLike</text>
+          letter-spacing="-3.5">AutoQN</text>
     <text x="4" y="340"
           font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
           font-weight="500" font-size="22" fill="#0a0a0a"
-          letter-spacing="4">BY GOLIKE · OFFICIAL</text>
+          letter-spacing="4">BY QN · OFFICIAL</text>
   </g>
 
   <!-- Tagline -->
   <text x="120" y="490"
         font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
         font-weight="600" font-size="36" fill="#0a0a0a"
-        letter-spacing="-1">Tool auto chính thức Golike — cày job 24/7</text>
+        letter-spacing="-1">Tool auto chính thức QN — cày job 24/7</text>
   <text x="120" y="540"
         font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
         font-weight="500" font-size="26" fill="#0a0a0a" opacity="0.7"
@@ -54,5 +54,5 @@
   <text x="1080" y="600" text-anchor="end"
         font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
         font-weight="600" font-size="22" fill="#0a0a0a"
-        letter-spacing="1">auto.golike.net</text>
+        letter-spacing="1">auto.qn.net</text>
 </svg>

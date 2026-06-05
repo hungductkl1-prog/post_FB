@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.API.Jobs.GoLike;
 using Sunny.Subdy.Common.API.Jobs.TuongTacCheo;
 using System.Text.Json;
@@ -15,15 +15,15 @@ namespace Sunny.Subdy.Common.API.Jobs
             {
                 case "https://app.golike.net/":
                     {
-                        var golikeClient = new GoLikeClient();
-                        JsonNode? jGolike = await golikeClient.GetFacebookJob(uid, token, job_type, fb_name);
+                        var qnClient = new GoLikeClient();
+                        JsonNode? jQN = await qnClient.GetFacebookJob(uid, token, job_type, fb_name);
 
-                        if (jGolike == null)
+                        if (jQN == null)
                         {
                             throw new Exception("Không lấy được kết quả từ server.");
                         }
 
-                        var dataToken = jGolike["data"];
+                        var dataToken = jQN["data"];
                         if (dataToken is not JsonArray)
                         {
                             throw new Exception("Dữ liệu job không hợp lệ.");
@@ -105,33 +105,33 @@ namespace Sunny.Subdy.Common.API.Jobs
             {
                 case "https://app.golike.net/":
                     {
-                        var golikeClient = new GoLikeClient();
-                        JsonNode? jGolike = await golikeClient.ReportFacebookJob(uid, token, token, job);
+                        var qnClient = new GoLikeClient();
+                        JsonNode? jQN = await qnClient.ReportFacebookJob(uid, token, token, job);
 
-                        if (jGolike == null)
+                        if (jQN == null)
                         {
                             throw new Exception("Không lấy được kết quả từ server.");
                         }
-                        if (!string.IsNullOrEmpty(jGolike["message"]?.ToString()))
+                        if (!string.IsNullOrEmpty(jQN["message"]?.ToString()))
                         {
-                            return jGolike["message"]?.ToString();
+                            return jQN["message"]?.ToString();
                         }
-                        throw new Exception(jGolike.ToJsonString());
+                        throw new Exception(jQN.ToJsonString());
                     }
                 case "https://tuongtaccheo.com/":
                     {
-                        var golikeClient = new TuongTacCheoClient();
-                        JsonNode? jGolike = await golikeClient.ReportFacebookJob(token, job, prefix);
+                        var qnClient = new TuongTacCheoClient();
+                        JsonNode? jQN = await qnClient.ReportFacebookJob(token, job, prefix);
 
-                        if (jGolike == null)
+                        if (jQN == null)
                         {
                             throw new Exception("Không lấy được kết quả từ server.");
                         }
-                        if (!string.IsNullOrEmpty(jGolike["mess"]?.ToString()))
+                        if (!string.IsNullOrEmpty(jQN["mess"]?.ToString()))
                         {
-                            return jGolike["mess"]?.ToString();
+                            return jQN["mess"]?.ToString();
                         }
-                        throw new Exception(jGolike.ToJsonString());
+                        throw new Exception(jQN.ToJsonString());
                     }
                 default:
                     throw new Exception("JobService không hợp lệ.");
@@ -145,8 +145,8 @@ namespace Sunny.Subdy.Common.API.Jobs
             {
                 case "https://app.golike.net/":
                     {
-                        var golikeClient = new GoLikeClient();
-                        List<string> lines = golikeClient.GetJobTypes(token);
+                        var qnClient = new GoLikeClient();
+                        List<string> lines = qnClient.GetJobTypes(token);
 
                         if (lines == null || !lines.Any())
                         {
@@ -166,8 +166,8 @@ namespace Sunny.Subdy.Common.API.Jobs
             {
                 case "https://app.golike.net/":
                     {
-                        var golikeClient = new GoLikeClient();
-                        string json = golikeClient.GetCoin(token);
+                        var qnClient = new GoLikeClient();
+                        string json = qnClient.GetCoin(token);
 
                         if (string.IsNullOrWhiteSpace(json))
                             throw new Exception("Không lấy được kết quả từ server.");

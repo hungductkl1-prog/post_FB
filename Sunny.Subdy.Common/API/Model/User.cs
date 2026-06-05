@@ -14,6 +14,6 @@
         public bool IsActive { get; set; } = true;
         public bool IsBanned { get; set; }
         public string Role { get; set; }
-        public string? Token_Golike { get; set; }
+        public string? Token_QN { get; set; }
     }
 }

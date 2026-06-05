@@ -1,6 +1,6 @@
-# AutoGoLike — Brand assets
+﻿# AutoQN — Brand assets
 
-Bộ logo + asset social chính thức của AutoGoLike. Dùng cho web, OG image, Telegram, Facebook, Zalo, email signature, in ấn.
+Bộ logo + asset social chính thức của AutoQN. Dùng cho web, OG image, Telegram, Facebook, Zalo, email signature, in ấn.
 
 ## Cấu trúc
 
@@ -19,7 +19,7 @@ public/brand/
 | `logo-mark-inverse.svg` | Mark vuông (GL) — nền tối. Match `PublicFooter`. |
 | `logo-mark-mono-dark.svg` | Mark đơn sắc đen + chữ trắng. |
 | `logo-mark-mono-light.svg` | Mark đơn sắc trắng + chữ đen. |
-| `logo-full.svg` | Mark + wordmark "AutoGoLike / BY GOLIKE · OFFICIAL" — nền sáng. |
+| `logo-full.svg` | Mark + wordmark "AutoQN / BY QN · OFFICIAL" — nền sáng. |
 | `logo-full-inverse.svg` | Mark + wordmark — nền tối. |
 | `logo-wordmark.svg` | Chỉ wordmark, không có mark. |
 
@@ -71,12 +71,12 @@ Script dùng `pnpm dlx sharp-cli` (không cần cài global). Lần đầu hơi 
 - **Paper:** `#ffffff`
 - **Mark:** ô vuông bo `rx ≈ 14–16` (mark nhỏ) / `rx ≈ 44–120` (scale lên cho avatar/banner), **xoay -4°**, chữ "GL" canh giữa, font-weight 800.
 - **Display font:** Space Grotesk → fallback Inter / system-ui.
-- **Mono font:** JetBrains Mono (cho tagline `BY GOLIKE · OFFICIAL`).
+- **Mono font:** JetBrains Mono (cho tagline `BY QN · OFFICIAL`).
 
 ## Lưu ý
 
 - Mark **luôn xoay -4°** — đây là dấu hiệu nhận diện. Đừng dựng thẳng.
-- Tagline `BY GOLIKE · OFFICIAL` viết HOA, letter-spacing rộng.
+- Tagline `BY QN · OFFICIAL` viết HOA, letter-spacing rộng.
 - PNG render bằng `sharp` (libvips) → KHÔNG load Space Grotesk từ Google Fonts. Fallback sang system font (macOS: Helvetica). Vẫn giữ vibe bold sans-serif. Nếu cần render đúng Space Grotesk:
   - Mở SVG trong Figma/Illustrator → export PNG.
   - Hoặc convert text sang outline path trong SVG rồi re-export.

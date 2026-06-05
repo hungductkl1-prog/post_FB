@@ -1,4 +1,4 @@
-using AntdUI;
+﻿using AntdUI;
 using LamToolAutoPhonePrime.Utils.Design;
 using System.ComponentModel;
 using System.Drawing;
@@ -53,8 +53,8 @@ namespace LamToolAutoPhonePrime.Views.Forms
             _chkCaiFacebook.Checked    = src.CaiFacebook;
             _chkKhoiDong.Checked       = src.KhoiDong;
             _chkTatGPS.Checked         = src.TatGPS;
-            _chkCaiTLC.Checked         = src.CaiGolikeHelper;
-            _chkCapQuyenTLC.Checked    = src.CapQuyenGolikeHelper;
+            _chkCaiTLC.Checked         = src.CaiQNHelper;
+            _chkCapQuyenTLC.Checked    = src.CapQuyenQNHelper;
             _nudBright.Value           = Clamp(src.BrightnessPercent, 0, 100);
             _nudPin.Value              = Clamp(src.PinPercent, 0, 999);
         }
@@ -142,13 +142,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
 
             _chkCaiFacebook = MkChk("Cài app Facebook", 0, y, W);
             body.Controls.Add(_chkCaiFacebook);
-            _chkCaiTLC = MkChk("Cài GolikeHelper", 210, y, W);
+            _chkCaiTLC = MkChk("Cài QNHelper", 210, y, W);
             body.Controls.Add(_chkCaiTLC);
             y += 34;
 
             _chkKhoiDong = MkChk("Khởi động lại máy", 0, y, W);
             body.Controls.Add(_chkKhoiDong);
-            _chkCapQuyenTLC = MkChk("Cấp quyền GolikeHelper", 210, y, W);
+            _chkCapQuyenTLC = MkChk("Cấp quyền QNHelper", 210, y, W);
             body.Controls.Add(_chkCapQuyenTLC);
             y += 34;
 
@@ -187,8 +187,8 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     CaiFacebook          = _chkCaiFacebook.Checked,
                     KhoiDong             = _chkKhoiDong.Checked,
                     TatGPS               = _chkTatGPS.Checked,
-                    CaiGolikeHelper      = _chkCaiTLC.Checked,
-                    CapQuyenGolikeHelper = _chkCapQuyenTLC.Checked,
+                    CaiQNHelper      = _chkCaiTLC.Checked,
+                    CapQuyenQNHelper = _chkCapQuyenTLC.Checked,
                     BrightnessPercent    = (int)_nudBright.Value,
                     PinPercent           = (int)_nudPin.Value,
                 };
@@ -276,13 +276,13 @@ namespace LamToolAutoPhonePrime.Views.Forms
         public bool CaiFacebook { get; set; }
         public bool KhoiDong { get; set; }
         public bool TatGPS { get; set; }
-        public bool CaiGolikeHelper { get; set; }
-        public bool CapQuyenGolikeHelper { get; set; }
+        public bool CaiQNHelper { get; set; }
+        public bool CapQuyenQNHelper { get; set; }
         public int BrightnessPercent { get; set; } = 100;
         public int PinPercent { get; set; } = 999;
 
         public bool AnyChecked =>
             CaiDatBanDau || TatAmThanh || NgonNguEng || CaiFacebook ||
-            KhoiDong || TatGPS || CaiGolikeHelper || CapQuyenGolikeHelper;
+            KhoiDong || TatGPS || CaiQNHelper || CapQuyenQNHelper;
     }
 }

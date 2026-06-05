@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.API.Jobs.GoLike;
 using Sunny.Subdy.Common.API.Model;
 using Sunny.Subdy.Common.Helper;
@@ -43,10 +43,10 @@ namespace Sunny.Subdy.Common.API
 
         public static User Login(string username, string password)
         {
-            // Chuyển sang dùng Golike Private API (gateway.golike.net)
+            // Chuyển sang dùng QN Private API (gateway.golike.net)
             return GoLikePrivateClient.Login(username, password);
         }
-        public static string GetTokenAutoGolike(string username, string password)
+        public static string GetTokenAutoQN(string username, string password)
         {
             try
             {
@@ -61,7 +61,7 @@ namespace Sunny.Subdy.Common.API
 
                 if (string.IsNullOrEmpty(response))
                 {
-                    throw new Exception("Không thể kết nối đến server Auto Golike. Vui lòng thử lại.");
+                    throw new Exception("Không thể kết nối đến server Auto QN. Vui lòng thử lại.");
                 }
 
                 CheckForServerError(response);
@@ -73,7 +73,7 @@ namespace Sunny.Subdy.Common.API
                 {
                     string message = jObject["message"]?.ToString()
                                      ?? jObject["error"]?.ToString()
-                                     ?? "Đăng nhập Auto Golike thất bại";
+                                     ?? "Đăng nhập Auto QN thất bại";
                     throw new Exception(message);
                 }
 

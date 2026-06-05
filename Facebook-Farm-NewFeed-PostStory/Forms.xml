@@ -1,0 +1,79 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+	<!--
+	  This file is part of RdXmlLibrary project.
+	  Visit https://github.com/kant2002/rdxmllibrary for latest version.
+	  If you have modifications specific to this Nuget package,
+	  please contribute back.
+  -->
+	<Application>
+		<Assembly Name="System.Resources.Extensions">
+			<Type Name="System.Resources.Extensions.RuntimeResourceSet" Dynamic="Required All" />
+			<Type Name="System.Resources.Extensions.DeserializingResourceReader" Dynamic="Required All" />
+		</Assembly>
+		<Assembly Name="System.Drawing">
+			<Type Name="System.Drawing.Bitmap" Dynamic="Required All" />
+		</Assembly>
+		<Assembly Name="System.Windows.Forms">
+			<!-- Các thuộc tính của PropertyGrid -->
+			<Type Name="System.Windows.Forms.PropertyGridInternal.PropertiesTab" Dynamic="Required All" />
+
+			<!-- Các loại DataGridView và các cột liên quan -->
+			<Type Name="System.Windows.Forms.DataGridViewColumn" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewButtonColumn" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewComboBoxColumn" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewCheckBoxColumn" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewImageColumn" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewLinkColumn" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewTextBoxColumn" Dynamic="Required All" />
+
+			<!-- Các loại DataGridViewCell -->
+			<Type Name="System.Windows.Forms.DataGridViewButtonCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewComboBoxCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewCheckBoxCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewHeaderCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewImageCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewLinkCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewRowHeaderCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewTextBoxCell" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewTopLeftHeaderCell" Dynamic="Required All" />
+
+			<!-- Các loại Editing Control cho DataGridView -->
+			<Type Name="System.Windows.Forms.DataGridViewComboBoxEditingControl" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.DataGridViewTextBoxEditingControl" Dynamic="Required All" />
+
+			<!-- Các loại Controls cơ bản -->
+			<Type Name="System.Windows.Forms.Button" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.TextBox" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Label" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.ComboBox" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.RadioButton" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.CheckBox" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.ListBox" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.GroupBox" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Panel" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.TabControl" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.TabPage" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.RichTextBox" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.PictureBox" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.ProgressBar" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.LinkLabel" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.ToolTip" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.TrackBar" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.MenuStrip" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.ToolStrip" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.StatusStrip" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.Timer" Dynamic="Required All" />
+
+			<!-- Các loại UserControl -->
+			<Type Name="System.Windows.Forms.UserControl" Dynamic="Required All" />
+
+			<!-- Các loại Form -->
+			<Type Name="System.Windows.Forms.Form" Dynamic="Required All" />
+			<Type Name="System.Windows.Forms.UserControl" Dynamic="Required All" />
+		</Assembly>
+		
+		
+
+	</Application>
+</Directives>

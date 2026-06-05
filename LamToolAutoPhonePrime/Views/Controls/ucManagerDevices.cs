@@ -1,4 +1,4 @@
-using AntdUI;
+﻿using AntdUI;
 using AutoAndroid;
 using Emgu.CV.Structure;
 using LamToolAutoPhonePrime;
@@ -771,8 +771,8 @@ namespace Sunny.Subdy.UI.View.Pages
             bool caiFacebook  = opts.CaiFacebook;
             bool khoiDong     = opts.KhoiDong;
             bool tatGPS       = opts.TatGPS;
-            bool caiTLC       = opts.CaiGolikeHelper;
-            bool capQuyenTLC  = opts.CapQuyenGolikeHelper;
+            bool caiTLC       = opts.CaiQNHelper;
+            bool capQuyenTLC  = opts.CapQuyenQNHelper;
 
             SetRightPanelEnabled(false);
             // Auto re-enable panel sau 60s — tránh kẹt UI nếu 1 device treo lâu
@@ -843,15 +843,15 @@ namespace Sunny.Subdy.UI.View.Pages
 
                             if (caiTLC)
                             {
-                                dev.Status = "Cài GolikeHelper...";
+                                dev.Status = "Cài QNHelper...";
                                 await client.maxChange.Install();
                             }
 
                             if (capQuyenTLC)
                             {
-                                dev.Status = "Cấp quyền GolikeHelper...";
+                                dev.Status = "Cấp quyền QNHelper...";
                                 client.SetEnableModuleMaxChange();
-                                client.LogHelper.SUCCESS("Đã cấp quyền GolikeHelper");
+                                client.LogHelper.SUCCESS("Đã cấp quyền QNHelper");
                             }
 
                             dev.Status = "Hoàn thành";
@@ -878,10 +878,10 @@ namespace Sunny.Subdy.UI.View.Pages
         {
             try
             {
-                string exePath = Path.Combine(AppContext.BaseDirectory, "Golike-Android-View.exe");
+                string exePath = Path.Combine(AppContext.BaseDirectory, "QN-Android-View.exe");
                 if (!File.Exists(exePath))
                 {
-                    MessageBox.Show($"Không tìm thấy Golike-Android-View.exe tại:\n{exePath}", "Golike Android View", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show($"Không tìm thấy QN-Android-View.exe tại:\n{exePath}", "QN Android View", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -893,7 +893,7 @@ namespace Sunny.Subdy.UI.View.Pages
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi khởi chạy Golike Android View:\n{ex.Message}", "Golike Android View", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Lỗi khi khởi chạy QN Android View:\n{ex.Message}", "QN Android View", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

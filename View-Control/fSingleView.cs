@@ -1,4 +1,4 @@
-using LamToolAutoPhonePrime;
+﻿using LamToolAutoPhonePrime;
 using ScrcpyNet;
 using Sunny.Subdy.Data.Models;
 
@@ -21,7 +21,7 @@ public partial class fSingleView : AntdUI.Window
     private void OnLoad(object? sender, EventArgs e)
     {
         AppBranding.ApplyTo(this, windowBar);
-        windowBar.Text = $"Golike Android View - {device.Serial}";
+        windowBar.Text = $"QN Android View - {device.Serial}";
         labelStatus.Text = "Đang kết nối...";
         _ = ConnectAsync();
     }

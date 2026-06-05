@@ -1,11 +1,11 @@
-import os
+﻿import os
 import zipfile
 import shutil
 import winreg
 from modules.utils import print_step, print_status, print_info, print_warn, run_cmd, download_with_progress, GREEN, YELLOW, RESET
 
-# GolikeHelper base directory
-LTHELPER_DIR = r"C:\GolikeHelper"
+# QNHelper base directory
+LTHELPER_DIR = r"C:\QNHelper"
 
 # Download URLs
 PLATFORM_TOOLS_URL = "https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
@@ -154,7 +154,7 @@ def cleanup_old_adb_paths():
         parts = current_path.split(";")
 
         # Keywords to detect old ADB/Java-related paths
-        adb_keywords = ["platform-tools", "adb", "android-sdk", "lthelper", "tlchelper", "golikehelper"]
+        adb_keywords = ["platform-tools", "adb", "android-sdk", "lthelper", "tlchelper", "qnhelper"]
         cleaned = []
         removed = []
 
@@ -283,7 +283,7 @@ def setup_environment_variables():
 
 def setup_env():
     """Download SDK platform-tools + JDK 17, setup environment."""
-    print_step("Tải và cài đặt ADB + Java (C:\\GolikeHelper)")
+    print_step("Tải và cài đặt ADB + Java (C:\\QNHelper)")
 
     # Create base directory
     os.makedirs(LTHELPER_DIR, exist_ok=True)
@@ -307,7 +307,7 @@ def setup_env():
     ok_env = setup_environment_variables()
 
     if ok_sdk and ok_java and ok_env:
-        print(f"\n  {GREEN}✔ ADB + Java đã sẵn sàng tại C:\\GolikeHelper{RESET}")
+        print(f"\n  {GREEN}✔ ADB + Java đã sẵn sàng tại C:\\QNHelper{RESET}")
         return True
     else:
         print_warn("Một số bước cài đặt thất bại, vui lòng kiểm tra lại")

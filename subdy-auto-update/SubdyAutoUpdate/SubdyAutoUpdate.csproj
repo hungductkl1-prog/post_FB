@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -25,12 +25,12 @@
     <AssemblyVersion>$(CurrentTime)</AssemblyVersion>
     <FileVersion>$(CurrentTime)</FileVersion>
 
-    <AssemblyName>GolikeAutoUpdate</AssemblyName>
-    <Product>GolikeAutoUpdate</Product>
-    <Company>Golike</Company>
-    <Copyright>Golike</Copyright>
-    <Title>Golike Auto Update</Title>
-    <PackageProjectUrl>https://golike.net/</PackageProjectUrl>
+    <AssemblyName>QNAutoUpdate</AssemblyName>
+    <Product>QNAutoUpdate</Product>
+    <Company>QN</Company>
+    <Copyright>QN</Copyright>
+    <Title>QN Auto Update</Title>
+    <PackageProjectUrl>https://qn.net/</PackageProjectUrl>
     <ApplicationIcon>Resources\logo.ico</ApplicationIcon>
   </PropertyGroup>
 

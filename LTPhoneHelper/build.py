@@ -1,4 +1,4 @@
-"""Build script - tạo GolikeHelper.exe bằng PyInstaller."""
+﻿"""Build script - tạo QNHelper.exe bằng PyInstaller."""
 
 import subprocess
 import sys
@@ -8,7 +8,7 @@ def build():
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--onefile",
-        "--name", "GolikeHelper",
+        "--name", "QNHelper",
         "--console",
         "--icon", "logo.ico",
         "--uac-admin",
@@ -17,9 +17,9 @@ def build():
         "main.py",
     ]
 
-    print("Building GolikeHelper.exe...")
+    print("Building QNHelper.exe...")
     subprocess.run(cmd, check=True)
-    print("\nBuild done! File: dist/GolikeHelper.exe")
+    print("\nBuild done! File: dist/QNHelper.exe")
 
 
 if __name__ == "__main__":

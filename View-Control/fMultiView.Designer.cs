@@ -1,4 +1,4 @@
-namespace ViewControl;
+﻿namespace ViewControl;
 
 partial class fMultiView
 {
@@ -38,7 +38,7 @@ partial class fMultiView
         windowBar.ShowIcon = true;
         windowBar.Size = new Size(1200, 38);
         windowBar.TabIndex = 0;
-        windowBar.Text = "Golike Android View";
+        windowBar.Text = "QN Android View";
 
         // panelTop — toolbar
         panelTop.Back = Color.FromArgb(248, 248, 250);
@@ -132,7 +132,7 @@ partial class fMultiView
         FormBorderStyle = FormBorderStyle.None;
         MinimumSize = new Size(640, 400);
         Name = "fMultiView";
-        Text = "Golike Android View";
+        Text = "QN Android View";
 
         windowBar.ResumeLayout(false);
         panelTop.ResumeLayout(false);

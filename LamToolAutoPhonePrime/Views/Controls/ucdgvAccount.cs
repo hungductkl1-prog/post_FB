@@ -84,9 +84,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             menulist = null;
             CreateMenuStrip();
 
-            dataGridViewCheckBoxColumn1.Width = 40;
-            dataGridViewCheckBoxColumn1.MinimumWidth = 40;
-            dataGridViewCheckBoxColumn1.Resizable = DataGridViewTriState.True;
+            NormalizeAccountSelectorColumn();
 
             dataGridViewTextBoxColumn1.Width = 40;
             dataGridViewTextBoxColumn1.MinimumWidth = 40;
@@ -131,6 +129,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             }
             ControlHelper.LoadConfigColums(dataGridView1, hideList);
             ForceHideInternalColumns(dataGridView1);
+            NormalizeAccountSelectorColumn();
 
             // Tooltip cho các icon button quản lý nhóm
             var toolTip = new ToolTip { AutoPopDelay = 3000, InitialDelay = 300, ReshowDelay = 200 };
@@ -164,6 +163,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             // khi headers đã final để visibility đúng theo lựa chọn của user.
             ControlHelper.LoadConfigColums(dataGridView1, hideList);
             ForceHideInternalColumns(dataGridView1);
+            NormalizeAccountSelectorColumn();
 
             // Re-apply column visibility sau khi ConfigHelper restore (Load fire sau ctor)
             // → đảm bảo grid paint lần đầu đã có đúng cấu hình cột.
@@ -171,6 +171,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             {
                 ControlHelper.LoadConfigColums(dataGridView1, hideList);
                 ForceHideInternalColumns(dataGridView1);
+                NormalizeAccountSelectorColumn();
             };
         }
 
@@ -312,6 +313,132 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 var col = dgv.Columns[name];
                 if (col != null) col.Visible = false;
             }
+        }
+
+        private void NormalizeAccountSelectorColumn()
+        {
+            if (dataGridView1 == null || dataGridViewCheckBoxColumn1 == null) return;
+
+            dataGridViewCheckBoxColumn1.Visible = true;
+            dataGridViewCheckBoxColumn1.ReadOnly = true;
+            dataGridViewCheckBoxColumn1.DataPropertyName = nameof(Account.Checked);
+            dataGridViewCheckBoxColumn1.HeaderText = "Chọn";
+            dataGridViewCheckBoxColumn1.ToolTipText = "Chọn tài khoản để chạy chức năng";
+            dataGridViewCheckBoxColumn1.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            dataGridViewCheckBoxColumn1.Width = 56;
+            dataGridViewCheckBoxColumn1.MinimumWidth = 56;
+            dataGridViewCheckBoxColumn1.Resizable = DataGridViewTriState.False;
+            dataGridViewCheckBoxColumn1.ValueType = typeof(bool);
+            dataGridViewCheckBoxColumn1.SortMode = DataGridViewColumnSortMode.NotSortable;
+            dataGridViewCheckBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Padding = Padding.Empty,
+                NullValue = false,
+                ForeColor = Color.Transparent,
+                SelectionForeColor = Color.Transparent
+            };
+
+            if (dataGridViewCheckBoxColumn1.Index >= 0)
+                dataGridViewCheckBoxColumn1.DisplayIndex = 0;
+
+            dataGridView1.CellPainting -= DataGridView1_AccountCheckboxCellPainting;
+            dataGridView1.CellPainting += DataGridView1_AccountCheckboxCellPainting;
+            dataGridView1.CellClick -= DataGridView1_AccountSelectorCellClick;
+            dataGridView1.CellClick += DataGridView1_AccountSelectorCellClick;
+            dataGridView1.CurrentCellDirtyStateChanged -= DataGridView1_CurrentCellDirtyStateChanged;
+            dataGridView1.CurrentCellDirtyStateChanged += DataGridView1_CurrentCellDirtyStateChanged;
+        }
+
+        private void DataGridView1_AccountSelectorCellClick(object? sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            if (!IsAccountSelectorColumn(e.ColumnIndex)) return;
+            if (dataGridView1.Rows[e.RowIndex].DataBoundItem is not Account account) return;
+
+            account.Checked = !account.Checked;
+            dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = account.Checked;
+            dataGridView1.InvalidateCell(e.ColumnIndex, e.RowIndex);
+            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_accounts.Count(x => x.Checked)}");
+        }
+
+        private void DataGridView1_CurrentCellDirtyStateChanged(object? sender, EventArgs e)
+        {
+            try
+            {
+                if (!dataGridView1.IsCurrentCellDirty) return;
+                if (dataGridView1.CurrentCell?.OwningColumn != dataGridViewCheckBoxColumn1) return;
+                dataGridView1.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            }
+            catch
+            {
+            }
+        }
+
+        private void DataGridView1_AccountCheckboxCellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            if (!IsAccountSelectorColumn(e.ColumnIndex)) return;
+
+            bool selected = e.State.HasFlag(DataGridViewElementStates.Selected);
+            e.PaintBackground(e.CellBounds, selected);
+
+            bool isChecked = false;
+            if (e.Value is bool value)
+            {
+                isChecked = value;
+            }
+            else if (dataGridView1.Rows[e.RowIndex].DataBoundItem is Account account)
+            {
+                isChecked = account.Checked;
+            }
+
+            int boxSize = Math.Max(16, Math.Min(20, Math.Min(e.CellBounds.Width, e.CellBounds.Height) - 10));
+            var box = new Rectangle(
+                e.CellBounds.Left + (e.CellBounds.Width - boxSize) / 2,
+                e.CellBounds.Top + (e.CellBounds.Height - boxSize) / 2,
+                boxSize,
+                boxSize);
+
+            Color borderColor = isChecked ? ColorPalette.Primary : (selected ? Color.White : Color.FromArgb(120, 120, 120));
+            Color fillColor = isChecked ? ColorPalette.Primary : Color.White;
+
+            var oldSmoothing = e.Graphics.SmoothingMode;
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            using (var fill = new SolidBrush(fillColor))
+            using (var border = new Pen(borderColor, selected || isChecked ? 2F : 1.5F))
+            {
+                e.Graphics.FillRectangle(fill, box);
+                e.Graphics.DrawRectangle(border, box);
+            }
+
+            if (isChecked)
+            {
+                using var checkPen = new Pen(Color.White, 2F)
+                {
+                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
+                    EndCap = System.Drawing.Drawing2D.LineCap.Round,
+                    LineJoin = System.Drawing.Drawing2D.LineJoin.Round
+                };
+
+                var p1 = new Point(box.Left + boxSize / 4, box.Top + boxSize / 2);
+                var p2 = new Point(box.Left + boxSize / 2 - 1, box.Bottom - boxSize / 4 - 1);
+                var p3 = new Point(box.Right - boxSize / 4, box.Top + boxSize / 3);
+                e.Graphics.DrawLines(checkPen, new[] { p1, p2, p3 });
+            }
+
+            e.Graphics.SmoothingMode = oldSmoothing;
+            e.Handled = true;
+        }
+
+        private bool IsAccountSelectorColumn(int columnIndex)
+        {
+            if (columnIndex < 0 || columnIndex >= dataGridView1.Columns.Count) return false;
+            var column = dataGridView1.Columns[columnIndex];
+            return ReferenceEquals(column, dataGridViewCheckBoxColumn1)
+                || column.Name == dataGridViewCheckBoxColumn1.Name
+                || column.DataPropertyName == nameof(Account.Checked);
         }
 
         private DataGridViewColumn CreateColumnsDataGridView(string dataPropertyName, string header, string toolTip, bool visible, int miniWith, DataGridViewAutoSizeColumnMode size, DataGridViewCellStyle style)
@@ -464,7 +591,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
             var col = dataGridView1.Columns[e.ColumnIndex];
             if (col == null) return;
 
-            if (col.DataPropertyName == nameof(Account.STT))
+            if (col.DataPropertyName == nameof(Account.Checked))
+            {
+                e.Value = string.Empty;
+                e.FormattingApplied = true;
+            }
+            else if (col.DataPropertyName == nameof(Account.STT))
             {
                 e.CellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             }
@@ -528,36 +660,17 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private async Task LoadJobService()
         {
-            await Task.Run(() =>
+            var typejobs = await Task.Run(() => JobServices.GetTypeJobByPlatformt(_platform) ?? new List<string>());
+            var typejobsLower = typejobs.Select(j => j.ToLowerInvariant()).ToHashSet();
+
+            foreach (ToolStripItem item in toolStripDropDownButton1.DropDownItems)
             {
-                var items = new List<string>();
+                if (item.Name.Contains("total", StringComparison.OrdinalIgnoreCase))
+                    continue;
 
-                var typejobs = JobServices.GetTypeJobByPlatformt(_platform);
-                var typejobsLower = typejobs.Select(j => j.ToLower()).ToHashSet();
-
-                foreach (ToolStripItem item in toolStripDropDownButton1.DropDownItems)
-                {
-                    if (item.Name.Contains("total", StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    var jobName = item.Name.Split('_')[0].ToLower();
-                    item.Visible = typejobsLower.Contains(jobName);
-                }
-
-                // Thêm các job type mặc định vào danh sách
-                items.AddRange(typejobs);
-
-                var scripts = _scriptContext.GetByPlatform(_platform);
-                if (scripts.Count > 0)
-                {
-                    var scriptNames = scripts
-                        .Where(x => !string.IsNullOrEmpty(x.Name))
-                        .Select(x => x.Name)
-                        .ToList();
-
-                    items.AddRange(scriptNames);
-                }
-               
-            });
+                var jobName = item.Name.Split('_')[0].ToLowerInvariant();
+                item.Visible = typejobsLower.Contains(jobName);
+            }
         }
 
         private void select1_SelectedIndexChanged(object sender, AntdUI.IntEventArgs e)
@@ -626,6 +739,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
             tableLayoutPanel1.Enabled = panel4.Enabled = false;
             try
             {
+                string selectedFolder = select1.Text.Trim();
+
                 // Load data in background thread
                 var result = await Task.Run(() =>
                 {
@@ -639,7 +754,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                             ["@isView"] = 1,
                         };
 
-                        string namefolder = select1.Text.Trim();
+                        string namefolder = selectedFolder;
                         List<string> uids = new List<string>();
 
                         if (namefolder == "[ Chọn theo uid ]")
@@ -800,6 +915,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             f.ShowDialog();
             ControlHelper.LoadConfigColums(dataGridView1, new List<string> { nameof(Account.Id), nameof(Account.ColorType), nameof(Account.Running) });
             ForceHideInternalColumns(dataGridView1);
+            NormalizeAccountSelectorColumn();
         }
 
         private CancellationTokenSource _searchCts;
@@ -1834,7 +1950,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 if (matchScript != null)
                 {
                     string scriptName = matchScript.Name ?? "";
-                    // "Làm Job Golike" giờ dùng token login Golike — bỏ popup nhập token.
+                    // "Làm Job QN" giờ dùng token login QN — bỏ popup nhập token.
                     var toUpdate = new List<Account>();
                     foreach (DataGridViewRow row in CheckedRows)
                         if (row.DataBoundItem is Account a) { a.NameScript = scriptName; toUpdate.Add(a); }
@@ -2343,7 +2459,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         private bool VerifySubdyPassword()
         {
             var user = Globals.User;
-            if (user == null) { AntdHelper.MsgWarn(_form, "Chưa đăng nhập tài khoản Golike."); return false; }
+            if (user == null) { AntdHelper.MsgWarn(_form, "Chưa đăng nhập tài khoản QN."); return false; }
 
             const int W = 370, H = 200;
             const int PAD = 20;
@@ -2699,7 +2815,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                         try
                         {
                             var svc = new Sunny.Subd.Core.Facebook.FacebookService();
-                            var ext = await svc.Login(client, acc, ct, 180, null!);
+                            var ext = await svc.Login(client, acc, ct, 400, null!);
                             string stateText = ext.SubdyEnum == Sunny.Subd.Core.Models.SubdyEnum.Success
                                 ? "Login thành công"
                                 : $"Login thất bại: {ext.Message}";

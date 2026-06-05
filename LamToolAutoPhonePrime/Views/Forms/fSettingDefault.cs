@@ -2,6 +2,7 @@
 using LamToolAutoPhonePrime.Utils;
 using Sunny.Subd.Core.Facebook;
 using Sunny.Subd.Core.Proxies;
+using Sunny.Subdy.Common.API.Captchas;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Services;
 using Sunny.Subdy.Data.Context;
@@ -237,7 +238,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
         private void button4_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Title = "Golike.net Chọn file APK";
+            openFileDialog.Title = "QN.net Chọn file APK";
             openFileDialog.Filter = "File APK (*.apk)|*.apk";
             openFileDialog.Multiselect = false;
 
@@ -278,6 +279,45 @@ namespace LamToolAutoPhonePrime.Views.Forms
                     return;
                 }
                 textBox3.Text = f.SelectedPath;
+            }
+        }
+
+        private async void buttonCheckCaptcha_Click(object sender, EventArgs e)
+        {
+            string key = textBoxCaptchaKey.Text?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(key))
+            {
+                labelCaptchaStatus.ForeColor = Color.IndianRed;
+                labelCaptchaStatus.Text = "Vui lòng nhập key cap.guru trước khi check.";
+                return;
+            }
+
+            buttonCheckCaptcha.Enabled = false;
+            labelCaptchaStatus.ForeColor = Color.FromArgb(100, 100, 100);
+            labelCaptchaStatus.Text = "Đang kiểm tra số dư...";
+
+            try
+            {
+                string result = await CaptchaService.Getbalance(GuruCaptchaClient.Url, key);
+                if (string.IsNullOrEmpty(result) || result.Contains("error", StringComparison.OrdinalIgnoreCase))
+                {
+                    labelCaptchaStatus.ForeColor = Color.IndianRed;
+                    labelCaptchaStatus.Text = $"Lỗi: {result}";
+                }
+                else
+                {
+                    labelCaptchaStatus.ForeColor = Color.SeaGreen;
+                    labelCaptchaStatus.Text = $"Số dư: {result}$";
+                }
+            }
+            catch (Exception ex)
+            {
+                labelCaptchaStatus.ForeColor = Color.IndianRed;
+                labelCaptchaStatus.Text = $"Lỗi: {ex.Message}";
+            }
+            finally
+            {
+                buttonCheckCaptcha.Enabled = true;
             }
         }
     }

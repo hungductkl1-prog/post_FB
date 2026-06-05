@@ -100,7 +100,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                         }
                         else if (_jobService == "Subdy")
                         {
-                            // FarmJob Subdy đã được thay thế bằng Golike Private API (gateway.golike.net)
+                            // FarmJob Subdy đã được thay thế bằng QN Private API (gateway.golike.net)
                             jobs = GoLikePrivateClient.GetJobs(_tokenJobService, _account.Uid);
                         }
                         else
@@ -299,11 +299,11 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             {
                 _sate = "Khởi tạo dịch vụ job";
                 await InitSettings();
-                // FarmJob Subdy đã thay bằng Golike Private API: token lấy từ Login (Globals.User.Token).
+                // FarmJob Subdy đã thay bằng QN Private API: token lấy từ Login (Globals.User.Token).
                 if (_jobService == "Subdy")
                 {
                     if (string.IsNullOrEmpty(Globals.User.Token))
-                        throw new Exception("Chưa đăng nhập Golike. Vui lòng đăng nhập lại.");
+                        throw new Exception("Chưa đăng nhập QN. Vui lòng đăng nhập lại.");
                     _tokenJobService = Globals.User.Token;
                 }
                 //SubdyClient.AddPlatformAccount(Globals.User.Token, 1, _account.Uid, _account.FullName);
@@ -499,7 +499,7 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
             loadJobTotals();
             if (subdy.SubdyEnum == SubdyEnum.Success)
             {
-                // Lấy coin + pending coin từ Golike /statistics/report (thay cho SubdyClient.GetProfile).
+                // Lấy coin + pending coin từ QN /statistics/report (thay cho SubdyClient.GetProfile).
                 var report = new GoLikeClient().GetCoinReport(Globals.User.Token);
                 if (report.CurrentCoin >= 0)
                 {
@@ -732,12 +732,12 @@ namespace Sunny.Subd.Core.Facebook.ScriptActions
                             if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
                                 || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase))
                             {
-                                // Ưu tiên token phiên login Golike; fallback token cấu hình cũ nếu có.
+                                // Ưu tiên token phiên login QN; fallback token cấu hình cũ nếu có.
                                 _tokenJobService = Globals.User?.Token;
                                 if (string.IsNullOrWhiteSpace(_tokenJobService))
                                     _tokenJobService = FarmXuVipHelper.GetToken();
                                 if (string.IsNullOrWhiteSpace(_tokenJobService))
-                                    throw new Exception("Chưa đăng nhập Golike — không có token cho \"Làm Job Golike\".");
+                                    throw new Exception("Chưa đăng nhập QN — không có token cho \"Làm Job QN\".");
                             }
                             else
                             {

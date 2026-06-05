@@ -1,4 +1,4 @@
-namespace ViewControl;
+﻿namespace ViewControl;
 
 partial class fSingleView
 {
@@ -44,7 +44,7 @@ partial class fSingleView
         windowBar.ShowIcon = true;
         windowBar.Size = new Size(620, 40);
         windowBar.TabIndex = 0;
-        windowBar.Text = "Golike Android View";
+        windowBar.Text = "QN Android View";
 
         // panelBody — wrap toàn bộ phía dưới windowBar
         panelBody.Back = Color.FromArgb(245, 246, 250);
@@ -169,7 +169,7 @@ partial class fSingleView
         FormBorderStyle = FormBorderStyle.None;
         MinimumSize = new Size(380, 460);
         Name = "fSingleView";
-        Text = "Golike Android View";
+        Text = "QN Android View";
 
         windowBar.ResumeLayout(false);
         panelBody.ResumeLayout(false);

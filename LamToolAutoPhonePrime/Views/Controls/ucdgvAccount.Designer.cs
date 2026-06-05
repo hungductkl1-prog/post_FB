@@ -62,7 +62,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             button7 = new AntdUI.Button();
             panel5 = new AntdUI.Panel();
             dataGridView1 = new DoubleBufferedDataGridView();
-            dataGridViewCheckBoxColumn1 = new DataGridViewCheckBoxColumn();
+            dataGridViewCheckBoxColumn1 = new DataGridViewTextBoxColumn();
             dataGridViewTextBoxColumn1 = new DataGridViewTextBoxColumn();
             toolStrip1 = new ToolStrip();
             toolStripLabel3 = new ToolStripLabel();
@@ -473,7 +473,6 @@ namespace LamToolAutoPhonePrime.Views.Controls
             dataGridViewCellStyle3.NullValue = false;
             dataGridViewCheckBoxColumn1.DefaultCellStyle = dataGridViewCellStyle3;
             dataGridViewCheckBoxColumn1.FillWeight = 43.8844223F;
-            dataGridViewCheckBoxColumn1.FlatStyle = FlatStyle.System;
             dataGridViewCheckBoxColumn1.HeaderText = "Chọn";
             dataGridViewCheckBoxColumn1.MinimumWidth = 60;
             dataGridViewCheckBoxColumn1.Name = "dataGridViewCheckBoxColumn1";
@@ -1024,7 +1023,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         private ToolStripMenuItem LikePage_toolStripMenuItem;
         private ToolStripMenuItem JoinGroup_toolStripMenuItem;
         private ToolStripMenuItem JobTotal_toolStripMenuItem;
-        private DataGridViewCheckBoxColumn dataGridViewCheckBoxColumn1;
+        private DataGridViewTextBoxColumn dataGridViewCheckBoxColumn1;
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn1;
     }
 }

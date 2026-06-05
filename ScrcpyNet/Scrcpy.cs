@@ -41,7 +41,17 @@ namespace ScrcpyNet
         private readonly AdbClient adb;
         private readonly DeviceData device;
         private readonly Channel<IControlMessage> controlChannel = Channel.CreateUnbounded<IControlMessage>();
-        private readonly Channel<AVPacket> bufferChannel = Channel.CreateUnbounded<AVPacket>();
+        // Bounded channel — nếu decoder chậm hơn producer (multi-view 4-8 tile),
+        // mỗi packet giữ buffer H264 vài KB-vài MB cloned → tích vô hạn = 24GB RAM sau vài giờ.
+        // Dùng FullMode=Wait + check count ở producer side để có thể av_packet_free packet bị drop
+        // (DropOldest sẽ "nuốt" packet → không có chỗ free → vẫn leak).
+        private const int BufferChannelCapacity = 30;
+        private readonly Channel<IntPtr> bufferChannel = Channel.CreateBounded<IntPtr>(new BoundedChannelOptions(BufferChannelCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = true,
+        });
         private static readonly ArrayPool<byte> pool = ArrayPool<byte>.Shared;
         private static readonly ILogger log = Log.ForContext<VideoStreamDecoder>();
         private int port = 27183;
@@ -166,9 +176,45 @@ namespace ScrcpyNet
         private async void BufferMain()
         {
             if (this.cts == null) return;
-            await foreach (var item in this.bufferChannel.Reader.ReadAllAsync())
+            try
             {
-                this.VideoStreamDecoder?.DecodePacket(item);
+                await foreach (var item in this.bufferChannel.Reader.ReadAllAsync(this.cts.Token))
+                {
+                    if (item == IntPtr.Zero) continue;
+                    try
+                    {
+                        this.VideoStreamDecoder?.DecodePacket(item);
+                    }
+                    catch (Exception ex)
+                    {
+                        // DecodePacket nên tự free, nhưng nếu nó throw trước khi free → ta phải free ở đây
+                        log.Error(ex, "[{Serial}] DecodePacket threw — freeing packet to avoid leak", device.Serial);
+                        unsafe
+                        {
+                            AVPacket* p = (AVPacket*)item;
+                            ffmpeg.av_packet_free(&p);
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                // Drain channel khi shutdown — mọi packet còn lại phải được free
+                DrainBufferChannel();
+            }
+        }
+
+        private void DrainBufferChannel()
+        {
+            while (this.bufferChannel.Reader.TryRead(out var leftover))
+            {
+                if (leftover == IntPtr.Zero) continue;
+                unsafe
+                {
+                    AVPacket* p = (AVPacket*)leftover;
+                    try { ffmpeg.av_packet_free(&p); } catch { }
+                }
             }
         }
 
@@ -181,6 +227,9 @@ namespace ScrcpyNet
             try
             {
                 try { cts?.Cancel(); } catch { }
+
+                // Complete writer để BufferMain thoát await foreach + drain channel free các packet còn lại
+                try { bufferChannel.Writer.TryComplete(); } catch { }
 
                 // Đóng socket trước để các Read/Write đang block bị wake-up
                 try { videoClient?.Close(); } catch { }
@@ -205,6 +254,8 @@ namespace ScrcpyNet
             {
                 try { cts?.Dispose(); } catch { }
                 cts = null;
+                // Best-effort drain — phòng trường hợp BufferMain không kịp drain (Join timeout 1s)
+                DrainBufferChannel();
                 // Best-effort cleanup of ADB routes
                 try { MobileServerCleanup(); } catch { }
             }
@@ -332,11 +383,42 @@ namespace ScrcpyNet
                             {
                                 foreach (var info in packets)
                                 {
-                                    this.bufferChannel.Writer.TryWrite(info);
+                                    // TryWrite trả false khi channel full (Wait mode) hoặc closed.
+                                    // Khi đó packet đã được clone → phải av_packet_free hoặc leak buffer H264.
+                                    bool written = false;
+                                    try
+                                    {
+                                        written = this.bufferChannel.Writer.TryWrite(info);
+                                        if (!written)
+                                        {
+                                            // Channel full → drop packet này (consumer chậm). Free để tránh leak.
+                                            unsafe
+                                            {
+                                                AVPacket* p = (AVPacket*)info;
+                                                ffmpeg.av_packet_free(&p);
+                                            }
+                                        }
+                                    }
+                                    catch
+                                    {
+                                        if (!written)
+                                        {
+                                            unsafe
+                                            {
+                                                AVPacket* p = (AVPacket*)info;
+                                                try { ffmpeg.av_packet_free(&p); } catch { }
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
                             log.Verbose("Received and decoded a packet in {@ElapsedMilliseconds} ms", sw.ElapsedMilliseconds);
+                        }
+                        else
+                        {
+                            // Cancelled trước khi decode → vẫn cần parse để biết, nhưng packets không tạo.
+                            // Không có gì để free.
                         }
                     }
                     finally

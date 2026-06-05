@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
 	<Application>
 
@@ -61,8 +61,8 @@
 			<Type Name="Sunny.Subdy.Data.Models.DeviceModel" Dynamic="Required All" />
 		</Assembly>
 
-		<!-- ViewControl forms (assembly name = AssemblyName trong csproj = Golike-Android-View) -->
-		<Assembly Name="Golike-Android-View">
+		<!-- ViewControl forms (assembly name = AssemblyName trong csproj = QN-Android-View) -->
+		<Assembly Name="QN-Android-View">
 			<Type Name="ViewControl.fSingleView" Dynamic="Required All" Preserve="All" />
 			<Type Name="ViewControl.fMultiView" Dynamic="Required All" Preserve="All" />
 			<Type Name="LamToolAutoPhonePrime.ucDeviceView" Dynamic="Required All" Preserve="All" />

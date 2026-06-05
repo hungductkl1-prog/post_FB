@@ -36,7 +36,7 @@ namespace LamToolAutoPhonePrime
         {
             InitializeComponent();
 
-            // Dọn legacy FarmXu + remap "Farm-Xu-VIP" → "Làm Job Golike". Idempotent &
+            // Dọn legacy FarmXu + remap "Farm-Xu-VIP" → "Làm Job QN". Idempotent &
             // hoàn toàn read/write DB → defer sang background để không kéo dài constructor.
             // Cleanup này không ảnh hưởng UI render; account cũ chỉ hiển thị sai NameScript
             // trong vài giây đầu nếu user mở tab Account ngay lập tức.
@@ -72,7 +72,7 @@ namespace LamToolAutoPhonePrime
             CreateMenu("Thiết bị", "android", Properties.Resources.icons8_android_30_New);
 
             // Title cố định — không đổi theo section
-            windowBar.Text = "GolikeAutoPhone";
+            windowBar.Text = "QNAutoPhone";
 
             // SSA visual redesign — chỉ đụng UI, không đổi business logic
             SsaTheme.ApplyFMain(this);
@@ -277,7 +277,7 @@ namespace LamToolAutoPhonePrime
                 _ => btn.Text
             };
             label1.Text = labelText;
-            // windowBar.Text giữ cố định ("GolikeAutoPhone") — không đổi theo section
+            // windowBar.Text giữ cố định ("QNAutoPhone") — không đổi theo section
 
             // UC nặng (Devices/Instagram/Threads/Histories) được lazy-create sau frame đầu.
             // Nếu user click trước khi sẵn sàng → no-op, sẽ vào tab khi UC tạo xong.
@@ -347,7 +347,7 @@ namespace LamToolAutoPhonePrime
             Controls.Add(_loadingOverlay);
             _loadingOverlay.BringToFront();
 
-            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "Golike Phone Farm xin chào!" };
+            var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "QN Phone Farm xin chào!" };
 
             _loadingCts = new CancellationTokenSource();
             var token = _loadingCts.Token;
@@ -512,7 +512,7 @@ namespace LamToolAutoPhonePrime
             var user = Globals.User;
             if (user == null) return;
 
-            label4.Text = user.FullName ?? user.UserName ?? "Golike.net";
+            label4.Text = user.FullName ?? user.UserName ?? "QN.net";
             label8.Text = $"{user.Balance:N0} xu";
             if (_lblPendingValue != null)
                 _lblPendingValue.Text = $"{user.PendingBalance:N0} xu";
@@ -630,12 +630,12 @@ namespace LamToolAutoPhonePrime
                 // License check chỉ chạy khi đã đăng nhập (Globals.User != null).
                 // Nếu chưa login → bỏ qua, LoginGuard sẽ bật fLogin khi user thực sự
                 // dùng feature cần auth (tạo nhóm / thêm tài khoản / chạy job).
-                if (Globals.User?.Token_Golike != null)
+                if (Globals.User?.Token_QN != null)
                 {
-                    var key = LamToolClient.GetLicenses(Globals.User.Token_Golike);
+                    var key = LamToolClient.GetLicenses(Globals.User.Token_QN);
                     if (!key.success)
                     {
-                        var veri = LamToolClient.VerifyLicense(Globals.User.Token_Golike, Globals.NameApp, Globals.DeviceId, Globals.DeviceId);
+                        var veri = LamToolClient.VerifyLicense(Globals.User.Token_QN, Globals.NameApp, Globals.DeviceId, Globals.DeviceId);
                         if (!veri.valid)
                         {
                             MessageBox.Show(veri.error);

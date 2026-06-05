@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using Sunny.Subdy.Common.API.Model;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Logs;
@@ -6,7 +6,7 @@ using Sunny.Subdy.Common.Logs;
 namespace Sunny.Subdy.Common.API.Jobs.GoLike
 {
     /// <summary>
-    /// Client cho Golike "Facebook Private Job API" (gateway.golike.net).
+    /// Client cho QN "Facebook Private Job API" (gateway.golike.net).
     /// Thay thế các endpoint Subdy FarmJob: Login / GetJobs / CompleteJob / SkipJob.
     /// </summary>
     public static class GoLikePrivateClient
@@ -65,14 +65,14 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 string response = HttpRequestHelper.Request("POST", url, headerText, body);
 
                 if (string.IsNullOrEmpty(response))
-                    throw new Exception("Không thể kết nối đến server Golike. Vui lòng thử lại.");
+                    throw new Exception("Không thể kết nối đến server QN. Vui lòng thử lại.");
 
                 CheckForServerError(response);
 
                 var jObject = JsonNode.Parse(response)!.AsObject();
                 bool success = jObject["success"]?.GetValue<bool>() ?? false;
                 if (!success)
-                    throw new Exception(jObject["message"]?.ToString() ?? "Đăng nhập Golike thất bại");
+                    throw new Exception(jObject["message"]?.ToString() ?? "Đăng nhập QN thất bại");
 
                 // Token nằm ở root, không nằm trong data.
                 string token = jObject["token"]?.ToString();
@@ -118,14 +118,14 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 string response = HttpRequestHelper.GET(url, headers: headers);
 
                 if (string.IsNullOrEmpty(response))
-                    throw new Exception("Không thể kết nối đến server Golike.");
+                    throw new Exception("Không thể kết nối đến server QN.");
 
                 CheckForServerError(response);
 
                 var jObject = JsonNode.Parse(response)!.AsObject();
                 bool success = jObject["success"]?.GetValue<bool>() ?? false;
                 if (!success)
-                    throw new Exception(jObject["message"]?.ToString() ?? "Lấy danh sách job Golike thất bại");
+                    throw new Exception(jObject["message"]?.ToString() ?? "Lấy danh sách job QN thất bại");
 
                 var jobs = new List<JobModel>();
                 var dataArray = jObject["data"]?.AsArray();
@@ -180,14 +180,14 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
                 string response = HttpRequestHelper.POST_JSON(url, headers: headers, jsonBody: jsonBody);
 
                 if (string.IsNullOrEmpty(response))
-                    throw new Exception("Không thể kết nối đến server Golike.");
+                    throw new Exception("Không thể kết nối đến server QN.");
 
                 CheckForServerError(response);
 
                 var jObject = JsonNode.Parse(response)!.AsObject();
                 bool ok = jObject["success"]?.GetValue<bool>() ?? false;
                 if (!ok)
-                    throw new Exception(jObject["message"]?.ToString() ?? "Complete job Golike thất bại");
+                    throw new Exception(jObject["message"]?.ToString() ?? "Complete job QN thất bại");
 
                 return jObject["message"]?.ToString() ?? string.Empty;
             }

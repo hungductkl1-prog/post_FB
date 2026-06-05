@@ -1,4 +1,4 @@
-using AntdUI;
+﻿using AntdUI;
 using LamToolAutoPhonePrime.Views.Controls;
 using Sunny.Subdy.Common.Helper;
 using System.Drawing.Drawing2D;
@@ -1005,13 +1005,13 @@ namespace LamToolAutoPhonePrime.Utils.Design
 
         /// <summary>
         /// Tạo/reuse AntdUI.Select "Kịch bản" trên toolbar panel4.
-        /// Items mặc định: "Làm Job Golike", "Chạy theo kịch bản" + danh sách Name script từ DB.
+        /// Items mặc định: "Làm Job QN", "Chạy theo kịch bản" + danh sách Name script từ DB.
         /// Idempotent — chạy Apply nhiều lần không duplicate control.
         /// </summary>
         private const string CustomScriptOption = "Chạy theo kịch bản";
         private const string CustomScriptOptionLegacy = "Tùy chọn";
-        private const string DefaultGolikeScript = "Làm Job Golike";
-        private const string DefaultGolikeScriptLegacy = "Farm-Xu-VIP";
+        private const string DefaultQNScript = "Làm Job QN";
+        private const string DefaultQNScriptLegacy = "Farm-Xu-VIP";
 
         private static AntdUI.Select? EnsureScriptSelect(ucdgvAccount uc)
         {
@@ -1036,21 +1036,21 @@ namespace LamToolAutoPhonePrime.Utils.Design
             panel4.Controls.Add(cbo);
             ReloadScriptSelectItems(uc, cbo);
 
-            // Default "Làm Job Golike" khi chưa có selection (ConfigHelper sẽ override sau nếu có config)
-            SelectDefaultGolikeIfAvailable(cbo);
+            // Default "Làm Job QN" khi chưa có selection (ConfigHelper sẽ override sau nếu có config)
+            SelectDefaultQNIfAvailable(cbo);
 
-            // Sau khi uc Load, ConfigHelper đã restore → nếu vẫn -1, fallback "Làm Job Golike"
+            // Sau khi uc Load, ConfigHelper đã restore → nếu vẫn -1, fallback "Làm Job QN"
             // Flag: chỉ apply khi user thực sự thay đổi (bỏ qua initial set sau Load)
             bool ucLoaded = false;
             uc.Load += (_, __) =>
             {
-                SelectDefaultGolikeIfAvailable(cbo);
+                SelectDefaultQNIfAvailable(cbo);
                 ucLoaded = true;
             };
 
             // Mass-apply NameScript khi đổi selection:
             //  - "Chạy theo kịch bản" → RestoreScriptsFromDb (reload giá trị gốc cho từng row)
-            //  - Script khác          → ApplyScriptToAll(name). Token GoLike lấy từ login (bỏ popup).
+            //  - Script khác          → ApplyScriptToAll(name). Token QN lấy từ login (bỏ popup).
             cbo.SelectedIndexChanged += (_, __) =>
             {
                 if (!ucLoaded) return;
@@ -1070,13 +1070,13 @@ namespace LamToolAutoPhonePrime.Utils.Design
             return cbo;
         }
 
-        private static void SelectDefaultGolikeIfAvailable(AntdUI.Select cbo)
+        private static void SelectDefaultQNIfAvailable(AntdUI.Select cbo)
         {
             if (cbo.SelectedIndex >= 0) return;
-            if (cbo.Items.Contains(DefaultGolikeScript))
-                cbo.SelectedIndex = cbo.Items.IndexOf(DefaultGolikeScript);
-            else if (cbo.Items.Contains(DefaultGolikeScriptLegacy))
-                cbo.SelectedIndex = cbo.Items.IndexOf(DefaultGolikeScriptLegacy);
+            if (cbo.Items.Contains(DefaultQNScript))
+                cbo.SelectedIndex = cbo.Items.IndexOf(DefaultQNScript);
+            else if (cbo.Items.Contains(DefaultQNScriptLegacy))
+                cbo.SelectedIndex = cbo.Items.IndexOf(DefaultQNScriptLegacy);
         }
 
         private static void InvokeUcMethod(ucdgvAccount uc, string methodName, params object[] args)
@@ -1096,13 +1096,13 @@ namespace LamToolAutoPhonePrime.Utils.Design
         private static void ReloadScriptSelectItems(ucdgvAccount uc, AntdUI.Select cbo)
         {
             cbo.Items.Clear();
-            // FarmXu bị ẩn — "Làm Job Golike" hiện cho Facebook/Instagram/Threads (cùng route SpamXuHandler).
+            // FarmXu bị ẩn — "Làm Job QN" hiện cho Facebook/Instagram/Threads (cùng route SpamXuHandler).
             var platformName = GetField<string>(uc, "_platform") ?? "";
             if (string.Equals(platformName, "Facebook", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(platformName, "Instagram", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(platformName, "Threads", StringComparison.OrdinalIgnoreCase))
             {
-                cbo.Items.Add(DefaultGolikeScript);
+                cbo.Items.Add(DefaultQNScript);
             }
             cbo.Items.Add(CustomScriptOption);
 

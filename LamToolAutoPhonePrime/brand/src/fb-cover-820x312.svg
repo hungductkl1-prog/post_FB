@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 312" width="820" height="312" role="img" aria-label="AutoGoLike — Tool auto chính thức Golike">
-  <title>AutoGoLike Facebook cover</title>
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 312" width="820" height="312" role="img" aria-label="AutoQN — Tool auto chính thức QN">
+  <title>AutoQN Facebook cover</title>
   <rect width="820" height="312" fill="#d3ff3c"/>
   <g fill="#0a0a0a" opacity="0.08">
     <circle cx="40" cy="40" r="4"/>
@@ -24,11 +24,11 @@
     <text x="0" y="158"
           font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
           font-weight="800" font-size="60" fill="#0a0a0a"
-          letter-spacing="-2">AutoGoLike</text>
+          letter-spacing="-2">AutoQN</text>
     <text x="3" y="188"
           font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
           font-weight="500" font-size="14" fill="#0a0a0a"
-          letter-spacing="2.5">BY GOLIKE · OFFICIAL</text>
+          letter-spacing="2.5">BY QN · OFFICIAL</text>
     <text x="0" y="226"
           font-family="'Space Grotesk','Inter',system-ui,-apple-system,sans-serif"
           font-weight="600" font-size="20" fill="#0a0a0a"
@@ -37,5 +37,5 @@
   <text x="780" y="294" text-anchor="end"
         font-family="'JetBrains Mono','SF Mono',ui-monospace,monospace"
         font-weight="600" font-size="14" fill="#0a0a0a"
-        letter-spacing="0.8">auto.golike.net</text>
+        letter-spacing="0.8">auto.qn.net</text>
 </svg>

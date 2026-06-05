@@ -65,7 +65,7 @@
 		<!-- SsaTheme uses reflection (GetField with BindingFlags.NonPublic) to retune designer-generated
 		     private fields. Without these directives, the trimmer strips private field metadata and
 		     GetField() returns null at runtime, so theme silently skips and UI falls back to legacy Designer layout. -->
-		<Assembly Name="GolikePhoneFarm" Dynamic="Required All">
+		<Assembly Name="QNPhoneFarm" Dynamic="Required All">
 			<Type Name="LamToolAutoPhonePrime.fMain" Dynamic="Required All" />
 			<Type Name="LamToolAutoPhonePrime.Views.Controls.ucdgvAccount" Dynamic="Required All" />
 			<Type Name="LamToolAutoPhonePrime.Views.fQuanLyKichBan" Dynamic="Required All" />

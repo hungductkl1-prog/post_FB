@@ -57,6 +57,32 @@ namespace Sunny.Subdy.Common.API.Captchas
             }
         }
 
+        /// <summary>
+        /// Gửi ảnh captcha (base64) lên cap.guru theo method=base64 và trả về captcha id.
+        /// </summary>
+        public static async Task<string> GetIdImageCaptcha(string key, string base64Image)
+        {
+            var client = new HttpClient();
+            var jsonBody = $"{{\"key\":\"{key}\",\"method\":\"base64\",\"body\":\"{base64Image}\",\"json\":1}}";
+            var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
+            var response = await client.PostAsync("http://api2.cap.guru/in.php", content);
+
+            try
+            {
+                var result = await response.Content.ReadAsStringAsync();
+                var data = JsonNode.Parse(result)!.AsObject();
+                if (data != null && data["status"]?.GetValue<int>() == 1)
+                {
+                    return data["request"]!.ToString();
+                }
+                return $"error: {data?.ToString() ?? "Unknown error"}";
+            }
+            catch (Exception ex)
+            {
+                return $"error: {ex.Message}";
+            }
+        }
+
         public static async Task<string> Getbalance(string key)
         {
             try

@@ -1,4 +1,4 @@
-using AntdUI;
+﻿using AntdUI;
 using LamToolAutoPhonePrime.Views.Controls;
 using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.UI.View.Pages;
@@ -219,7 +219,7 @@ namespace LamToolAutoPhonePrime.Utils
             // 1. Nhóm (folder)
             Add(account.TourCboGroup,
                 "Chọn nhóm tài khoản",
-                "Dropdown chọn nhóm (folder) đang làm việc. Mỗi nhóm chứa một danh sách tài khoản riêng, ví dụ: Làm Job Golike, Nuôi-Acc-Mới...");
+                "Dropdown chọn nhóm (folder) đang làm việc. Mỗi nhóm chứa một danh sách tài khoản riêng, ví dụ: Làm Job QN, Nuôi-Acc-Mới...");
 
             Add(account.TourBtnFolderManager,
                 "Quản lý nhóm",

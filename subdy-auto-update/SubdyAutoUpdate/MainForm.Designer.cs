@@ -1,4 +1,4 @@
-namespace SubdyAutoUpdate;
+﻿namespace SubdyAutoUpdate;
 
 partial class MainForm
 {
@@ -69,7 +69,7 @@ partial class MainForm
         lblAppName.AutoSize = false;
         lblAppName.Font = new Font("Segoe UI Semibold", 14F, FontStyle.Bold);
         lblAppName.ForeColor = Color.White;
-        lblAppName.Text = "Golike Auto Update";
+        lblAppName.Text = "QN Auto Update";
         lblAppName.TextAlign = ContentAlignment.BottomLeft;
         lblAppName.Height = 32;
 
@@ -78,7 +78,7 @@ partial class MainForm
         lblSubtitle.AutoSize = false;
         lblSubtitle.Font = new Font("Segoe UI", 8.5F);
         lblSubtitle.ForeColor = Color.FromArgb(130, 130, 150);
-        lblSubtitle.Text = "GolikePhoneFarm — Cập nhật tự động";
+        lblSubtitle.Text = "QNPhoneFarm — Cập nhật tự động";
         lblSubtitle.TextAlign = ContentAlignment.TopLeft;
         lblSubtitle.Height = 18;
 
@@ -110,7 +110,7 @@ partial class MainForm
         steps.Font = new Font("Segoe UI", 10F);
         steps.ForeColor = Color.FromArgb(200, 200, 215);
         steps.BackColor = Color.Transparent;
-        steps.Items.Add(new AntdUI.StepsItem("Dừng phần mềm",    "Kiểm tra và tắt GolikePhoneFarm"));
+        steps.Items.Add(new AntdUI.StepsItem("Dừng phần mềm",    "Kiểm tra và tắt QNPhoneFarm"));
         steps.Items.Add(new AntdUI.StepsItem("Kiểm tra phiên bản", "Kết nối máy chủ cập nhật"));
         steps.Items.Add(new AntdUI.StepsItem("Tải xuống",          "Đang tải bản cập nhật mới"));
         steps.Items.Add(new AntdUI.StepsItem("Cài đặt",            "Cài đặt và khởi động lại"));
@@ -157,7 +157,7 @@ partial class MainForm
         MaximumSize = new Size(440, 380);
         MinimumSize = new Size(440, 380);
         StartPosition = FormStartPosition.CenterScreen;
-        Text = "Golike Auto Update";
+        Text = "QN Auto Update";
         BackColor = Color.FromArgb(18, 18, 24);
 
         Controls.Add(panelRoot);

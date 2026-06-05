@@ -122,6 +122,11 @@
             label12 = new Label();
             label11 = new Label();
             checkBox15 = new CheckBox();
+            groupBoxCaptcha = new GroupBox();
+            labelCaptchaKey = new Label();
+            textBoxCaptchaKey = new TextBox();
+            buttonCheckCaptcha = new AntdUI.Button();
+            labelCaptchaStatus = new Label();
             windowBar.SuspendLayout();
             panel1.SuspendLayout();
             panel2.SuspendLayout();
@@ -148,6 +153,7 @@
             ((System.ComponentModel.ISupportInitialize)nud_IndexFailProxy).BeginInit();
             tabPageSettingEnhance.SuspendLayout();
             groupBox3.SuspendLayout();
+            groupBoxCaptcha.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)numericUpDown7).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericUpDown8).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericUpDown9).BeginInit();
@@ -969,6 +975,7 @@
             // 
             // tabPageSettingEnhance
             // 
+            tabPageSettingEnhance.Controls.Add(groupBoxCaptcha);
             tabPageSettingEnhance.Controls.Add(groupBox3);
             tabPageSettingEnhance.Controls.Add(radioButton3);
             tabPageSettingEnhance.Controls.Add(radioButton1);
@@ -1077,9 +1084,62 @@
             label21.Size = new Size(87, 17);
             label21.TabIndex = 0;
             label21.Text = "Số lần lặp lại:";
-            // 
+            //
+            // groupBoxCaptcha
+            //
+            groupBoxCaptcha.Anchor = AnchorStyles.Left;
+            groupBoxCaptcha.Controls.Add(labelCaptchaKey);
+            groupBoxCaptcha.Controls.Add(textBoxCaptchaKey);
+            groupBoxCaptcha.Controls.Add(buttonCheckCaptcha);
+            groupBoxCaptcha.Controls.Add(labelCaptchaStatus);
+            groupBoxCaptcha.Location = new Point(380, 154);
+            groupBoxCaptcha.Name = "groupBoxCaptcha";
+            groupBoxCaptcha.Size = new Size(420, 100);
+            groupBoxCaptcha.TabIndex = 210;
+            groupBoxCaptcha.TabStop = false;
+            groupBoxCaptcha.Text = "Captcha (cap.guru)";
+            //
+            // labelCaptchaKey
+            //
+            labelCaptchaKey.AutoSize = true;
+            labelCaptchaKey.Location = new Point(10, 28);
+            labelCaptchaKey.Name = "labelCaptchaKey";
+            labelCaptchaKey.Size = new Size(67, 17);
+            labelCaptchaKey.Text = "Key API:";
+            //
+            // textBoxCaptchaKey
+            //
+            textBoxCaptchaKey.Location = new Point(83, 25);
+            textBoxCaptchaKey.Name = "textBoxCaptchaKey";
+            textBoxCaptchaKey.PlaceholderText = "Nhập key cap.guru";
+            textBoxCaptchaKey.Size = new Size(225, 25);
+            textBoxCaptchaKey.TabIndex = 1;
+            //
+            // buttonCheckCaptcha
+            //
+            buttonCheckCaptcha.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            buttonCheckCaptcha.IconRatio = 1F;
+            buttonCheckCaptcha.IconSvg = "WalletOutlined";
+            buttonCheckCaptcha.Location = new Point(314, 22);
+            buttonCheckCaptcha.Name = "buttonCheckCaptcha";
+            buttonCheckCaptcha.Shape = AntdUI.TShape.Round;
+            buttonCheckCaptcha.Size = new Size(96, 32);
+            buttonCheckCaptcha.TabIndex = 2;
+            buttonCheckCaptcha.Text = "Check";
+            buttonCheckCaptcha.Type = AntdUI.TTypeMini.Primary;
+            buttonCheckCaptcha.Click += buttonCheckCaptcha_Click;
+            //
+            // labelCaptchaStatus
+            //
+            labelCaptchaStatus.AutoSize = true;
+            labelCaptchaStatus.ForeColor = Color.FromArgb(100, 100, 100);
+            labelCaptchaStatus.Location = new Point(10, 62);
+            labelCaptchaStatus.Name = "labelCaptchaStatus";
+            labelCaptchaStatus.Size = new Size(0, 17);
+            labelCaptchaStatus.Text = "";
+            //
             // radioButton3
-            // 
+            //
             radioButton3.Anchor = AnchorStyles.Left;
             radioButton3.AutoSize = true;
             radioButton3.Font = new Font("Microsoft YaHei UI", 9F);
@@ -1268,6 +1328,8 @@
             tabPageSettingEnhance.PerformLayout();
             groupBox3.ResumeLayout(false);
             groupBox3.PerformLayout();
+            groupBoxCaptcha.ResumeLayout(false);
+            groupBoxCaptcha.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)numericUpDown7).EndInit();
             ((System.ComponentModel.ISupportInitialize)numericUpDown8).EndInit();
             ((System.ComponentModel.ISupportInitialize)numericUpDown9).EndInit();
@@ -1373,5 +1435,10 @@
         private Label label21;
         private RadioButton radioButton3;
         private RadioButton radioButton1;
+        private GroupBox groupBoxCaptcha;
+        private Label labelCaptchaKey;
+        private TextBox textBoxCaptchaKey;
+        private AntdUI.Button buttonCheckCaptcha;
+        private Label labelCaptchaStatus;
     }
 }
