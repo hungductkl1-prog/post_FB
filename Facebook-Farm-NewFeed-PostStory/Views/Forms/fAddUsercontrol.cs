@@ -7,7 +7,7 @@ using Sunny.Subdy.UI.View.Pages;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fAddUsercontrol : AntdUI.Window
+    public partial class fAddUsercontrol : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private FolderContext _folderContext;
         private string _type = "";
@@ -40,7 +40,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                     panel1.Controls.Remove(_control);
             };
 
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
 
             // Force button2 ("Bắt đầu") hiển thị khi dialog show — tránh trường hợp
             // lần 2 vào form, button2 vẫn ở trạng thái Visible=false hoặc Location bị

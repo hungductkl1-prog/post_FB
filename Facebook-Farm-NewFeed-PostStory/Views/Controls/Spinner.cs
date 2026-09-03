@@ -50,7 +50,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
         [Browsable(true)]
         [Category("Appearance")]
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-        public Color NodeFillColor { get; set; } = Color.CornflowerBlue;
+        public Color NodeFillColor { get; set; } = Facebook_Farm_NewFeed_PostStory.Utils.Design.ColorPalette.Primary;
 
         [Browsable(true)]
         [Category("Appearance")]
@@ -127,6 +127,16 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
         {
             timer.Enabled = Visible;
             base.OnVisibleChanged(e);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                timer.Stop();
+                timer.Dispose();
+            }
+            base.Dispose(disposing);
         }
 
         private IOrderedEnumerable<Control> GetIntersectingControls(Control parent)

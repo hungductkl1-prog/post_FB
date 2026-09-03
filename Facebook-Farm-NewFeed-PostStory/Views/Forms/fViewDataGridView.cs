@@ -7,7 +7,7 @@ using Sunny.Subdy.Data.Models;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fViewDataGridView : AntdUI.Window
+    public partial class fViewDataGridView : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private FolderContext _folderContext;
         private string _type = "";
@@ -16,7 +16,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
         {
             InitializeComponent();
             AddCheckBoxesToFlowLayoutPanel(cases, name);
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
         private void AddCheckBoxesToFlowLayoutPanel(List<string> cases, string name)
         {

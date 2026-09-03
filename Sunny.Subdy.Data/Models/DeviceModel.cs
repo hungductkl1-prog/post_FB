@@ -38,8 +38,8 @@ namespace Sunny.Subdy.Data.Models
         private bool _isSelectControl;
         private bool _isLive;
         private bool _isAdbOnline;
-        private bool _hasInternet = false; // default false: row khoá cho tới khi DeviceHealthCheckService probe xong + xác nhận có mạng
-        private bool _isRowEnabled = false; // UI: false → row disabled (xám + read-only). Mặc định khoá, chỉ mở khi IsLive && HasInternet
+        private bool _hasInternet = false;
+        private bool _isRowEnabled = true;
         private int _index;
 
         // Cache PropertyChangedEventArgs to avoid allocations
@@ -266,18 +266,14 @@ namespace Sunny.Subdy.Data.Models
             }
         }
 
-        // Project mới: chỉ cần Live (ATX/Appium connected) là tick được — bỏ
-        // ràng buộc HasInternet vì DeviceHealthCheckService không còn chạy ở lần
-        // load đầu, để HasInternet=false sẽ khoá toàn bộ row trong dialog
-        // "Chọn thiết bị". Internet (nếu mất) sẽ được WifiAutoConnect xử lý lúc chạy.
+        // Luôn cho phép chọn device, không phụ thuộc ATX/Internet.
         private void RecomputeRowEnabled()
         {
-            IsRowEnabled = _isLive;
+            IsRowEnabled = true;
         }
 
         /// <summary>
-        /// IsRowEnabled = false khi device không đạt điều kiện (mất internet hoặc ATX fail).
-        /// UI dùng để vẽ row mờ + đặt ReadOnly để user không tick checkbox.
+        /// Luôn true — user được tick chọn mọi device.
         /// </summary>
         [NotMapped]
         public bool IsRowEnabled

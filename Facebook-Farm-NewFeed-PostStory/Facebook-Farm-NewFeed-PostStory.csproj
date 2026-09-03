@@ -102,6 +102,21 @@
     </ItemGroup>
   </Target>
 
+  <!-- Native AOT linker path fix:
+       findvcvarsall.bat runs vcvarsall.bat which internally calls vswhere.exe without
+       a full path. When building outside a VS Developer Prompt, that internal call fails
+       and the error text pollutes the captured CppLinker property with a spurious ';'
+       separator, breaking the link command. Extract the real path via regex. -->
+  <Target Name="FixNativeLinkerPath" AfterTargets="SetupOSSpecificProps">
+    <PropertyGroup>
+      <_CleanedLinker>$([System.Text.RegularExpressions.Regex]::Match($(CppLinker), '[A-Za-z]:\\[^;]+link\.exe').Value)</_CleanedLinker>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(_CleanedLinker)' != ''">
+      <CppLinker>$(_CleanedLinker)</CppLinker>
+      <CppLibCreator>$([System.IO.Path]::GetDirectoryName($(_CleanedLinker)))\lib.exe</CppLibCreator>
+    </PropertyGroup>
+  </Target>
+
   <!-- Optional: workaround for crash in parallel merge sort -->
   <ItemGroup>
     <IlcCompileInput Include="--parallelism:1" />
@@ -114,7 +129,6 @@
     <ProjectReference Include="..\ScrcpyNet\ScrcpyNet.csproj" />
     <ProjectReference Include="..\Sunny.Subd.Core\Sunny.Subd.Core.csproj" />
     <ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
-    <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
     <ProjectReference Include="..\Sunny.Subdy.Server\Sunny.Subdy.Server.csproj" />
   </ItemGroup>
 
@@ -147,10 +161,8 @@
 
   <Target Name="BuildHttpRequestLibIfMissing" DependsOnTargets="ResolveHttpRequestLibMsBuildPath" Condition="('$(HttpRequestLibNativePlatform)' == 'x64' and !Exists('$(HttpRequestLibX64DllPath)')) or ('$(HttpRequestLibNativePlatform)' == 'Win32' and !Exists('$(HttpRequestLibWin32LegacyDllPath)') and !Exists('$(HttpRequestLibWin32DllPath)'))">
     <Message Text="Building HttpRequestLib ($(Configuration)|$(HttpRequestLibNativePlatform))..." Importance="high" />
-    <Exec Command="&quot;$(HttpRequestLibMsBuildPath)&quot; &quot;$(HttpRequestLibProjectPath)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(HttpRequestLibNativePlatform) /p:SolutionDir=$(HttpRequestLibSolutionDir) /nologo"
-          Condition="'$(HttpRequestLibMsBuildPath)' != ''" />
-    <Warning Text="HttpRequestLib.dll missing — skip copy (set HttpRequestLibMsBuildPath if you have VS C++ toolchain)."
-             Condition="('$(HttpRequestLibNativePlatform)' == 'x64' and !Exists('$(HttpRequestLibX64DllPath)')) or ('$(HttpRequestLibNativePlatform)' == 'Win32' and !Exists('$(HttpRequestLibWin32LegacyDllPath)') and !Exists('$(HttpRequestLibWin32DllPath)'))" />
+    <Exec Command="&quot;$(HttpRequestLibMsBuildPath)&quot; &quot;$(HttpRequestLibProjectPath)&quot; /t:Build /p:Configuration=$(Configuration) /p:Platform=$(HttpRequestLibNativePlatform) /p:SolutionDir=$(HttpRequestLibSolutionDir) /nologo" Condition="'$(HttpRequestLibMsBuildPath)' != ''" />
+    <Warning Text="HttpRequestLib.dll missing — skip copy (set HttpRequestLibMsBuildPath if you have VS C++ toolchain)." Condition="('$(HttpRequestLibNativePlatform)' == 'x64' and !Exists('$(HttpRequestLibX64DllPath)')) or ('$(HttpRequestLibNativePlatform)' == 'Win32' and !Exists('$(HttpRequestLibWin32LegacyDllPath)') and !Exists('$(HttpRequestLibWin32DllPath)'))" />
   </Target>
 
   <Target Name="BuildAndCopyHttpRequestLib" BeforeTargets="Build" DependsOnTargets="BuildHttpRequestLibIfMissing">
@@ -191,6 +203,29 @@
   </Target>
   <Target Name="CopyViewControl" BeforeTargets="Build" Condition="Exists('$(ViewControlExe)')">
     <Copy SourceFiles="$(ViewControlExe)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Copy sqlite3 binaries for different Android ABIs -->
+  <ItemGroup>
+    <Sqlite3Binary Include="$(MSBuildProjectDirectory)\Resources\sqlite3\**\*.*" />
+  </ItemGroup>
+
+  <!-- Khi build thường: copy vào $(OutDir)\resources\sqlite3 -->
+  <Target Name="CopySqlite3Binaries" AfterTargets="Build">
+    <Copy SourceFiles="@(Sqlite3Binary)"
+          DestinationFolder="$(OutDir)resources\sqlite3\%(RecursiveDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(Sqlite3Binary)' != ''" />
+  </Target>
+
+  <!-- Khi publish (AOT/self-contained): $(OutDir) không phải thư mục đích cuối, phải copy
+       vào $(PublishDir). Không có target này thì publish\...\resources\sqlite3 rỗng → runtime
+       không tìm thấy binary → lỗi. -->
+  <Target Name="CopySqlite3BinariesOnPublish" AfterTargets="Publish">
+    <Copy SourceFiles="@(Sqlite3Binary)"
+          DestinationFolder="$(PublishDir)resources\sqlite3\%(RecursiveDir)"
+          SkipUnchangedFiles="true"
+          Condition="'@(Sqlite3Binary)' != ''" />
   </Target>
 
 </Project>

@@ -4,7 +4,7 @@ using Sunny.Subdy.Common.Helper;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fSelectMultiFolder : AntdUI.Window
+    public partial class fSelectMultiFolder : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private readonly string _platform;
         private readonly List<string> _folders;
@@ -15,7 +15,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             InitializeComponent();
             _platform = platform;
             _folders = folders;
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
 
             // Load các folder đã chọn trước đó
             string folderPath = Path.Combine(Path.GetTempPath(), $"folders_{_platform}.txt");

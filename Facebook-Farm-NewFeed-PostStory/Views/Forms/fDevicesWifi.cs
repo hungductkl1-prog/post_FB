@@ -10,7 +10,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fDevicesWifi : AntdUI.Window
+    public partial class fDevicesWifi : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private readonly List<DeviceModel> _devices;
         private readonly BindingList<WifiRow> _rows = new();
@@ -57,7 +57,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
         {
             _devices = devices ?? new List<DeviceModel>();
             BuildUi();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             LoadRows();
         }
 

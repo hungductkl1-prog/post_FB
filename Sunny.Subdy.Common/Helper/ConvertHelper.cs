@@ -77,6 +77,56 @@ namespace Sunny.Subdy.Common.Helper
             }
         }
 
+        /// <summary>
+        /// Overload đọc trực tiếp từ object qua reflection — dùng cho grid VirtualMode
+        /// (không còn DataBoundItem). type là chuỗi property name nối bằng '|',
+        /// vd "Uid|Password|TowFA". items là tập account đã tick checkbox.
+        /// </summary>
+        public static void CopyFormat(string type, IEnumerable<object> items)
+        {
+            List<string> lines = new List<string>();
+            string[] splitTypes = type.Split('|');
+
+            try
+            {
+                var propCache = new Dictionary<string, System.Reflection.PropertyInfo>(StringComparer.OrdinalIgnoreCase);
+                Type itemType = null;
+
+                foreach (var item in items)
+                {
+                    if (item == null) continue;
+                    if (itemType == null)
+                    {
+                        itemType = item.GetType();
+                        foreach (var t in splitTypes)
+                        {
+                            if (string.IsNullOrEmpty(t) || propCache.ContainsKey(t)) continue;
+                            propCache[t] = itemType.GetProperty(t,
+                                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
+                        }
+                    }
+
+                    List<string> fields = new List<string>();
+                    foreach (string typeItem in splitTypes)
+                    {
+                        if (string.IsNullOrEmpty(typeItem)) { fields.Add(typeItem); continue; }
+                        propCache.TryGetValue(typeItem, out var pi);
+                        fields.Add(pi != null ? (Convert.ToString(pi.GetValue(item)) ?? "") : "");
+                    }
+                    lines.Add(string.Join("|", fields));
+                }
+
+                string result = string.Join("\n", lines);
+                if (string.IsNullOrEmpty(result)) { CommonMethod.ShowMessageWarning("Vui lòng tick checkbox tài khoản cần copy."); return; }
+                Clipboard.SetText(result);
+                CommonMethod.ShowMessageSuccess($"Copy thành công {lines.Count} tài khoản.");
+            }
+            catch (Exception ex)
+            {
+                CommonMethod.ShowConfirmWarning($"Có lỗi xảy ra, vui lòng báo admin! [{ex.Message}]");
+            }
+        }
+
         private static IEnumerable<DataGridViewRow> GetCheckedRows(DataGridView data)
         {
             System.Reflection.PropertyInfo checkedProp = null;

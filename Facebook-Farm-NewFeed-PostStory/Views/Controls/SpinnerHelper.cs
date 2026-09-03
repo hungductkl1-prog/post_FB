@@ -111,7 +111,7 @@ public class SpinnerHelper : Control
             );
 
             // Draw the background rectangle
-            using (Brush backgroundBrush = new SolidBrush(Color.DodgerBlue))
+            using (Brush backgroundBrush = new SolidBrush(Facebook_Farm_NewFeed_PostStory.Utils.Design.ColorPalette.Primary))
             {
                 e.Graphics.FillRectangle(backgroundBrush, backgroundRect);
             }
@@ -129,6 +129,16 @@ public class SpinnerHelper : Control
     {
         timer.Enabled = Visible;
         base.OnVisibleChanged(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            timer.Stop();
+            timer.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     private IOrderedEnumerable<Control> GetIntersectingControls(Control parent)

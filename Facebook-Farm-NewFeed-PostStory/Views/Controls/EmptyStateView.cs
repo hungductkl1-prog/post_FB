@@ -3,6 +3,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
@@ -36,7 +37,14 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
 
         public event EventHandler? CtaClicked;
 
+        /// <summary>When false, mouse hits pass through to the grid below.</summary>
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public bool AllowHitTest { get; set; } = true;
+
         private AntdUI.Button? _btnCta;
+
+        private const int WmNchitTest = 0x0084;
+        private const int HtTransparent = -1;
 
         public EmptyStateView()
         {
@@ -79,8 +87,22 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             _btnCta.BringToFront();
         }
 
+        protected override void WndProc(ref System.Windows.Forms.Message m)
+        {
+            if ((!Visible || !AllowHitTest) && m.Msg == WmNchitTest)
+            {
+                m.Result = (IntPtr)HtTransparent;
+                return;
+            }
+
+            base.WndProc(ref m);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (!Visible || !AllowHitTest)
+                return;
+
             base.OnPaint(e);
             var g = e.Graphics;
             g.SmoothingMode    = SmoothingMode.AntiAlias;

@@ -20,7 +20,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             _updateFolder = Path.Combine(AppContext.BaseDirectory, "UpdateTemp");
             _zipPath = Path.Combine(_updateFolder, "update.zip");
             this.Load += FUpdate_Load;
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
 
         private void FUpdate_Load(object? sender, EventArgs e)

@@ -1,4 +1,5 @@
 ﻿using AutoAndroid;
+using Facebook_Farm_NewFeed_PostStory.Utils;
 using FFmpeg.AutoGen;
 using ScrcpyNet;
 using SDL2;
@@ -266,16 +267,30 @@ namespace Facebook_Farm_NewFeed_PostStory
             if (showOverlayText && e.Button == MouseButtons.Right)
             {
                 var ucMenuscrip = new ucMenuscripDevice(false) { Height = this.Size.Height };
-                var config = new AntdUI.Popover.Config(
-       pictureBox1,
-      ucMenuscrip
-   )
+                ucMenuscrip.TestChangeDeviceClicked += async (s, ev) =>
                 {
-                    ArrowAlign = AntdUI.TAlign.Right,
-                    Offset = 4
+                    try
+                    {
+                        var client = new ADBClient(device);
+                        bool ok = await Task.Run(() =>
+                        client.maxChange.ChangeDeviceName("", "")
+                        );
+                        if (ok)
+                        {
+                            device.Status = client.GetDeviceName();
+                        }
+                        else
+                        {
+                            device.Status = "Change that bai";
+                        }
+                       
+                    }
+                    catch (Exception ex)
+                    {
+                        Trace.WriteLine($"[ucDeviceView/{device.Serial}] TestChangeDevice error: {ex.Message}");
+                    }
                 };
-
-                var f = AntdUI.Popover.open(config);
+               
                 return;
             }
             // Touch handling
@@ -644,8 +659,6 @@ namespace Facebook_Farm_NewFeed_PostStory
                 Trace.WriteLine($"[ucDeviceView/{device.Serial}] FIRST FRAME received {frame.width}x{frame.height}. handle={IsHandleCreated} visible={Visible} pbVisible={pictureBox1.Visible} pbHandle={pictureBox1.IsHandleCreated}");
             }
 
-            // Chỉ kiểm tra handle hợp lệ — không kiểm tra Visible vì SDL render trực tiếp lên HWND
-            // Visible == false trong WinForms khi parent đang layout, nhưng HWND vẫn render được.
             if (!pictureBox1.IsHandleCreated || IsDisposed)
                 return;
 
@@ -659,26 +672,27 @@ namespace Facebook_Farm_NewFeed_PostStory
 
             try
             {
+                bool sizeChanged = frame.width != renderSize.Width || frame.height != renderSize.Height;
+                bool needInit = sdlRender == IntPtr.Zero || sdlTexture == IntPtr.Zero || sizeChanged;
+
+                // InitRender gọi SDL_CreateWindowFrom(pictureBox1.Handle) — phải chạy trên UI thread.
+                // Nếu đang ở background thread (FFmpeg callback), schedule InitRender trên UI thread
+                // và bỏ qua frame hiện tại. Frame tiếp theo sẽ render bình thường.
+                if (needInit)
+                {
+                    if (sizeChanged)
+                        renderSize = new Size(frame.width, frame.height);
+                    else if (renderSize.Width <= 0 || renderSize.Height <= 0)
+                        renderSize = new Size(frame.width, frame.height);
+
+                    ScheduleInitRender();
+                    return;
+                }
+
                 lock (locker)
                 {
-                    if (isResize)
+                    if (IsDisposed || isResize)
                         return;
-
-                    if (frame.width != renderSize.Width || frame.height != renderSize.Height)
-                    {
-                        renderSize = new Size(frame.width, frame.height);
-                        InitRender();
-                    }
-
-                    // Lazy re-init: frame đến nhưng render chưa sẵn sàng (race với OnLoadSizeEvent)
-                    if (sdlRender == IntPtr.Zero || sdlTexture == IntPtr.Zero)
-                    {
-                        if (renderSize.Width <= 0 || renderSize.Height <= 0)
-                        {
-                            renderSize = new Size(frame.width, frame.height);
-                        }
-                        InitRender();
-                    }
 
                     if (sdlTexture == IntPtr.Zero || sdlRender == IntPtr.Zero)
                         return;
@@ -724,6 +738,31 @@ namespace Facebook_Farm_NewFeed_PostStory
             {
                 Interlocked.Exchange(ref processingFrame, 0);
             }
+        }
+
+        private int _initRenderPending = 0;
+
+        /// <summary>
+        /// Schedule InitRender on UI thread. Thread-safe — multiple callers are coalesced.
+        /// </summary>
+        private void ScheduleInitRender()
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            if (Interlocked.Exchange(ref _initRenderPending, 1) == 1) return;
+            try
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    _initRenderPending = 0;
+                    if (IsDisposed) return;
+                    lock (locker)
+                    {
+                        InitRender();
+                    }
+                });
+            }
+            catch (ObjectDisposedException) { _initRenderPending = 0; }
+            catch (InvalidOperationException) { _initRenderPending = 0; }
         }
 
         private void PictureBox1_SizeChanged(object? sender, EventArgs e)
@@ -820,7 +859,7 @@ namespace Facebook_Farm_NewFeed_PostStory
         private SDL.SDL_Rect MakeThumb(int pw, int ph, int ww, int wh)
         {
             if (pw <= 0 || ph <= 0 || ww <= 0 || wh <= 0)
-                return new SDL.SDL_Rect { x = 0, y = 0, w = ww, h = wh };
+                return new SDL.SDL_Rect { x = 0, y = 0, w = Math.Max(1, ww), h = Math.Max(1, wh) };
 
             double scaleX = ww / (double)pw;
             double scaleY = wh / (double)ph;
@@ -901,6 +940,35 @@ namespace Facebook_Farm_NewFeed_PostStory
             pos.Point = new ScrcpyNet.Point { X = (int)mx, Y = (int)my };
             pos.ScreenSize = new ScreenSize { Width = (ushort)renderSize.Width, Height = (ushort)renderSize.Height };
             return pos;
+        }
+
+        #endregion
+
+        #region Helpers
+
+        private string? PromptInput(string title, string label, string defaultValue = "")
+        {
+            var form = this.FindForm();
+            string? result = null;
+            using var dlg = new Form
+            {
+                Text = title,
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ClientSize = new Size(420, 130)
+            };
+            var lbl = new Label { Text = label, Left = 12, Top = 12, AutoSize = true };
+            var txt = new TextBox { Left = 12, Top = 38, Width = 396, Text = defaultValue };
+            var ok = new Button { Text = "Xác nhận", Left = 232, Top = 80, Width = 80, DialogResult = DialogResult.OK };
+            var cancel = new Button { Text = "Hủy", Left = 322, Top = 80, Width = 80, DialogResult = DialogResult.Cancel };
+            dlg.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
+            dlg.AcceptButton = ok;
+            dlg.CancelButton = cancel;
+            if (dlg.ShowDialog(form) == DialogResult.OK)
+                result = txt.Text;
+            return result;
         }
 
         #endregion

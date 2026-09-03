@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fSettingJob : AntdUI.Window
+    public partial class fSettingJob : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private string _platform = "";
         private string _server = "";
@@ -30,7 +30,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             {
                 cbb_ListTypeProxy.SelectedIndex = 0;
             }
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
 
             this.Load += (_, __) => Facebook_Farm_NewFeed_PostStory.Utils.Design.SsaTheme.ApplyFSettingJob(this);
         }

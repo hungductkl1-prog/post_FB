@@ -187,13 +187,9 @@ namespace ScrcpyNet
                     }
                     catch (Exception ex)
                     {
-                        // DecodePacket nên tự free, nhưng nếu nó throw trước khi free → ta phải free ở đây
-                        log.Error(ex, "[{Serial}] DecodePacket threw — freeing packet to avoid leak", device.Serial);
-                        unsafe
-                        {
-                            AVPacket* p = (AVPacket*)item;
-                            ffmpeg.av_packet_free(&p);
-                        }
+                        // DecodePacket luôn free packet trong finally (kể cả khi throw).
+                        // Không free lại ở đây vì item vẫn trỏ đến địa chỉ đã bị free → double-free.
+                        log.Error(ex, "[{Serial}] DecodePacket threw — packet already freed by DecodePacket finally", device.Serial);
                     }
                 }
             }

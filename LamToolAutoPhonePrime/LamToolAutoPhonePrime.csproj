@@ -138,7 +138,6 @@
 	  <ProjectReference Include="..\ScrcpyNet\ScrcpyNet.csproj" />
 	  <ProjectReference Include="..\Sunny.Subd.Core\Sunny.Subd.Core.csproj" />
 	  <ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
-	  <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
 	  <ProjectReference Include="..\Sunny.Subdy.Server\Sunny.Subdy.Server.csproj" />
 	</ItemGroup>
 	<ItemGroup>
@@ -258,9 +257,7 @@
 	  evaluation-time (lúc VS load designer/IntelliSense → file có thể bị lock).
 	  ContinueOnError=true để designer/IntelliSense không fail nếu file đang bị giữ.
 	-->
-	<Target Name="ResolveBuildCounter"
-			BeforeTargets="GetAssemblyVersion;BeforeBuild;CoreCompile"
-			Condition="Exists('$(BuildCounterFile)')">
+	<Target Name="ResolveBuildCounter" BeforeTargets="GetAssemblyVersion;BeforeBuild;CoreCompile" Condition="Exists('$(BuildCounterFile)')">
 		<ReadLinesFromFile File="$(BuildCounterFile)" ContinueOnError="true">
 			<Output TaskParameter="Lines" PropertyName="_BuildCounterRaw" />
 		</ReadLinesFromFile>
@@ -277,9 +274,7 @@
 	</Target>
 
 	<!-- Khi file chưa tồn tại, vẫn cần BuildNumber=1 cho lần build đầu -->
-	<Target Name="ResolveBuildCounterFirstRun"
-			BeforeTargets="GetAssemblyVersion;BeforeBuild;CoreCompile"
-			Condition="!Exists('$(BuildCounterFile)')">
+	<Target Name="ResolveBuildCounterFirstRun" BeforeTargets="GetAssemblyVersion;BeforeBuild;CoreCompile" Condition="!Exists('$(BuildCounterFile)')">
 		<PropertyGroup>
 			<BuildNumber>1</BuildNumber>
 			<CurrentTime>$(BuildDateToday).$(BuildNumber)</CurrentTime>

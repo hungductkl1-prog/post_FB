@@ -12,7 +12,7 @@ using System.Reflection;
 
 namespace Facebook_Farm_NewFeed_PostStory
 {
-    public partial class Form1 : AntdUI.Window
+    public partial class Form1 : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private readonly ScrcpyManager manager = new ScrcpyManager();
 

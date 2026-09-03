@@ -15,7 +15,7 @@ using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fSettingDefault : AntdUI.Window
+    public partial class fSettingDefault : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private string _platform = "";
         private System.Windows.Forms.Timer _txtLinesDebounceTimer;
@@ -39,7 +39,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             var boxes = new CheckBox[]
             {
                     checkBox9, checkBox11, checkBox13, checkBox1, checkBox2, checkBox3,
-                    checkBox4, checkBox5, checkBox6, checkBox8, checkBox15, checkBox17
+                    checkBox4, checkBox5, checkBox6, checkBox8, checkBox15, checkBox17, checkBox18
             };
             foreach (var cb in boxes)
             {
@@ -81,7 +81,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             }), shouldExit: false);
 
             // Apply fonts after initial rendering to avoid layout jank
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
 
             // Finalize layout resume
             ResumeLayout(false);
@@ -147,7 +147,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             panel6.Enabled = checkBox5.Checked;
             checkBox7.Enabled = checkBox6.Checked;
             panel7.Enabled = checkBox8.Checked;
-            timePicker1.Enabled = timePicker2.Enabled = checkBox15.Checked;
+            uiTimePicker1.Enabled = uiTimePicker2.Enabled = checkBox15.Checked;
             panel11.Enabled = checkBox17.Checked;
         }
 

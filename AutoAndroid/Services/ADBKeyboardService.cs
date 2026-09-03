@@ -10,42 +10,63 @@ namespace AutoAndroid
     {
         public static string Path_Keyboard = Path.Combine(AppContext.BaseDirectory, "App", "ADBKeyboard.apk");
         public static string Package_Keyboard = "com.android.adbkeyboard";
-        private ADBClient _service;
+        private readonly object _initializationLock = new();
+        private Task<bool>? _initializationTask;
+        private readonly ADBClient _service;
+
         public ADBKeyboardService(ADBClient service)
         {
             _service = service;
         }
-        public async Task<bool> TurnOnADBKeyboard()
+
+        private Task<bool> EnsureReadyAsync()
+        {
+            lock (_initializationLock)
+            {
+                return _initializationTask ??= TurnOnADBKeyboardCore();
+            }
+        }
+        public Task<bool> TurnOnADBKeyboard()
+        {
+            return EnsureReadyAsync();
+        }
+
+        private async Task<bool> TurnOnADBKeyboardCore()
         {
             for (int i = 0; i < 10; i++)
             {
                 try
                 {
-                    if (!_service.AppList().Contains(Package_Keyboard))
+                    if (!_service.AppList().Contains(Package_Keyboard, StringComparer.OrdinalIgnoreCase))
                     {
                         if (!File.Exists(Path_Keyboard))
                         {
-                            string folderName = Path.GetFileName(Path.GetDirectoryName(Path_Keyboard));
-                            Directory.CreateDirectory(folderName);
+                            string? folderName = Path.GetDirectoryName(Path_Keyboard);
+                            if (!string.IsNullOrEmpty(folderName))
+                                Directory.CreateDirectory(folderName);
                             InitHelper.GithubDown("https://raw.githubusercontent.com/LamLe2001/changer/main/ADBKeyboard.apk", Path_Keyboard);
                         }
-                        _service.InstallApp(Path_Keyboard);
+                        if (!_service.InstallApp(Path_Keyboard))
+                            continue;
                     }
+
                     string text = _service.Shell("ime set com.android.adbkeyboard/.AdbIME");
-                    if (text.Contains("result=0"))
-                    {
+                    if (text.Contains("result=0", StringComparison.OrdinalIgnoreCase)
+                        || text.Contains("selected", StringComparison.OrdinalIgnoreCase))
                         return true;
-                    }
-                    else if (text.Contains("selected"))
-                    {
-                        return true;
-                    }
+
                     _service.Shell("am start -a android.settings.INPUT_METHOD_SETTINGS");
                     int tickCount = Environment.TickCount;
-                    while (true)
+                    while (Environment.TickCount - tickCount < 10000)
                     {
+                        _service.ThrowIfStopped();
                         string text2 = _service.GetXMLSource();
-                        string text3 = _service.FindElement(text2, new List<string> { "//*[@text='ADB Keyboard']/parent::*/parent::*/child::*/child::*[@checked='true']", "//*[@text='ADB Keyboard']", "//node[@text='OK']" }, 10);
+                        string text3 = _service.FindElement(text2, new List<string>
+                        {
+                            "//*[@text='ADB Keyboard']/parent::*/parent::*/child::*/child::*[@checked='true']",
+                            "//*[@text='ADB Keyboard']",
+                            "//node[@text='OK']"
+                        }, 10);
                         switch (text3)
                         {
                             case "//*[@text='ADB Keyboard']":
@@ -54,18 +75,20 @@ namespace AutoAndroid
                                 break;
                             case "//*[@text='ADB Keyboard']/parent::*/parent::*/child::*/child::*[@checked='true']":
                                 text = _service.Shell("ime set com.android.adbkeyboard/.AdbIME");
-                                return true;
+                                if (text.Contains("result=0", StringComparison.OrdinalIgnoreCase)
+                                    || text.Contains("selected", StringComparison.OrdinalIgnoreCase))
+                                    return true;
+                                break;
                         }
-                         _service.Delay(1);
-                        if (Environment.TickCount - tickCount >= 10000)
-                        {
-                            break;
-                        }
+                        await Task.Delay(1000).ConfigureAwait(false);
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch
                 {
-               
                 }
             }
 
@@ -76,7 +99,9 @@ namespace AutoAndroid
         {
             try
             {
-                TurnOnADBKeyboard();
+                if (!EnsureReadyAsync().GetAwaiter().GetResult())
+                    return false;
+
                 if (clear)
                 {
                     ClearInputWithADBKeyboard();
@@ -89,9 +114,12 @@ namespace AutoAndroid
                     return true;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
-               
             }
             return false;
         }

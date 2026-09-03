@@ -8,6 +8,7 @@ namespace Facebook_Farm_NewFeed_PostStory
         private Form? targetForm;
         private Form? parentForm; 
         public event EventHandler? SettingsButtonClicked;
+        public event EventHandler? TestChangeDeviceClicked;
         public ucMenuscripDevice(bool check, Form form = null, Form formCha = null)
         {
             InitializeComponent();
@@ -29,12 +30,15 @@ namespace Facebook_Farm_NewFeed_PostStory
             ConfigureToolStripButton(toolStripButton10, "Thực hiện hành động");
             ConfigureToolStripButton(toolStripButton9, "Thực hiện nhiệm vụ");
             ConfigureToolStripButton(toolStripButton8, "Kết thúc nhiệm vụ");
+            ConfigureToolStripButton(toolStripButton_TestChangeDevice, "Test change device");
             ConfigureToolStripDropDown(toolStripDropDownButton1, "Chuyển đổi phương", toolStripMenuItem1, "Quản lý lệnh");
             ConfigureToolStripButton(toolStripButton3, "Xoay phải");
             // Buttons bottom
             ConfigureAntdButton(button1, "BorderOutlined");
             ConfigureAntdButton(button2, "HomeOutlined");
             ConfigureAntdButton(button3, "DoubleLeftOutlined");
+
+            toolStripButton_TestChangeDevice.Click += (s, e) => TestChangeDeviceClicked?.Invoke(this, EventArgs.Empty);
         }
 
 

@@ -28,17 +28,17 @@
         /// </summary>
         private void InitializeComponent()
         {
-            windowBar = new AntdUI.PageHeader();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
             panel3 = new Panel();
-            button6 = new AntdUI.Button();
-            button5 = new AntdUI.Button();
-            button4 = new AntdUI.Button();
-            panel1 = new AntdUI.Panel();
-            button9 = new AntdUI.Button();
-            panel2 = new AntdUI.Panel();
+            button6 = new Button();
+            button5 = new Button();
+            button4 = new Button();
+            panel1 = new Panel();
+            button9 = new Button();
+            panel2 = new Panel();
             alert10 = new AntdUI.Alert();
-            button2 = new AntdUI.Button();
-            button3 = new AntdUI.Button();
+            button2 = new Button();
+            button3 = new Button();
             windowBar.SuspendLayout();
             panel3.SuspendLayout();
             panel1.SuspendLayout();
@@ -48,24 +48,16 @@
             // windowBar
             // 
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(panel3);
             windowBar.Cursor = Cursors.Hand;
-            windowBar.DividerMargin = 1;
-            windowBar.DividerShow = true;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Microsoft YaHei UI", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
             windowBar.Size = new Size(411, 36);
-            windowBar.SubText = "";
             windowBar.TabIndex = 9;
             windowBar.Text = "Thông báo";
-            windowBar.UseSystemStyleColor = true;
-            windowBar.UseTextBold = false;
             // 
             // panel3
             // 
@@ -81,45 +73,33 @@
             // 
             // button6
             // 
-            button6.BadgeSize = 1.5F;
             button6.Cursor = Cursors.Hand;
             button6.Dock = DockStyle.Right;
-            button6.IconRatio = 5F;
             button6.Location = new Point(2, 5);
             button6.Name = "button6";
-            button6.Radius = 30;
-            button6.Shape = AntdUI.TShape.Circle;
             button6.Size = new Size(21, 26);
             button6.TabIndex = 23;
-            button6.Type = AntdUI.TTypeMini.Success;
+            button6.FlatStyle = FlatStyle.Flat; button6.FlatAppearance.BorderSize = 0; button6.BackColor = Color.FromArgb(82, 196, 26); button6.ForeColor = Color.White; button6.UseVisualStyleBackColor = false;
             // 
             // button5
             // 
-            button5.BadgeSize = 1.5F;
             button5.Cursor = Cursors.Hand;
             button5.Dock = DockStyle.Right;
-            button5.IconRatio = 5F;
             button5.Location = new Point(23, 5);
             button5.Name = "button5";
-            button5.Radius = 30;
-            button5.Shape = AntdUI.TShape.Circle;
             button5.Size = new Size(21, 26);
             button5.TabIndex = 22;
-            button5.Type = AntdUI.TTypeMini.Warn;
+            button5.FlatStyle = FlatStyle.Flat; button5.FlatAppearance.BorderSize = 0; button5.BackColor = Color.FromArgb(250, 173, 20); button5.ForeColor = Color.White; button5.UseVisualStyleBackColor = false;
             // 
             // button4
             // 
-            button4.BadgeSize = 1.5F;
             button4.Cursor = Cursors.Hand;
             button4.Dock = DockStyle.Right;
-            button4.IconRatio = 5F;
             button4.Location = new Point(44, 5);
             button4.Name = "button4";
-            button4.Radius = 30;
-            button4.Shape = AntdUI.TShape.Circle;
             button4.Size = new Size(21, 26);
             button4.TabIndex = 21;
-            button4.Type = AntdUI.TTypeMini.Error;
+            button4.FlatStyle = FlatStyle.Flat; button4.FlatAppearance.BorderSize = 0; button4.BackColor = Color.FromArgb(255, 77, 79); button4.ForeColor = Color.White; button4.UseVisualStyleBackColor = false;
             button4.Click += button4_Click;
             // 
             // panel1
@@ -128,8 +108,7 @@
             panel1.Dock = DockStyle.Bottom;
             panel1.Location = new Point(0, 207);
             panel1.Name = "panel1";
-            panel1.padding = new Padding(12);
-            panel1.Radius = 12;
+            panel1.Padding = new Padding(12);
             panel1.Size = new Size(411, 89);
             panel1.TabIndex = 10;
             panel1.Text = "panel1";
@@ -138,16 +117,12 @@
             // 
             button9.Anchor = AnchorStyles.Bottom;
             button9.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            button9.IconRatio = 1.1F;
-            button9.IconSvg = "CheckOutlined";
-            button9.IconToggleAnimation = 400;
             button9.Location = new Point(124, 23);
             button9.Name = "button9";
-            button9.Shape = AntdUI.TShape.Round;
             button9.Size = new Size(182, 42);
             button9.TabIndex = 15;
             button9.Text = "Xác nhận";
-            button9.Type = AntdUI.TTypeMini.Success;
+            button9.FlatStyle = FlatStyle.Flat; button9.FlatAppearance.BorderSize = 0; button9.BackColor = Color.FromArgb(82, 196, 26); button9.ForeColor = Color.White; button9.UseVisualStyleBackColor = false;
             button9.Click += button9_Click;
             // 
             // panel2
@@ -158,16 +133,14 @@
             panel2.Dock = DockStyle.Fill;
             panel2.Location = new Point(0, 36);
             panel2.Name = "panel2";
-            panel2.padding = new Padding(12);
             panel2.Padding = new Padding(12);
-            panel2.Radius = 12;
+            panel2.Padding = new Padding(12);
             panel2.Size = new Size(411, 171);
             panel2.TabIndex = 11;
             panel2.Text = "panel2";
             // 
             // alert10
             // 
-            alert10.BorderWidth = 1F;
             alert10.Dock = DockStyle.Fill;
             alert10.Icon = AntdUI.TType.Info;
             alert10.Location = new Point(12, 12);
@@ -181,31 +154,23 @@
             // 
             button2.Anchor = AnchorStyles.Bottom;
             button2.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            button2.IconRatio = 1F;
-            button2.IconSvg = "CloseOutlined";
-            button2.IconToggleAnimation = 400;
             button2.Location = new Point(423, 182);
             button2.Name = "button2";
-            button2.Shape = AntdUI.TShape.Round;
             button2.Size = new Size(139, 42);
             button2.TabIndex = 16;
             button2.Text = "Đóng";
-            button2.Type = AntdUI.TTypeMini.Error;
+            button2.FlatStyle = FlatStyle.Flat; button2.FlatAppearance.BorderSize = 0; button2.BackColor = Color.FromArgb(255, 77, 79); button2.ForeColor = Color.White; button2.UseVisualStyleBackColor = false;
             // 
             // button3
             // 
             button3.Anchor = AnchorStyles.Bottom;
             button3.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            button3.IconRatio = 1.1F;
-            button3.IconSvg = "SaveOutlined";
-            button3.IconToggleAnimation = 400;
             button3.Location = new Point(274, 182);
             button3.Name = "button3";
-            button3.Shape = AntdUI.TShape.Round;
             button3.Size = new Size(131, 42);
             button3.TabIndex = 15;
             button3.Text = "Lưu";
-            button3.Type = AntdUI.TTypeMini.Success;
+            button3.FlatStyle = FlatStyle.Flat; button3.FlatAppearance.BorderSize = 0; button3.BackColor = Color.FromArgb(82, 196, 26); button3.ForeColor = Color.White; button3.UseVisualStyleBackColor = false;
             // 
             // fShowThongBao
             // 
@@ -230,16 +195,16 @@
 
         #endregion
 
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Panel panel1;
-        private AntdUI.Button button9;
-        private AntdUI.Panel panel2;
-        private AntdUI.Button button2;
-        private AntdUI.Button button3;
-        private AntdUI.Button button4;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Panel panel1;
+        private Button button9;
+        private Panel panel2;
+        private Button button2;
+        private Button button3;
+        private Button button4;
         private Panel panel3;
-        private AntdUI.Button button6;
-        private AntdUI.Button button5;
+        private Button button6;
+        private Button button5;
         private AntdUI.Alert alert10;
     }
 }

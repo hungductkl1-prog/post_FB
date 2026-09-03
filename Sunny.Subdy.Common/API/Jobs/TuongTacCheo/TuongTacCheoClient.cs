@@ -11,17 +11,16 @@ namespace Sunny.Subdy.Common.API.Jobs.TuongTacCheo
 {
     public class TuongTacCheoClient
     {
-        private readonly HttpClient _httpClient;
+        // Shared singleton — tái dùng cho mọi instance; cấu hình cố định (UseCookies=false, BaseAddress).
+        private static readonly HttpClient _httpClient = new HttpClient(new HttpClientHandler { UseCookies = false })
+        {
+            BaseAddress = new Uri("https://tuongtaccheo.com/")
+        };
 
         public string SiteUrl = $"https://tuongtaccheo.com/cauhinh/facebook.php";
 
         public TuongTacCheoClient()
         {
-            var handler = new HttpClientHandler { UseCookies = false };
-            _httpClient = new HttpClient(handler)
-            {
-                BaseAddress = new Uri("https://tuongtaccheo.com/")
-            };
         }
 
         public async Task<string> GetSiteKey(string cookie)
@@ -85,7 +84,7 @@ namespace Sunny.Subdy.Common.API.Jobs.TuongTacCheo
             try
             {
                 var handler = new HttpClientHandler { UseCookies = false };
-                var client = new HttpClient(handler);
+                using var client = new HttpClient(handler);
                 var formData = new FormUrlEncodedContent(new[]
                 {
                     new KeyValuePair<string, string>("access_token", token)
@@ -127,7 +126,7 @@ namespace Sunny.Subdy.Common.API.Jobs.TuongTacCheo
             try
             {
                 var handler = new HttpClientHandler { UseCookies = false };
-                var client = new HttpClient(handler);
+                using var client = new HttpClient(handler);
                 var formData = new FormUrlEncodedContent(new[]
                 {
                     new KeyValuePair<string, string>("access_token", token)
@@ -165,7 +164,7 @@ namespace Sunny.Subdy.Common.API.Jobs.TuongTacCheo
             try
             {
                 var handler = new HttpClientHandler { UseCookies = false };
-                var client = new HttpClient(handler);
+                using var client = new HttpClient(handler);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
                 var request = new HttpRequestMessage(HttpMethod.Post, "https://tuongtaccheo.com/cauhinh/datnick.php");
@@ -293,7 +292,7 @@ namespace Sunny.Subdy.Common.API.Jobs.TuongTacCheo
             try
             {
                 var handler = new HttpClientHandler { UseCookies = false };
-                var client = new HttpClient(handler);
+                using var client = new HttpClient(handler);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://tuongtaccheo.com/kiemtien/{prefix}/getpost.php");
@@ -326,7 +325,7 @@ namespace Sunny.Subdy.Common.API.Jobs.TuongTacCheo
             try
             {
                 var handler = new HttpClientHandler { UseCookies = false };
-                var client = new HttpClient(handler);
+                using var client = new HttpClient(handler);
                 client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
 
                 var request = new HttpRequestMessage(HttpMethod.Post, $"https://tuongtaccheo.com/kiemtien/{prefix}/nhantien.php");

@@ -8,7 +8,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fImportProxy : AntdUI.Window
+    public partial class fImportProxy : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private AccountContext context;
         private List<Guid> listId;
@@ -17,7 +17,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             InitializeComponent();
             listId = ids;
             context = new AccountContext();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             cbbTypeProxy.SelectedIndex = 0;
         }
 
@@ -26,7 +26,6 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             var proxies = txtLines.Lines
                 .Select(p => p.Trim())
                 .Where(p => !string.IsNullOrEmpty(p))
-                .Distinct()
                 .ToList();
 
             if (proxies.Count == 0)
@@ -35,8 +34,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 return;
             }
 
+            // Mặc định là "Lần lượt": giữ nguyên từng dòng proxy theo thứ tự nhập.
             if (E82D5414.Checked)
+            {
                 proxies = SubdyHelper.Shuffle(proxies);
+            }
 
             int repeatCount = (int)FE1FAE23.Value;
             bool skipExisting = ckbKhongNhapTaiKhoanDaCo.Checked;
@@ -47,6 +49,14 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 AntdHelper.NotifyWarn(this, "Cảnh báo", "Không có tài khoản nào được chọn!");
                 return;
             }
+
+            // GetByIds dùng IN (...) nên không đảm bảo thứ tự. Khôi phục đúng thứ tự
+            // tài khoản được truyền từ danh sách checkbox trên giao diện.
+            var accountById = accounts.ToDictionary(account => account.Id);
+            accounts = listId
+                .Where(id => accountById.ContainsKey(id))
+                .Select(id => accountById[id])
+                .ToList();
 
             int maxUpdate = proxies.Count * repeatCount;
             int updatedCount = 0;

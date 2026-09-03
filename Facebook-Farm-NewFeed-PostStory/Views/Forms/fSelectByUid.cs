@@ -4,7 +4,7 @@ using Sunny.Subdy.Common.Helper;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fSelectByUid : AntdUI.Window
+    public partial class fSelectByUid : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private readonly string _platform;
         public bool Saved { get; private set; } = false;
@@ -13,7 +13,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
         {
             InitializeComponent();
             _platform = platform;
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
 
             // Load lại uid đã lưu trước đó (nếu có)
             string uidPath = Path.Combine(Path.GetTempPath(), $"uids_{_platform}.txt");

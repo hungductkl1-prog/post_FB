@@ -29,26 +29,26 @@
         private void InitializeComponent()
         {
             AntdUI.Tabs.StyleCard styleCard1 = new AntdUI.Tabs.StyleCard();
-            windowBar = new AntdUI.PageHeader();
-            btn_mode = new AntdUI.Button();
-            btn_global = new AntdUI.Button();
-            btn_setting = new AntdUI.Button();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
+            btn_mode = new Button();
+            btn_global = new Button();
+            btn_setting = new Button();
             panel1 = new Panel();
             flowLayoutPanel1 = new SelectableFlowLayoutPanel();
-            panel2 = new AntdUI.Panel();
+            panel2 = new Panel();
             tabs3 = new AntdUI.Tabs();
             tabPageSettingDefault = new AntdUI.TabPage();
             panel5 = new Panel();
             panel8 = new Panel();
             flowLayoutPanel3 = new AntdUI.In.FlowLayoutPanel();
             panel9 = new Panel();
-            button4 = new AntdUI.Button();
-            button3 = new AntdUI.Button();
+            button4 = new Button();
+            button3 = new Button();
             checkBox1 = new CheckBox();
             panel7 = new Panel();
-            button2 = new AntdUI.Button();
+            button2 = new Button();
             label5 = new Label();
-            button1 = new AntdUI.Button();
+            button1 = new Button();
             panel4 = new Panel();
             slider2 = new AntdUI.Slider();
             slider1 = new AntdUI.Slider();
@@ -56,8 +56,8 @@
             label4 = new Label();
             flowLayoutPanel2 = new AntdUI.In.FlowLayoutPanel();
             tabPageSettingAndroid = new AntdUI.TabPage();
-            panel3 = new AntdUI.Panel();
-            button9 = new AntdUI.Button();
+            panel3 = new Panel();
+            button9 = new Button();
             windowBar.SuspendLayout();
             panel1.SuspendLayout();
             panel2.SuspendLayout();
@@ -74,69 +74,46 @@
             // windowBar
             // 
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
             windowBar.Cursor = Cursors.Hand;
-            windowBar.DividerMargin = 1;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Icon = Properties.Resources.logo_lamtool_v3_dark_16;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
-            windowBar.ShowIcon = true;
             windowBar.Size = new Size(997, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", 6.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            windowBar.SubGap = 1;
-            windowBar.SubText = "v18.12.08.2025";
             windowBar.TabIndex = 8;
             windowBar.Text = "QN Phone Farm";
-            windowBar.UseSystemStyleColor = true;
-            windowBar.UseTextBold = false;
             // 
             // btn_mode
             // 
             btn_mode.Dock = DockStyle.Right;
-            btn_mode.Ghost = true;
-            btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
-            btn_mode.IconSvg = "";
+            btn_mode.Image = Properties.Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(917, 0);
             btn_mode.Name = "btn_mode";
-            btn_mode.Radius = 0;
             btn_mode.Size = new Size(26, 35);
             btn_mode.TabIndex = 6;
-            btn_mode.ToggleIconSvg = "MoonOutlined";
-            btn_mode.WaveSize = 0;
             // 
             // btn_global
             // 
             btn_global.Dock = DockStyle.Right;
-            btn_global.Ghost = true;
-            btn_global.Icon = Properties.Resources.icons8_circle_16_Yellow;
-            btn_global.IconSvg = "";
+            btn_global.Image = Properties.Resources.icons8_circle_16_Yellow;
             btn_global.Location = new Point(943, 0);
             btn_global.Name = "btn_global";
-            btn_global.Radius = 0;
             btn_global.Size = new Size(24, 35);
             btn_global.TabIndex = 7;
-            btn_global.WaveSize = 0;
             // 
             // btn_setting
             // 
             btn_setting.Dock = DockStyle.Right;
-            btn_setting.Ghost = true;
-            btn_setting.Icon = Properties.Resources.icons8_circle_16_Red;
-            btn_setting.IconSvg = "";
+            btn_setting.Image = Properties.Resources.icons8_circle_16_Red;
             btn_setting.Location = new Point(967, 0);
             btn_setting.Name = "btn_setting";
-            btn_setting.Radius = 0;
             btn_setting.Size = new Size(30, 35);
             btn_setting.TabIndex = 8;
-            btn_setting.WaveSize = 0;
             // 
             // panel1
             // 
@@ -163,7 +140,6 @@
             // 
             // panel2
             // 
-            panel2.BadgeSize = 2.2F;
             panel2.Controls.Add(tabs3);
             panel2.Controls.Add(panel3);
             panel2.Dock = DockStyle.Left;
@@ -176,7 +152,6 @@
             // tabs3
             // 
             tabs3.BackColor = Color.White;
-            tabs3.BadgeAlign = AntdUI.TAlign.None;
             tabs3.Controls.Add(tabPageSettingDefault);
             tabs3.Controls.Add(tabPageSettingAndroid);
             tabs3.Dock = DockStyle.Fill;
@@ -199,7 +174,6 @@
             tabPageSettingDefault.Controls.Add(panel4);
             tabPageSettingDefault.Controls.Add(flowLayoutPanel2);
             tabPageSettingDefault.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            tabPageSettingDefault.IconSvg = "SettingOutlined";
             tabPageSettingDefault.Location = new Point(3, 35);
             tabPageSettingDefault.Name = "tabPageSettingDefault";
             tabPageSettingDefault.Padding = new Padding(10);
@@ -248,34 +222,22 @@
             // 
             // button4
             // 
-            button4.DefaultBack = Color.White;
-            button4.DisplayStyle = AntdUI.TButtonDisplayStyle.Text;
             button4.Dock = DockStyle.Right;
             button4.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             button4.ForeColor = Color.Green;
-            button4.IconHoverSvg = "";
-            button4.IconRatio = 0.9F;
-            button4.IconSvg = "";
             button4.Location = new Point(81, 0);
             button4.Name = "button4";
-            button4.Radius = 10;
             button4.Size = new Size(100, 27);
             button4.TabIndex = 12;
             button4.Text = "Hiển thị tất cả";
             // 
             // button3
             // 
-            button3.DefaultBack = Color.White;
-            button3.DisplayStyle = AntdUI.TButtonDisplayStyle.Text;
             button3.Dock = DockStyle.Right;
             button3.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             button3.ForeColor = Color.Green;
-            button3.IconHoverSvg = "";
-            button3.IconRatio = 0.9F;
-            button3.IconSvg = "";
             button3.Location = new Point(181, 0);
             button3.Name = "button3";
-            button3.Radius = 10;
             button3.Size = new Size(112, 27);
             button3.TabIndex = 11;
             button3.Text = "Hiển thị đã chọn";
@@ -304,16 +266,11 @@
             // 
             // button2
             // 
-            button2.DefaultBack = Color.White;
             button2.Dock = DockStyle.Right;
             button2.Font = new Font("Segoe UI", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             button2.ForeColor = Color.Green;
-            button2.IconHoverSvg = "";
-            button2.IconRatio = 0.9F;
-            button2.IconSvg = "PlusSquareOutlined";
             button2.Location = new Point(202, 0);
             button2.Name = "button2";
-            button2.Radius = 10;
             button2.Size = new Size(91, 28);
             button2.TabIndex = 10;
             button2.Text = "Thêm thẻ";
@@ -330,20 +287,13 @@
             // 
             // button1
             // 
-            button1.DefaultBack = Color.White;
             button1.Dock = DockStyle.Left;
             button1.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
             button1.ForeColor = Color.Black;
-            button1.IconHoverSvg = "";
-            button1.IconRatio = 0.9F;
-            button1.IconSvg = "CaretDownOutlined";
-            button1.IconToggleAnimation = 10;
             button1.Location = new Point(0, 0);
             button1.Name = "button1";
-            button1.Radius = 10;
             button1.Size = new Size(31, 28);
             button1.TabIndex = 8;
-            button1.WaveSize = 3;
             // 
             // panel4
             // 
@@ -414,7 +364,6 @@
             // tabPageSettingAndroid
             // 
             tabPageSettingAndroid.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            tabPageSettingAndroid.IconSvg = "AndroidOutlined";
             tabPageSettingAndroid.Location = new Point(-995, -404);
             tabPageSettingAndroid.Name = "tabPageSettingAndroid";
             tabPageSettingAndroid.Size = new Size(995, 404);
@@ -435,15 +384,10 @@
             // button9
             // 
             button9.Cursor = Cursors.Hand;
-            button9.DefaultBack = Color.FromArgb(53, 119, 92);
             button9.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
             button9.ForeColor = Color.White;
-            button9.IconHoverSvg = "";
-            button9.IconRatio = 0.9F;
-            button9.IconSvg = "DoubleLeftOutlined";
             button9.Location = new Point(3, 3);
             button9.Name = "button9";
-            button9.Radius = 10;
             button9.Size = new Size(30, 25);
             button9.TabIndex = 7;
             // 
@@ -479,14 +423,14 @@
 
         #endregion
 
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Button btn_mode;
-        private AntdUI.Button btn_global;
-        private AntdUI.Button btn_setting;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Button btn_mode;
+        private Button btn_global;
+        private Button btn_setting;
         private Panel panel1;
-        private AntdUI.Panel panel2;
-        private AntdUI.Panel panel3;
-        private AntdUI.Button button9;
+        private Panel panel2;
+        private Panel panel3;
+        private Button button9;
         private AntdUI.Tabs tabs3;
         private AntdUI.TabPage tabPageSettingDefault;
         private AntdUI.TabPage tabPageSettingAndroid;
@@ -500,13 +444,13 @@
         private Panel panel5;
         private Panel panel7;
         private Label label5;
-        private AntdUI.Button button1;
-        private AntdUI.Button button2;
+        private Button button1;
+        private Button button2;
         private Panel panel8;
         private Panel panel9;
         private CheckBox checkBox1;
-        private AntdUI.Button button4;
-        private AntdUI.Button button3;
+        private Button button4;
+        private Button button3;
         private AntdUI.In.FlowLayoutPanel flowLayoutPanel3;
     }
 }

@@ -12,6 +12,25 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
     /// </summary>
     internal static class SsaTheme
     {
+        // Font dùng chung cho badge painter — KHÔNG dispose. Tránh cấp phát Font mỗi ô khi
+        // scroll grid 30k dòng (FontScale.Body9Bold tạo Font mới mỗi lần gọi → GDI churn → lag).
+        private static readonly Font _badgeFont = new Font(FontScale.FamilyName, FontScale.Body, FontStyle.Bold);
+
+        // Cache brush badge theo màu — bg lấy từ tập palette cố định (~7 màu), dùng lại thay vì
+        // new SolidBrush mỗi ô khi cuộn. Badge painter chỉ chạy trên UI thread nên dùng chung an toàn.
+        private static readonly System.Collections.Generic.Dictionary<Color, SolidBrush> _badgeBrushCache = new();
+        private static SolidBrush BadgeBrush(Color c)
+        {
+            if (!_badgeBrushCache.TryGetValue(c, out var b))
+            {
+                b = new SolidBrush(c);
+                _badgeBrushCache[c] = b;
+            }
+            return b;
+        }
+        // GraphicsPath dùng lại 1 instance (Reset mỗi lần) — tránh cấp phát path + mảng điểm mỗi ô.
+        private static readonly GraphicsPath _badgePath = new GraphicsPath();
+
         // ══════════════════════════════════════════════════════════════════
         //  fMain
         // ══════════════════════════════════════════════════════════════════
@@ -935,16 +954,30 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
             void Toggle()
             {
                 if (dgv.IsDisposed) return;
-                es.Visible = dgv.Rows.Count == 0;
+                // VirtualMode: bind RowCount tăng dần / không fire RowsAdded đúng lúc —
+                // ucdgvAccount.SyncEmptyStateOverlay() là nguồn sự thật, tránh overlay che grid chặn click.
+                if (dgv.VirtualMode) return;
+                es.Visible = dgv.RowCount == 0;
+                if (es.Visible)
+                    es.BringToFront();
+                else
+                    dgv.BringToFront();
             }
 
-            dgv.RowsAdded   += (_, __) => Toggle();
-            dgv.RowsRemoved += (_, __) => Toggle();
-            dgv.DataBindingComplete += (_, __) => Toggle();
-            dgv.HandleCreated += (_, __) => Toggle();
-
-            // Initial check
-            Toggle();
+            if (!dgv.VirtualMode)
+            {
+                dgv.RowsAdded += (_, __) => Toggle();
+                dgv.RowsRemoved += (_, __) => Toggle();
+                dgv.DataBindingComplete += (_, __) => Toggle();
+                dgv.HandleCreated += (_, __) => Toggle();
+                dgv.VisibleChanged += (_, __) => Toggle();
+                Toggle();
+            }
+            else
+            {
+                es.Visible = false;
+                dgv.BringToFront();
+            }
         }
 
         // ══════════════════════════════════════════════════════════════════
@@ -1074,6 +1107,31 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
         }
 
         /// <summary>
+        /// Reload lại danh sách kịch bản trong combobox toolbar (ssaCboScript) mà không cần
+        /// re-apply toàn bộ theme. Gọi sau khi tạo/sửa/xóa kịch bản để combobox cập nhật ngay
+        /// (không phải tắt mở lại tool). Giữ nguyên selection hiện tại nếu vẫn còn trong list.
+        /// </summary>
+        public static void RefreshScriptSelect(ucdgvAccount uc)
+        {
+            if (uc == null) return;
+            try
+            {
+                var panel4 = GetField<AntdUI.Panel>(uc, "panel4");
+                var cbo = panel4?.Controls.Find("ssaCboScript", true).FirstOrDefault() as AntdUI.Select;
+                if (cbo == null) return;
+
+                var prev = cbo.Text?.Trim();
+                ReloadScriptSelectItems(uc, cbo);
+
+                if (!string.IsNullOrEmpty(prev) && cbo.Items.Contains(prev))
+                    cbo.SelectedIndex = cbo.Items.IndexOf(prev);
+                else
+                    SelectDefaultCustomIfAvailable(cbo);
+            }
+            catch { /* silent */ }
+        }
+
+        /// <summary>
         /// Ghost button chuẩn SSA — dùng cho các hành động phụ trên toolbar.
         /// Tạo 1 lần, attach vào panel4; re-apply style nếu đã tồn tại.
         /// </summary>
@@ -1175,7 +1233,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
                     System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
                 if (mi != null)
                 {
-                    var task = mi.Invoke(uc, null) as Task;
+                    var task = mi.Invoke(uc, new object[] { true }) as Task;
                     if (task != null) await task;
                 }
             };
@@ -1213,71 +1271,64 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
         /// </summary>
         private static void AttachStatusBadgePainter(ucdgvAccount uc)
         {
-            var dgv = GetField<DataGridView>(uc, "dataGridView1");
-            if (dgv == null) return;
+            uc.EnsureStatusBadgePainter();
+        }
 
-            dgv.CellPainting += (s, e) =>
+        internal static void PaintAccountStatusBadge(DataGridView dgv, DataGridViewCellPaintingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+            var col = dgv.Columns[e.ColumnIndex];
+            var propName = col?.DataPropertyName;
+            if (propName != "State" && propName != "Status") return;
+
+            string text = e.Value?.ToString()?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(text))
             {
-                if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
-                var col = dgv.Columns[e.ColumnIndex];
-                var propName = col?.DataPropertyName;
-                if (propName != "State" && propName != "Status") return;
+                // để default painter vẽ cell trống
+                return;
+            }
 
-                string text = e.Value?.ToString()?.Trim() ?? string.Empty;
-                if (string.IsNullOrEmpty(text))
-                {
-                    // để default painter vẽ cell trống
-                    return;
-                }
+            bool selected = e.State.HasFlag(DataGridViewElementStates.Selected);
 
-                bool selected = e.State.HasFlag(DataGridViewElementStates.Selected);
+            // Paint full cell background (bao gồm cả vùng trailing khi cột Fill)
+            e.PaintBackground(e.CellBounds, selected);
 
-                // Paint full cell background (bao gồm cả vùng trailing khi cột Fill)
-                e.PaintBackground(e.CellBounds, selected);
-
-                // Khi row được chọn → vẽ text plain (không badge) trên nền selection
-                if (selected)
-                {
-                    using var plainFont = FontScale.Body9Bold;
-                    var textRectSel = e.CellBounds;
-                    textRectSel.Inflate(-Spacing.Md, 0);
-                    TextRenderer.DrawText(e.Graphics, text, plainFont, textRectSel, Color.White,
-                        TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-                    e.Handled = true;
-                    return;
-                }
-
-                // Semantic mapping cho badge pill (chỉ khi không selected)
-                var (bg, fg) = MapBadgeColor(text);
-
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-                using var badgeFont = FontScale.Body9Bold;
-                var textSize = TextRenderer.MeasureText(e.Graphics, text, badgeFont, Size.Empty, TextFormatFlags.NoPadding);
-
-                int padX = Spacing.Sm;
-                int padY = 3;
-                int badgeW = textSize.Width + padX * 2;
-                int badgeH = textSize.Height + padY * 2;
-
-                var cellRect = e.CellBounds;
-                var badgeRect = new Rectangle(
-                    cellRect.Left + Spacing.Md,
-                    cellRect.Top + (cellRect.Height - badgeH) / 2,
-                    badgeW,
-                    badgeH);
-
-                using (var bgBrush = new SolidBrush(bg))
-                using (var path = RoundedRect(badgeRect, Radius.Md))
-                {
-                    e.Graphics.FillPath(bgBrush, path);
-                }
-
-                TextRenderer.DrawText(e.Graphics, text, badgeFont, badgeRect, fg,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-
+            // Khi row được chọn → vẽ text plain (không badge) trên nền selection
+            if (selected)
+            {
+                var textRectSel = e.CellBounds;
+                textRectSel.Inflate(-Spacing.Md, 0);
+                TextRenderer.DrawText(e.Graphics, text, _badgeFont, textRectSel, Color.White,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
                 e.Handled = true;
-            };
+                return;
+            }
+
+            // Semantic mapping cho badge pill (chỉ khi không selected)
+            var (bg, fg) = MapBadgeColor(text);
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            var textSize = TextRenderer.MeasureText(e.Graphics, text, _badgeFont, Size.Empty, TextFormatFlags.NoPadding);
+
+            int padX = Spacing.Sm;
+            int padY = 3;
+            int badgeW = textSize.Width + padX * 2;
+            int badgeH = textSize.Height + padY * 2;
+
+            var cellRect = e.CellBounds;
+            var badgeRect = new Rectangle(
+                cellRect.Left + Spacing.Md,
+                cellRect.Top + (cellRect.Height - badgeH) / 2,
+                badgeW,
+                badgeH);
+
+            e.Graphics.FillPath(BadgeBrush(bg), RoundedRectShared(badgeRect, Radius.Md));
+
+            TextRenderer.DrawText(e.Graphics, text, _badgeFont, badgeRect, fg,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+
+            e.Handled = true;
         }
 
         private static (Color bg, Color fg) MapBadgeColor(string text)
@@ -1319,6 +1370,21 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
         private static GraphicsPath RoundedRect(Rectangle r, int radius)
         {
             var path = new GraphicsPath();
+            int d = radius * 2;
+            path.AddArc(r.X, r.Y, d, d, 180, 90);
+            path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+            path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+            path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        /// <summary>Như RoundedRect nhưng dùng lại 1 GraphicsPath dùng chung (chỉ gọi trên UI thread).
+        /// KHÔNG dispose giá trị trả về. Tránh cấp phát path mỗi ô khi vẽ badge lúc cuộn.</summary>
+        private static GraphicsPath RoundedRectShared(Rectangle r, int radius)
+        {
+            var path = _badgePath;
+            path.Reset();
             int d = radius * 2;
             path.AddArc(r.X, r.Y, d, d, 180, 90);
             path.AddArc(r.Right - d, r.Y, d, d, 270, 90);

@@ -157,6 +157,7 @@ namespace LamToolAutoPhonePrime.Views.Forms
             txtUids.Font = new Font("Segoe UI", 9.5F);
             txtUids.Location = new Point(15, 38);
             txtUids.Multiline = true;
+            txtUids.MaxLength = int.MaxValue;
             txtUids.Name = "txtUids";
             txtUids.ScrollBars = ScrollBars.Both;
             txtUids.Size = new Size(350, 220);

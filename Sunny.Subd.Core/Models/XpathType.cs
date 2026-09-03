@@ -8,6 +8,7 @@
         CP282,
         CP956,
         Logout,
+        WrongPassword,
         Block,
         Success,
         TowFA,
@@ -18,5 +19,18 @@
         Regsiner_Facebook,
         ExistEmail,
         Confim_Register,
+
+        // ── Pandora specific (verified on com.pandora.android v2504.1.1) ────
+        PandoraWelcomeScreen,
+        PandoraLoginButtons,
+        PandoraFTUE,
+        PandoraSearchElements,
+        PandoraSearchInput,
+        PandoraSoundTab,
+        PandoraSongResult,
+        PandoraPlayButton,
+        PandoraLikeButton,
+        PandoraBackButton,
+        PandoraPopupDismiss,
     }
 }

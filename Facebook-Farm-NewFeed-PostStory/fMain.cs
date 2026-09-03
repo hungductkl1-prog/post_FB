@@ -1,5 +1,4 @@
-﻿using AntdUI;
-using Facebook_Farm_NewFeed_PostStory.Utils;
+﻿using Facebook_Farm_NewFeed_PostStory.Utils;
 using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 using Facebook_Farm_NewFeed_PostStory.Views.Controls;
 using Facebook_Farm_NewFeed_PostStory.Views.Forms;
@@ -15,7 +14,7 @@ using System.Reflection;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
 namespace Facebook_Farm_NewFeed_PostStory
 {
-    public partial class fMain : AntdUI.Window
+    public partial class fMain : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private static readonly Color ActiveColor = Color.DodgerBlue;
         private static readonly Color HoverColor = Color.FromArgb(236, 240, 241);
@@ -29,6 +28,11 @@ namespace Facebook_Farm_NewFeed_PostStory
         private bool _updateConfirmOpen;
         private System.Windows.Forms.Panel _loadingOverlay;
         private Control _currentButton;
+
+        // Task get list devices chạy nền ngay khi mở phần mềm (từ LoadData). Lưu lại để
+        // CreateRemainingControls đợi đúng task này hoàn tất trước khi LoadDevices() —
+        // tránh race khiến ConnectAll (kết nối ATX) chạy trên danh sách rỗng.
+        private Task _initialDeviceLoadTask = Task.CompletedTask;
 
         public static DateTime? StartTime = null;
 
@@ -46,7 +50,7 @@ namespace Facebook_Farm_NewFeed_PostStory
                     var scriptCtx = new Sunny.Subdy.Data.Context.ScriptContext();
                     scriptCtx.PurgeFarmXu();
                     var accCtx = new Sunny.Subdy.Data.Context.AccountContext();
-                    foreach (var platform in new[] { Sunny.Subdy.Common.Models.PlatformModel.Facebook, Sunny.Subdy.Common.Models.PlatformModel.Instagram, Sunny.Subdy.Common.Models.PlatformModel.Threads })
+                    foreach (var platform in new[] { Sunny.Subdy.Common.Models.PlatformModel.Facebook, Sunny.Subdy.Common.Models.PlatformModel.Instagram, Sunny.Subdy.Common.Models.PlatformModel.Threads, Sunny.Subdy.Common.Models.PlatformModel.Pandora })
                     {
                         var scripts = scriptCtx.GetByPlatform(platform);
                         if (scripts != null)
@@ -77,6 +81,7 @@ namespace Facebook_Farm_NewFeed_PostStory
             // Tạo menu động (thứ tự ngược do DockStyle.Top stacking).
             // Project mới chỉ giữ Facebook + Thiết bị — bỏ Dashboard/IG/Threads.
             CreateMenu("Facebook", "facebook", Properties.Resources.icons8_facebook_30);
+            CreateMenu("Pandora", "pandora", Properties.Resources.icons8_facebook_30);
             CreateMenu("Thiết bị", "android", Properties.Resources.icons8_android_30_New);
 
             // Title cố định — không đổi theo section
@@ -93,7 +98,7 @@ namespace Facebook_Farm_NewFeed_PostStory
             CreateLoadingOverlay();
 
             pMenu.Enabled = false;
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             new DragHandler(label1, this);
 
             string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
@@ -222,6 +227,7 @@ namespace Facebook_Farm_NewFeed_PostStory
                 {
                     Keys.D1 => "btn_android",
                     Keys.D2 => "btn_facebook",
+                    Keys.D3 => "btn_pandora",
                     _ => null
                 };
                 if (target != null)
@@ -270,6 +276,7 @@ namespace Facebook_Farm_NewFeed_PostStory
             {
                 "Thiết bị" => "Quản lý thiết bị",
                 "Facebook" => "Quản lý tài khoản Facebook",
+                "Pandora" => "Quản lý tài khoản Pandora",
                 "Instagram" => "Quản lý tài khoản Instagram",
                 "Thread" => "Quản lý tài khoản Thread",
                 "Dashboard" => "Dashboard",
@@ -285,6 +292,7 @@ namespace Facebook_Farm_NewFeed_PostStory
             {
                 case "btn_android": _ucDevices?.BringToFront(); break;
                 case "btn_facebook": _ucFacebook?.BringToFront(); break;
+                case "btn_pandora": _ucPandora?.BringToFront(); break;
             }
 
             // Chỉ hiện button thu gọn/mở rộng panel khi ở tab Thiết bị
@@ -332,20 +340,32 @@ namespace Facebook_Farm_NewFeed_PostStory
                 Cursor = Cursors.WaitCursor
             };
 
-            var spin = new AntdUI.Spin
+            var spin = new Label
             {
                 Dock = DockStyle.Fill,
                 Font = new Font(FontScale.FamilyName, 16f, FontStyle.Bold),
                 Text = "Đang khởi động...",
+                TextAlign = ContentAlignment.MiddleCenter,
                 ForeColor = Color.FromArgb(70, 70, 70)
             };
 
+            var progress = new ProgressBar
+            {
+                Style = ProgressBarStyle.Marquee,
+                Dock = DockStyle.Bottom,
+                Height = 4,
+                MarqueeAnimationSpeed = 30
+            };
+
             _loadingOverlay.Controls.Add(spin);
+            _loadingOverlay.Controls.Add(progress);
             Controls.Add(_loadingOverlay);
             _loadingOverlay.BringToFront();
 
             var messages = new[] { "Đang tải UI...", "Đang tải dữ liệu...", "Đang đồng bộ...", "Đang khởi động hệ thống...", "QN Phone Farm xin chào!" };
 
+            _loadingCts?.Cancel();
+            _loadingCts?.Dispose();
             _loadingCts = new CancellationTokenSource();
             var token = _loadingCts.Token;
 
@@ -383,6 +403,9 @@ namespace Facebook_Farm_NewFeed_PostStory
         {
             if (_loadingOverlay == null) return;
             _loadingOverlay.Visible = false;
+            _loadingOverlay.Enabled = false;
+            _loadingOverlay.SendToBack();
+            Cursor = Cursors.Default;
             _loadingCts?.Cancel();
             pMenu.Enabled = true;
         }
@@ -394,7 +417,11 @@ namespace Facebook_Farm_NewFeed_PostStory
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             _uiCts?.Cancel();
+            _uiCts?.Dispose();
+            _uiCts = null;
             _loadingCts?.Cancel();
+            _loadingCts?.Dispose();
+            _loadingCts = null;
             base.OnFormClosing(e);
         }
 
@@ -405,6 +432,10 @@ namespace Facebook_Farm_NewFeed_PostStory
             // which may be null at Program.Main time).
             Sunny.Subdy.Data.Models.ThrottledPropertyNotifier.Initialize();
 
+            // Pandora debug setup — creates default script + test account for self-debug
+            try { Automation.Pandora.PandoraDebugSetup.EnsureDebugSetup(); } catch { }
+            try { Automation.Pandora.PandoraDebugSetup.EnsureTestAccount(); } catch { }
+
             // Tab Facebook là tab mặc định mở đầu — tạo trước, BringToFront, hide loading
             // để user thấy UI hữu dụng ngay. Các UC khác defer sang sau (lazy create chunks)
             // → cắt được ~60-70% thời gian fMain_Load block trên UI thread.
@@ -413,6 +444,12 @@ namespace Facebook_Farm_NewFeed_PostStory
             _ucFacebook.Dock = DockStyle.Fill;
             pContent.Controls.Add(_ucFacebook);
             EnableDoubleBuffer(_ucFacebook);
+
+            _ucPandora = new ucdgvAccount(this, PlatformModel.Pandora);
+            _ucPandora.Dock = DockStyle.Fill;
+            pContent.Controls.Add(_ucPandora);
+            EnableDoubleBuffer(_ucPandora);
+
             pContent.ResumeLayout(false);
             pContent.PerformLayout();
 
@@ -436,6 +473,58 @@ namespace Facebook_Farm_NewFeed_PostStory
 
             // Chờ dữ liệu tải xong (không block UI render — đã hide loading trước đó).
             await dataTask;
+
+            // Metrics background logger: dump metrics + device metrics mỗi 60 giây
+            _ = Task.Run(async () =>
+            {
+                var logDir = System.IO.Path.Combine(AppContext.BaseDirectory, "logs");
+                try { System.IO.Directory.CreateDirectory(logDir); } catch { }
+
+                while (!IsDisposed)
+                {
+                    try { await Task.Delay(60_000); } catch { break; }
+                    try
+                    {
+                        AutoAndroid.Monitoring.MetricsCollector.GaugeSet("active.thread.count", Process.GetCurrentProcess().Threads.Count);
+                        AutoAndroid.Monitoring.MetricsCollector.GaugeSet("active.task.count", Task.CurrentId ?? 0);
+
+                        // Ghi metrics periodic
+                        System.IO.File.AppendAllText(
+                            System.IO.Path.Combine(logDir, "metrics.log"),
+                            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}]\n" +
+                            AutoAndroid.Monitoring.MetricsCollector.DumpToText() + "\n" +
+                            AutoAndroid.Monitoring.DeviceMetricsRegistry.DumpAll() + "\n"
+                        );
+
+                        // Ghi debug snapshot riêng (để user gửi file này)
+                        var snapshotPath = System.IO.Path.Combine(logDir, $"debug_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                        System.IO.File.WriteAllText(snapshotPath,
+                            $"=== QN DEBUG SNAPSHOT ===\n" +
+                            $"Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}\n" +
+                            $"Uptime: {(DateTime.Now - (Facebook_Farm_NewFeed_PostStory.fMain.StartTime ?? DateTime.Now)).ToString()}\n" +
+                            $"Machine: {Environment.MachineName}\n" +
+                            $"User: {Environment.UserName}\n" +
+                            $"\n" +
+                            AutoAndroid.Monitoring.MetricsCollector.DumpToText() + "\n" +
+                            AutoAndroid.Monitoring.DeviceMetricsRegistry.DumpAll() + "\n" +
+                            AutoAndroid.Services.DeviceConnectionManager.DumpAll() + "\n" +
+                            AutoAndroid.Services.CircuitBreakerRegistry.DumpAll() + "\n" +
+                            $"=== END SNAPSHOT ===\n"
+                        );
+
+                        // Chỉ giữ 20 file snapshot gần nhất
+                        try
+                        {
+                            var files = System.IO.Directory.GetFiles(logDir, "debug_*.txt")
+                                .OrderByDescending(f => f).ToList();
+                            foreach (var old in files.Skip(20))
+                                System.IO.File.Delete(old);
+                        }
+                        catch { }
+                    }
+                    catch { }
+                }
+            });
         }
 
         private async void CreateRemainingControls()
@@ -452,9 +541,9 @@ namespace Facebook_Farm_NewFeed_PostStory
                 pContent.ResumeLayout(false);
                 await Task.Yield();
 
-                // Devices xong → load list devices (đợi ADB ready trước).
+                // ucManagerDevices_Load tự xử lý phase1 (adb devices → grid) + phase2 (ATX nền)
+                // Chỉ cần đợi ADB server sẵn sàng trước khi control Load event fire.
                 try { await Globals.AdbReadyTask; } catch { }
-                if (!IsDisposed) await _ucDevices.LoadDevices();
             }
             catch (Exception ex) { Sunny.Subdy.Common.Logs.LogManager.Error(ex); }
         }
@@ -463,12 +552,7 @@ namespace Facebook_Farm_NewFeed_PostStory
         {
             try
             {
-                // Chạy song song ADB init và Device models
-               // var adbTask = Task.Run(() => ADBHelper.InitADB());
-                var deviceTask = Task.Run(() => DeviceServices.GetDeviceModels());
-
-                await Task.WhenAll(deviceTask);
-
+                // Device load giờ do ucManagerDevices_Load tự xử lý (phase1+phase2).
                 // Đợi device-id hoàn tất (chạy nền từ Program.Main).
                 try { await Globals.DeviceIdTask; } catch { }
 
@@ -482,6 +566,8 @@ namespace Facebook_Farm_NewFeed_PostStory
 
         private async Task UpdateUiLoop()
         {
+            _uiCts?.Cancel();
+            _uiCts?.Dispose();
             _uiCts = new CancellationTokenSource();
             var token = _uiCts.Token;
 
@@ -545,6 +631,7 @@ namespace Facebook_Farm_NewFeed_PostStory
             if (CommonMethod.ShowConfirmWarning("Bạn có chắc muốn đóng phần mềm?"))
             {
                 _ucFacebook.SaveConfig();
+                _ucPandora?.SaveConfig();
                 this.Close();
                 Environment.Exit(0);
             }

@@ -29,14 +29,14 @@
         private void InitializeComponent()
         {
             AntdUI.Tabs.StyleCard styleCard1 = new AntdUI.Tabs.StyleCard();
-            windowBar = new AntdUI.PageHeader();
-            btn_mode = new AntdUI.Button();
-            btn_global = new AntdUI.Dropdown();
-            btn_setting = new AntdUI.Button();
-            panel1 = new AntdUI.Panel();
-            button1 = new AntdUI.Button();
-            button9 = new AntdUI.Button();
-            panel2 = new AntdUI.Panel();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
+            btn_mode = new Button();
+            btn_global = new Button();
+            btn_setting = new Button();
+            panel1 = new Panel();
+            button1 = new Button();
+            button9 = new Button();
+            panel2 = new Panel();
             tabs3 = new AntdUI.Tabs();
             tabPageSettingDefault = new AntdUI.TabPage();
             checkBox14 = new CheckBox();
@@ -271,7 +271,6 @@
             // windowBar
             // 
             windowBar.BackColor = Color.White;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
@@ -279,7 +278,6 @@
             windowBar.Font = new Font("Microsoft YaHei UI", 11.25F);
             windowBar.ForeColor = Color.Black;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
             windowBar.Size = new Size(1061, 36);
             windowBar.TabIndex = 2;
@@ -288,34 +286,27 @@
             // btn_mode
             // 
             btn_mode.Dock = DockStyle.Right;
-            btn_mode.Ghost = true;
-            btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
+            btn_mode.Image = Properties.Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(981, 0);
             btn_mode.Name = "btn_mode";
-            btn_mode.Radius = 0;
             btn_mode.Size = new Size(26, 36);
             btn_mode.TabIndex = 0;
-            btn_mode.ToggleIconSvg = "MoonOutlined";
             // 
             // btn_global
             // 
             btn_global.Dock = DockStyle.Right;
-            btn_global.Ghost = true;
-            btn_global.Icon = Properties.Resources.icons8_circle_16_Yellow;
+            btn_global.Image = Properties.Resources.icons8_circle_16_Yellow;
             btn_global.Location = new Point(1007, 0);
             btn_global.Name = "btn_global";
-            btn_global.Radius = 0;
             btn_global.Size = new Size(24, 36);
             btn_global.TabIndex = 1;
             // 
             // btn_setting
             // 
             btn_setting.Dock = DockStyle.Right;
-            btn_setting.Ghost = true;
-            btn_setting.Icon = Properties.Resources.icons8_circle_16_Red;
+            btn_setting.Image = Properties.Resources.icons8_circle_16_Red;
             btn_setting.Location = new Point(1031, 0);
             btn_setting.Name = "btn_setting";
-            btn_setting.Radius = 0;
             btn_setting.Size = new Size(30, 36);
             btn_setting.TabIndex = 2;
             btn_setting.Click += btn_setting_Click;
@@ -327,9 +318,8 @@
             panel1.Dock = DockStyle.Bottom;
             panel1.Location = new Point(0, 538);
             panel1.Name = "panel1";
-            panel1.padding = new Padding(20);
+            panel1.Padding = new Padding(20);
             panel1.Padding = new Padding(12);
-            panel1.Radius = 12;
             panel1.Size = new Size(1061, 102);
             panel1.TabIndex = 1;
             // 
@@ -337,32 +327,24 @@
             // 
             button1.Anchor = AnchorStyles.Bottom;
             button1.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            button1.IconRatio = 1F;
-            button1.IconSvg = "CloseOutlined";
-            button1.IconToggleAnimation = 400;
             button1.Location = new Point(553, 33);
             button1.Name = "button1";
-            button1.Shape = AntdUI.TShape.Round;
             button1.Size = new Size(139, 42);
             button1.TabIndex = 17;
             button1.Text = "Đóng";
-            button1.Type = AntdUI.TTypeMini.Error;
+            button1.FlatStyle = FlatStyle.Flat; button1.FlatAppearance.BorderSize = 0; button1.BackColor = Color.FromArgb(255, 77, 79); button1.ForeColor = Color.White; button1.UseVisualStyleBackColor = false;
             button1.Click += btn_setting_Click;
             // 
             // button9
             // 
             button9.Anchor = AnchorStyles.Bottom;
             button9.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            button9.IconRatio = 1.1F;
-            button9.IconSvg = "SaveOutlined";
-            button9.IconToggleAnimation = 400;
             button9.Location = new Point(396, 33);
             button9.Name = "button9";
-            button9.Shape = AntdUI.TShape.Round;
             button9.Size = new Size(131, 42);
             button9.TabIndex = 16;
             button9.Text = "Lưu";
-            button9.Type = AntdUI.TTypeMini.Success;
+            button9.FlatStyle = FlatStyle.Flat; button9.FlatAppearance.BorderSize = 0; button9.BackColor = Color.FromArgb(82, 196, 26); button9.ForeColor = Color.White; button9.UseVisualStyleBackColor = false;
             button9.Click += button9_Click;
             // 
             // panel2
@@ -371,16 +353,14 @@
             panel2.Dock = DockStyle.Fill;
             panel2.Location = new Point(0, 36);
             panel2.Name = "panel2";
-            panel2.padding = new Padding(20);
+            panel2.Padding = new Padding(20);
             panel2.Padding = new Padding(30);
-            panel2.Radius = 16;
             panel2.Size = new Size(1061, 502);
             panel2.TabIndex = 0;
             // 
             // tabs3
             // 
             tabs3.BackColor = Color.White;
-            tabs3.BadgeAlign = AntdUI.TAlign.None;
             tabs3.Controls.Add(tabPageSettingDefault);
             tabs3.Controls.Add(tabPageSettingAndroid);
             tabs3.Controls.Add(tabPageSettingCaptcha);
@@ -427,7 +407,6 @@
             tabPageSettingDefault.Controls.Add(nudJobDelayFrom);
             tabPageSettingDefault.Controls.Add(label48);
             tabPageSettingDefault.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            tabPageSettingDefault.IconSvg = "SettingOutlined";
             tabPageSettingDefault.Location = new Point(-995, -404);
             tabPageSettingDefault.Name = "tabPageSettingDefault";
             tabPageSettingDefault.Padding = new Padding(10);
@@ -1231,7 +1210,6 @@
             // 
             tabPageSettingAndroid.Controls.Add(tabPage1);
             tabPageSettingAndroid.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            tabPageSettingAndroid.IconSvg = "CloudServerOutlined";
             tabPageSettingAndroid.Location = new Point(3, 35);
             tabPageSettingAndroid.Name = "tabPageSettingAndroid";
             tabPageSettingAndroid.Size = new Size(995, 404);
@@ -1263,7 +1241,6 @@
             tabPage1.Controls.Add(panel3);
             tabPage1.Controls.Add(checkBox1);
             tabPage1.Font = new Font("Segoe UI Semibold", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            tabPage1.IconSvg = "CloudServerOutlined";
             tabPage1.Location = new Point(8, 8);
             tabPage1.Name = "tabPage1";
             tabPage1.Size = new Size(995, 404);
@@ -1857,7 +1834,6 @@
             tabPageSettingCaptcha.Controls.Add(label16);
             tabPageSettingCaptcha.Controls.Add(label39);
             tabPageSettingCaptcha.Controls.Add(cbb_ListTypeProxy);
-            tabPageSettingCaptcha.IconSvg = "SafetyCertificateOutlined";
             tabPageSettingCaptcha.Location = new Point(-995, -404);
             tabPageSettingCaptcha.Name = "tabPageSettingCaptcha";
             tabPageSettingCaptcha.Size = new Size(995, 404);
@@ -2117,17 +2093,17 @@
 
         #endregion
 
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Button btn_mode;
-        private AntdUI.Dropdown btn_global;
-        private AntdUI.Button btn_setting;
-        private AntdUI.Panel panel1;
-        private AntdUI.Panel panel2;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Button btn_mode;
+        private Button btn_global;
+        private Button btn_setting;
+        private Panel panel1;
+        private Panel panel2;
         private AntdUI.Tabs tabs3;
         private AntdUI.TabPage tabPageSettingDefault;
         private AntdUI.TabPage tabPageSettingAndroid;
-        private AntdUI.Button button9;
-        private AntdUI.Button button1;
+        private Button button9;
+        private Button button1;
         private Panel panel20;
         private Label label46;
         private NumericUpDown numericUpDown46;

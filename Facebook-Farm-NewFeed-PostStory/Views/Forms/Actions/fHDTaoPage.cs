@@ -17,7 +17,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         public fHDTaoPage(string scriptId, string actionId = "")
         {
             InitializeComponent();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             checkBox1.CheckedChanged += ckbDefault_CheckedChanged;
             checkBox3.CheckedChanged += ckbDefault_CheckedChanged;
             checkBox4.CheckedChanged += ckbDefault_CheckedChanged;

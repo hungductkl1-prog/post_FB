@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -46,6 +46,7 @@ public class Account : INotifyPropertyChanged, IThrottledNotify
     public string MailClientId { get => _mailClientId; set => SetField(ref _mailClientId, value); }
     public string MailRefreshToken { get => _mailRefreshToken; set => SetField(ref _mailRefreshToken, value); }
     public string PassPrivateEmailAddress { get => _passPrivateEmailAddress; set => SetField(ref _passPrivateEmailAddress, value); }
+    public string MailRecovery { get => _mailRecovery; set => SetField(ref _mailRecovery, value); }
     public string Platformt { get => _platform; set => SetField(ref _platform, value); }
     public bool Checked { get => _checked; set => SetField(ref _checked, value); }
     public bool Running { get => _running; set => SetField(ref _running, value); }
@@ -59,9 +60,22 @@ public class Account : INotifyPropertyChanged, IThrottledNotify
                    _phone = "", _userAgent = "", _fullName = "", _state = "", _status = "", _result = "", _serial = "",
                    _ip = "", _userName = "", _nameFolder = "", _gender = "", _friends = "", _groups = "", _follow = "",
                    _birthday = "", _bio = "", _pagePro5 = "", _dateCreate = "", _avatar = "", _note = "", _deviceInfo = "",
-                   _emailAddress = "", _passMail = "", _mailClientId = "", _mailRefreshToken = "", _passPrivateEmailAddress = "", _recentInteraction = "", _platform = "", _nameScript="";
+                   _emailAddress = "", _passMail = "", _mailClientId = "", _mailRefreshToken = "", _passPrivateEmailAddress = "", _recentInteraction = "", _platform = "", _nameScript="", _mailRecovery="";
 
     private bool _checked = false, _running = false, _isView = true;
+    private int _bulkLoadDepth;
+
+    /// <summary>Tắt PropertyChanged khi load/ghi hàng loạt (50k+ account).</summary>
+    public void BeginBulkLoad() => _bulkLoadDepth++;
+
+    public void EndBulkLoad()
+    {
+        if (_bulkLoadDepth > 0) _bulkLoadDepth--;
+    }
+
+    /// <summary>Toggle checkbox không bắn PropertyChanged (tick hàng loạt).</summary>
+    public void SetCheckedSilently(bool value) => _checked = value;
+
     private int _colorType = 0, _total=0;
     private string _jobToday = "0", _summary = "", _summary_Skip = "", _xuToday = "";
     private int _index = 0;
@@ -89,7 +103,7 @@ public class Account : INotifyPropertyChanged, IThrottledNotify
 
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
-        if (propertyName == null) return;
+        if (propertyName == null || _bulkLoadDepth > 0) return;
         // Throttled: just mark dirty, the shared timer will fire the event on UI thread
         ThrottledPropertyNotifier.MarkDirty(this, propertyName);
     }

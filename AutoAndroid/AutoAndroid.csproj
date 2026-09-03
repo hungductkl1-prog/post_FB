@@ -33,7 +33,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
+		<ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
+		<ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

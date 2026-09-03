@@ -47,10 +47,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             cbbTypeProxy = new ComboBox();
             F32C6BA9 = new Label();
             txtLines = new TextBox();
-            windowBar = new AntdUI.PageHeader();
-            btn_mode = new AntdUI.Button();
-            btn_global = new AntdUI.Dropdown();
-            btn_setting = new AntdUI.Button();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
+            btn_mode = new Button();
+            btn_global = new Button();
+            btn_setting = new Button();
             pnlHeader.SuspendLayout();
             ((ISupportInitialize)A516E182).BeginInit();
             ((ISupportInitialize)FE1FAE23).BeginInit();
@@ -262,66 +262,45 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             // windowBar
             // 
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
             windowBar.Cursor = Cursors.Hand;
-            windowBar.DividerMargin = 1;
-            windowBar.DividerShow = true;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Microsoft YaHei UI", 11.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
             windowBar.Size = new Size(477, 36);
-            windowBar.SubText = "";
             windowBar.TabIndex = 125;
             windowBar.Text = "Cập nhật proxy vào tài khoản";
-            windowBar.UseSystemStyleColor = true;
-            windowBar.UseTextBold = false;
             // 
             // btn_mode
             // 
             btn_mode.Dock = DockStyle.Right;
-            btn_mode.Ghost = true;
-            btn_mode.Icon = Properties.Resources.icons8_circle_16_Green;
-            btn_mode.IconSvg = "";
+            btn_mode.Image = Properties.Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(397, 0);
             btn_mode.Name = "btn_mode";
-            btn_mode.Radius = 0;
             btn_mode.Size = new Size(26, 36);
             btn_mode.TabIndex = 11;
-            btn_mode.ToggleIconSvg = "MoonOutlined";
-            btn_mode.WaveSize = 0;
             // 
             // btn_global
             // 
             btn_global.Dock = DockStyle.Right;
-            btn_global.Ghost = true;
-            btn_global.Icon = Properties.Resources.icons8_circle_16_Yellow;
-            btn_global.IconSvg = "";
+            btn_global.Image = Properties.Resources.icons8_circle_16_Yellow;
             btn_global.Location = new Point(423, 0);
             btn_global.Name = "btn_global";
-            btn_global.Radius = 0;
             btn_global.Size = new Size(24, 36);
             btn_global.TabIndex = 10;
-            btn_global.WaveSize = 0;
             // 
             // btn_setting
             // 
             btn_setting.Dock = DockStyle.Right;
-            btn_setting.Ghost = true;
-            btn_setting.Icon = Properties.Resources.icons8_circle_16_Red;
-            btn_setting.IconSvg = "";
+            btn_setting.Image = Properties.Resources.icons8_circle_16_Red;
             btn_setting.Location = new Point(447, 0);
             btn_setting.Name = "btn_setting";
-            btn_setting.Radius = 0;
             btn_setting.Size = new Size(30, 36);
             btn_setting.TabIndex = 9;
-            btn_setting.WaveSize = 0;
             btn_setting.Click += btn_setting_Click;
             // 
             // fImportProxy
@@ -389,9 +368,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 
         internal Label F32C6BA9;
         private TextBox txtLines;
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Button btn_mode;
-        private AntdUI.Dropdown btn_global;
-        private AntdUI.Button btn_setting;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Button btn_mode;
+        private Button btn_global;
+        private Button btn_setting;
     }
 }

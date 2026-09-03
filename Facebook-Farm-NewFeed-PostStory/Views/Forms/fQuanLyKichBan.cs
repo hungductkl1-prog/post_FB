@@ -10,7 +10,7 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views
 {
-    public partial class fQuanLyKichBan : AntdUI.Window
+    public partial class fQuanLyKichBan : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private ScriptContext _scriptContext;
         private ScriptActionContext _scriptActionContext;

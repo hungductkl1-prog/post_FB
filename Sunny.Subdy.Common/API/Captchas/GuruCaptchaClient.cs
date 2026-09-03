@@ -9,7 +9,7 @@ namespace Sunny.Subdy.Common.API.Captchas
 
         public static async Task<string> GetIdCaptchaV2(string key, string sitekey, string siteurl)
         {
-            var client = new HttpClient();
+            using var client = new HttpClient();
             var jsonBody = $"{{\"key\":\"{key}\",\"method\":\"userrecaptcha\",\"googlekey\":\"{sitekey}\",\"pageurl\":\"{siteurl}\",\"json\":1}}";
             var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
             var response = await client.PostAsync("http://api2.cap.guru/in.php", content);
@@ -35,7 +35,7 @@ namespace Sunny.Subdy.Common.API.Captchas
 
         public static async Task<string> GetTokenCaptchaV2(string key, string id)
         {
-            var client = new HttpClient();
+            using var client = new HttpClient();
             var jsonBody = $"{{\"key\":\"{key}\",\"action\":\"get\",\"id\":\"{id}\",\"json\":1}}";
             var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
             var response = await client.PostAsync("http://api2.cap.guru/res.php", content);
@@ -62,7 +62,7 @@ namespace Sunny.Subdy.Common.API.Captchas
         /// </summary>
         public static async Task<string> GetIdImageCaptcha(string key, string base64Image)
         {
-            var client = new HttpClient();
+            using var client = new HttpClient();
             var jsonBody = $"{{\"key\":\"{key}\",\"method\":\"base64\",\"body\":\"{base64Image}\",\"json\":1}}";
             var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
             var response = await client.PostAsync("http://api2.cap.guru/in.php", content);
@@ -87,7 +87,7 @@ namespace Sunny.Subdy.Common.API.Captchas
         {
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Get, $"http://api2.cap.guru/res.php?action=getbalance&key={key}");
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();

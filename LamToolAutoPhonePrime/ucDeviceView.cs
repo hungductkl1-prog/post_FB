@@ -644,8 +644,6 @@ namespace LamToolAutoPhonePrime
                 Trace.WriteLine($"[ucDeviceView/{device.Serial}] FIRST FRAME received {frame.width}x{frame.height}. handle={IsHandleCreated} visible={Visible} pbVisible={pictureBox1.Visible} pbHandle={pictureBox1.IsHandleCreated}");
             }
 
-            // Chỉ kiểm tra handle hợp lệ — không kiểm tra Visible vì SDL render trực tiếp lên HWND
-            // Visible == false trong WinForms khi parent đang layout, nhưng HWND vẫn render được.
             if (!pictureBox1.IsHandleCreated || IsDisposed)
                 return;
 
@@ -659,26 +657,27 @@ namespace LamToolAutoPhonePrime
 
             try
             {
+                bool sizeChanged = frame.width != renderSize.Width || frame.height != renderSize.Height;
+                bool needInit = sdlRender == IntPtr.Zero || sdlTexture == IntPtr.Zero || sizeChanged;
+
+                // InitRender gọi SDL_CreateWindowFrom(pictureBox1.Handle) — phải chạy trên UI thread.
+                // Nếu đang ở background thread (FFmpeg callback), schedule InitRender trên UI thread
+                // và bỏ qua frame hiện tại. Frame tiếp theo sẽ render bình thường.
+                if (needInit)
+                {
+                    if (sizeChanged)
+                        renderSize = new Size(frame.width, frame.height);
+                    else if (renderSize.Width <= 0 || renderSize.Height <= 0)
+                        renderSize = new Size(frame.width, frame.height);
+
+                    ScheduleInitRender();
+                    return;
+                }
+
                 lock (locker)
                 {
-                    if (isResize)
+                    if (IsDisposed || isResize)
                         return;
-
-                    if (frame.width != renderSize.Width || frame.height != renderSize.Height)
-                    {
-                        renderSize = new Size(frame.width, frame.height);
-                        InitRender();
-                    }
-
-                    // Lazy re-init: frame đến nhưng render chưa sẵn sàng (race với OnLoadSizeEvent)
-                    if (sdlRender == IntPtr.Zero || sdlTexture == IntPtr.Zero)
-                    {
-                        if (renderSize.Width <= 0 || renderSize.Height <= 0)
-                        {
-                            renderSize = new Size(frame.width, frame.height);
-                        }
-                        InitRender();
-                    }
 
                     if (sdlTexture == IntPtr.Zero || sdlRender == IntPtr.Zero)
                         return;
@@ -724,6 +723,31 @@ namespace LamToolAutoPhonePrime
             {
                 Interlocked.Exchange(ref processingFrame, 0);
             }
+        }
+
+        private int _initRenderPending = 0;
+
+        /// <summary>
+        /// Schedule InitRender on UI thread. Thread-safe — multiple callers are coalesced.
+        /// </summary>
+        private void ScheduleInitRender()
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            if (Interlocked.Exchange(ref _initRenderPending, 1) == 1) return;
+            try
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    _initRenderPending = 0;
+                    if (IsDisposed) return;
+                    lock (locker)
+                    {
+                        InitRender();
+                    }
+                });
+            }
+            catch (ObjectDisposedException) { _initRenderPending = 0; }
+            catch (InvalidOperationException) { _initRenderPending = 0; }
         }
 
         private void PictureBox1_SizeChanged(object? sender, EventArgs e)
@@ -820,7 +844,7 @@ namespace LamToolAutoPhonePrime
         private SDL.SDL_Rect MakeThumb(int pw, int ph, int ww, int wh)
         {
             if (pw <= 0 || ph <= 0 || ww <= 0 || wh <= 0)
-                return new SDL.SDL_Rect { x = 0, y = 0, w = ww, h = wh };
+                return new SDL.SDL_Rect { x = 0, y = 0, w = Math.Max(1, ww), h = Math.Max(1, wh) };
 
             double scaleX = ww / (double)pw;
             double scaleY = wh / (double)ph;

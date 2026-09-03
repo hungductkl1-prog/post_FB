@@ -113,10 +113,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             A82CCFBF = new RadioButton();
             EF8F9F95 = new RadioButton();
             label26 = new Label();
-            windowBar = new AntdUI.PageHeader();
-            btn_mode = new AntdUI.Button();
-            btn_global = new AntdUI.Button();
-            btn_setting = new AntdUI.Button();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
+            btn_mode = new Button();
+            btn_global = new Button();
+            btn_setting = new Button();
             nudTimeTo = new NumericUpDown();
             nudTimeFrom = new NumericUpDown();
             txtTenHanhDong = new TextBox();
@@ -1087,69 +1087,46 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             // windowBar
             // 
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
             windowBar.Cursor = Cursors.Hand;
-            windowBar.DividerMargin = 1;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Icon = Resources.logo_lamtool_v3_dark_16;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
-            windowBar.ShowIcon = true;
             windowBar.Size = new Size(909, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", Facebook_Farm_NewFeed_PostStory.Utils.Design.FontScale.Caption, FontStyle.Regular, GraphicsUnit.Point, 0);
-            windowBar.SubGap = 1;
-            windowBar.SubText = "";
             windowBar.TabIndex = 186;
             windowBar.Text = "Cấu hình tương tác";
-            windowBar.UseSystemStyleColor = true;
-            windowBar.UseTextBold = false;
             // 
             // btn_mode
             // 
             btn_mode.Dock = DockStyle.Right;
-            btn_mode.Ghost = true;
-            btn_mode.Icon = Resources.icons8_circle_16_Green;
-            btn_mode.IconSvg = "";
+            btn_mode.Image = Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(829, 0);
             btn_mode.Name = "btn_mode";
-            btn_mode.Radius = 0;
             btn_mode.Size = new Size(26, 35);
             btn_mode.TabIndex = 6;
-            btn_mode.ToggleIconSvg = "MoonOutlined";
-            btn_mode.WaveSize = 0;
             // 
             // btn_global
             // 
             btn_global.Dock = DockStyle.Right;
-            btn_global.Ghost = true;
-            btn_global.Icon = Resources.icons8_circle_16_Yellow;
-            btn_global.IconSvg = "";
+            btn_global.Image = Resources.icons8_circle_16_Yellow;
             btn_global.Location = new Point(855, 0);
             btn_global.Name = "btn_global";
-            btn_global.Radius = 0;
             btn_global.Size = new Size(24, 35);
             btn_global.TabIndex = 7;
-            btn_global.WaveSize = 0;
             // 
             // btn_setting
             // 
             btn_setting.Dock = DockStyle.Right;
-            btn_setting.Ghost = true;
-            btn_setting.Icon = Resources.icons8_circle_16_Red;
-            btn_setting.IconSvg = "";
+            btn_setting.Image = Resources.icons8_circle_16_Red;
             btn_setting.Location = new Point(879, 0);
             btn_setting.Name = "btn_setting";
-            btn_setting.Radius = 0;
             btn_setting.Size = new Size(30, 35);
             btn_setting.TabIndex = 8;
-            btn_setting.WaveSize = 0;
             // 
             // nudTimeTo
             // 
@@ -1348,10 +1325,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         internal Label label11;
         #endregion
 
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Button btn_mode;
-        private AntdUI.Button btn_global;
-        private AntdUI.Button btn_setting;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Button btn_mode;
+        private Button btn_global;
+        private Button btn_setting;
         internal Panel plInteract;
         internal CheckBox ckbGian;
         internal CheckBox ckbBuon;

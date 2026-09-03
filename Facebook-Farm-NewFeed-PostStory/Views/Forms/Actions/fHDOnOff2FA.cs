@@ -18,7 +18,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         public fHDOnOff2FA(string scriptId, string actionId = "")
         {
             InitializeComponent();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             rbBat2FA.CheckedChanged += ckbDefault_CheckedChanged;
             rbTat2FA.CheckedChanged += ckbDefault_CheckedChanged;
             ckbAccountCenter.CheckedChanged += ckbDefault_CheckedChanged;

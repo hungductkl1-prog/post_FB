@@ -19,6 +19,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
     {
         private readonly JobHistoryContext _Context;
         private List<JobHistory> _jobHistories;
+        /// <summary>Trần số dòng nạp vào lưới — bảo vệ RAM/UI khi lịch sử rất lớn.</summary>
+        private const int MaxHistoryRows = 5000;
         // date, totalJobs, coin, uniqueUids, liveUids, dieUids, runSeconds
         private List<(DateTime date, int jobs, double coin, int uids, int live, int die, long runSeconds)> _chartData = new();
         private Dictionary<string, (int success, int fail)> _methodStats = new();
@@ -38,7 +40,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             selectDateRange.Items.Clear();
             selectDateRange.Items.AddRange(new object[] { "Tất cả", "3 tháng", "1 tháng", "7 ngày", "Hôm nay" });
             selectDateRange.SelectedIndex = 3; // mặc định 7 ngày
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
 
             GridStyleHelper.Apply(dataGridView1);
             dataGridView1.AutoGenerateColumns = false;
@@ -243,6 +245,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
                     query += $" AND {nameof(JobHistory.Uid)} = @uid";
                     parameters["@uid"] = uid;
                 }
+
+                // Chặn nạp toàn bảng vào RAM: chỉ lấy tối đa MaxHistoryRows bản ghi mới nhất.
+                // Lịch sử có thể lên tới hàng trăm nghìn dòng — materialize hết sẽ ngốn RAM + đơ UI.
+                query += $" ORDER BY date(substr({nameof(JobHistory.DateTime)}, 7, 4) || '-' || substr({nameof(JobHistory.DateTime)}, 4, 2) || '-' || substr({nameof(JobHistory.DateTime)}, 1, 2)) DESC LIMIT @limit";
+                parameters["@limit"] = MaxHistoryRows;
 
                 var accounts = _Context.GetAll(query, parameters);
 

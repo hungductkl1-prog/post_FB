@@ -1,5 +1,4 @@
-﻿using AntdUI;
-using AutoAndroid;
+﻿using AutoAndroid;
 using DeviceId;
 using Facebook_Farm_NewFeed_PostStory.Utils;
 using Facebook_Farm_NewFeed_PostStory.Views.Forms;
@@ -24,6 +23,60 @@ namespace Facebook_Farm_NewFeed_PostStory
             // MUST be first: re-enable WinForms data binding before any WinForms type is loaded
             // Binding.cctor reads this switch once; if set after first access it's too late.
             AppContext.SetSwitch("System.Windows.Forms.Binding.IsSupported", true);
+
+            // ── UTF-8 cho output process con (sửa tiếng Việt bị "?") ─────────────────
+            // Status thiết bị/tài khoản như "Kiểm tra tài khoản còn sống..." do thư viện
+            // chạy job (AutoAndroid/Sunny.Subd.Core) đọc stdout của process con (node/adb/
+            // script). Khi ProcessStartInfo không set StandardOutputEncoding, .NET dùng code
+            // page output của console → ký tự có dấu thành "?". Đặt console code page = UTF-8
+            // ở đây để các process con đọc output đúng tiếng Việt. Bọc try/catch vì app GUI
+            // có thể không có console attach (setter sẽ ném IOException — bỏ qua an toàn).
+            try { System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance); } catch { }
+            try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch { }
+            try { Console.InputEncoding = System.Text.Encoding.UTF8; } catch { }
+
+            // ── Global crash/exception logging ──────────────────────────────────────
+            // Trước đây KHÔNG có handler nào → mọi exception chưa bắt ở thread nền giết
+            // tiến trình im lặng (exit 0xffffffff) mà không ghi stack. Gắn handler để:
+            //  1) Ghi đầy đủ stack vào logs\crash_*.txt (định vị chính xác lỗi).
+            //  2) CatchException: exception trên UI thread KHÔNG làm crash app nữa.
+            //  3) Quan sát Task lỗi (UnobservedTaskException) để không kết thúc tiến trình.
+            try
+            {
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (_, e) => LogCrash("UI.ThreadException", e.Exception);
+                AppDomain.CurrentDomain.UnhandledException += (_, e) => LogCrash("AppDomain.Unhandled", e.ExceptionObject as Exception);
+                TaskScheduler.UnobservedTaskException += (_, e) => { LogCrash("UnobservedTask", e.Exception); e.SetObserved(); };
+                AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
+            }
+            catch { }
+
+            // Phase 5 grid diagnostics: set ACCOUNT_GRID_DIAG=1 before launch,
+            // OR drop an empty marker file named "diag.on" next to the .exe (reliable for
+            // non-VS launches where env vars don't propagate).
+            bool diagEnv =
+                string.Equals(Environment.GetEnvironmentVariable("ACCOUNT_GRID_DIAG"), "1", StringComparison.Ordinal)
+                || string.Equals(Environment.GetEnvironmentVariable("ACCOUNT_GRID_DIAG"), "true", StringComparison.OrdinalIgnoreCase);
+            bool diagFile = false;
+            try { diagFile = File.Exists(Path.Combine(AppContext.BaseDirectory, "diag.on")); } catch { }
+            if (diagEnv || diagFile)
+            {
+                AccountGridPerf.EnableDiagnostics(true);
+            }
+
+            // A/B render bypass: set ACCOUNT_GRID_NO_PAINT=1 to disable custom render handlers
+            // (custom checkbox painting, CellFormatting, status-badge) and compare FPS/CPU.
+            if (string.Equals(Environment.GetEnvironmentVariable("ACCOUNT_GRID_NO_PAINT"), "1", StringComparison.Ordinal)
+                || string.Equals(Environment.GetEnvironmentVariable("ACCOUNT_GRID_NO_PAINT"), "true", StringComparison.OrdinalIgnoreCase))
+            {
+                AccountGridPerf.EnableNoPaintMode(true);
+            }
+#if DEBUG
+            else
+            {
+                // DEBUG builds: opt-in via env only (no always-on overhead).
+            }
+#endif
 
             // WinForms config phải set trước khi tạo splash form (splash là Form thường).
             ComWrappers.RegisterForMarshalling(WinFormsComInterop.WinFormsComWrappers.Instance);
@@ -70,7 +123,6 @@ namespace Facebook_Farm_NewFeed_PostStory
             }
 
             splash?.SetStatus("Đang tải cấu hình giao diện...");
-            Localization.Provider = new VietnameseLocalization();
 
             // Wire up SortableBindingList to auto-unregister items from ThrottledPropertyNotifier
             // on removal, preventing stale PropertyChanged events from crashing DataGridView.
@@ -111,21 +163,26 @@ namespace Facebook_Farm_NewFeed_PostStory
 
             Globals.AutoLoginTask = Task.CompletedTask;
 
-            splash?.SetStatus("Đang mở giao diện...");
+            // ── Kiểm tra kích hoạt thiết bị (Google Sheets license) ──────────
+            // Đợi DeviceIdTask hoàn tất, mở form kích hoạt nếu thiết bị chưa đc
+            // active, chỉ cho vào fMain khi license hợp lệ.
+            splash?.SetStatus("Đang kiểm tra kích hoạt...");
+            try { Globals.DeviceIdTask.GetAwaiter().GetResult(); } catch { }
 
-            // Giữ splash đến khi fMain thực sự Shown (đã render frame đầu).
-            // Tạo fMain ở đây có thể mất vài giây (constructor + InitializeComponent),
-            // và fMain_Load tạo 4 UserControl đồng bộ trước await đầu tiên — nếu close
-            // splash trước Application.Run, user sẽ thấy màn hình trống ~10s như app cash.
+            splash?.Close();
+
+            using (var licenseForm = new fLicenseCheck())
+            {
+                if (licenseForm.ShowDialog() != DialogResult.OK)
+                    return;
+            }
+
+            // Tạo fMain — license đã OK, có thể mở giao diện chính.
             var main = new fMain();
             if (splash != null)
             {
-                void OnMainShown(object? s, EventArgs e)
-                {
-                    main.Shown -= OnMainShown;
-                    try { splash.Close(); } catch { }
-                }
-                main.Shown += OnMainShown;
+                // splash đã close ở trên — chỉ giữ block cũ cho an toàn (re-check dispose).
+                try { splash.Close(); } catch { }
             }
             Application.Run(main);
         }
@@ -272,6 +329,37 @@ namespace Facebook_Farm_NewFeed_PostStory
             {
                 Trace.TraceError("SetStartup failed: " + ex);
             }
+        }
+
+        // ── Crash logging helpers ───────────────────────────────────────────────
+        private static readonly object _crashLogLock = new();
+        private static int _firstChanceLogged;
+
+        private static void OnFirstChanceException(object? sender, System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
+        {
+            // Chỉ log IndexOutOfRange / ArgumentOutOfRange (thủ phạm crash nền lặp lại),
+            // throttle tối đa 30 lần để không làm chậm + không spam file.
+            if (e.Exception is IndexOutOfRangeException || e.Exception is ArgumentOutOfRangeException)
+            {
+                if (Interlocked.Increment(ref _firstChanceLogged) <= 30)
+                    LogCrash("FirstChance." + e.Exception.GetType().Name, e.Exception);
+            }
+        }
+
+        private static void LogCrash(string source, Exception? ex)
+        {
+            try
+            {
+                string dir = Path.Combine(AppContext.BaseDirectory, "logs");
+                Directory.CreateDirectory(dir);
+                string file = Path.Combine(dir, $"crash_{DateTime.Now:yyyy-MM-dd}.txt");
+                string text =
+                    $"------------------ {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{source}] ----------------------------"
+                    + Environment.NewLine + ex + Environment.NewLine + Environment.NewLine;
+                lock (_crashLogLock) File.AppendAllText(file, text);
+                Trace.TraceError($"[{source}] {ex}");
+            }
+            catch { }
         }
     }
 }

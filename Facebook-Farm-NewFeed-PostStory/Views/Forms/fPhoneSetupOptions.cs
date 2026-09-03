@@ -13,7 +13,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
     /// Trả về <see cref="PhoneSetupOptions"/> qua property <see cref="Result"/> khi OK.
     /// Hủy → DialogResult.Cancel, Result == null.
     /// </summary>
-    public class fPhoneSetupOptions : AntdUI.Window
+    public class fPhoneSetupOptions : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private static readonly string ConfigPath =
             Path.Combine(AppContext.BaseDirectory, "Config", "phone-setup-options.json");

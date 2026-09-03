@@ -10,7 +10,7 @@ using Sunny.Subdy.Data.Models;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fAddAccount : AntdUI.Window
+    public partial class fAddAccount : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private FolderContext _folderContext;
         private AccountContext _accountContext;
@@ -34,7 +34,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             }), shouldExit: false);
             FormatFile = $"accounts-format{platform}.txt";
             ControlHelper.LoadFormatFromFile(FormatFile, cbxs);
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
         private void LoadFormats()
         {
@@ -89,25 +89,58 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 return;
             }
 
+            List<string> lines = txtLines.Lines
+                .Where(line => !string.IsNullOrWhiteSpace(line))
+                .ToList();
+            string selectText = select8.Text ?? string.Empty;
+            string[] fieldMap = cbxs.Select(c => c.SelectedItem?.ToString() ?? string.Empty).ToArray();
+
             SetInputsEnabled(false);
             try
             {
-                await AntdHelper.WithLoading(this,
-                    _add ? "Đang thêm tài khoản..." : "Đang cập nhật tài khoản...",
-                    async () =>
+                if (_add)
+                {
+                    int added = 0;
+                    string? errorMessage = null;
+
+                    await AntdHelper.WithLoading(this, "Đang thêm tài khoản...", async () =>
                     {
-                        List<string> lines = txtLines.Lines
-                            .Where(line => !string.IsNullOrWhiteSpace(line))
-                            .ToList();
-
-                        if (_add) await AddAccounts(lines);
-                        else      await UpdateAccounts(lines);
-
-                        AntdHelper.NotifySuccess(
-                            this,
-                            _add ? "Đã thêm" : "Đã cập nhật",
-                            $"{lines.Count} tài khoản đã được xử lý.");
+                        var result = await Task.Run(() => AddAccounts(lines, selectText, fieldMap))
+                            .ConfigureAwait(false);
+                        added = result.Added;
+                        errorMessage = result.ErrorMessage;
                     });
+
+                    if (added > 0)
+                    {
+                        AntdHelper.NotifySuccess(this, "Đã thêm", $"{added} tài khoản mới.");
+                        Close();
+                    }
+                    else if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        AntdHelper.NotifyError(this, "Thao tác thất bại", errorMessage);
+                    }
+                }
+                else
+                {
+                    var updateResult = default(UpdateAccountsResult);
+
+                    await AntdHelper.WithLoading(this, "Đang cập nhật tài khoản...", async () =>
+                    {
+                        updateResult = await Task.Run(() => UpdateAccounts(lines, fieldMap))
+                            .ConfigureAwait(false);
+                    });
+
+                    if (updateResult.Success)
+                    {
+                        AntdHelper.NotifySuccess(this, "Thành công", updateResult.Message);
+                        Close();
+                    }
+                    else if (!string.IsNullOrEmpty(updateResult.Message))
+                    {
+                        AntdHelper.NotifyError(this, "Thao tác thất bại", updateResult.Message);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -120,6 +153,18 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             }
         }
 
+        private readonly struct AddAccountsResult
+        {
+            public int Added { get; init; }
+            public string? ErrorMessage { get; init; }
+        }
+
+        private readonly struct UpdateAccountsResult
+        {
+            public bool Success { get; init; }
+            public string Message { get; init; }
+        }
+
         private void SetInputsEnabled(bool enabled)
         {
             panel1.Enabled    = enabled;
@@ -130,7 +175,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             button9.Enabled   = enabled;
             select8.Enabled   = enabled;
         }
-        private async Task UpdateAccounts(List<string> lines)
+        private UpdateAccountsResult UpdateAccounts(List<string> lines, string[] fieldMap)
         {
             List<Account> accounts = new List<Account>();
             AccountContext accountContext = new AccountContext();
@@ -142,20 +187,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 Account account = new Account();
                 string[] parts = line.Split('|');
 
-                for (int i = 0; i < cbxs.Count && i < parts.Length; i++)
+                for (int i = 0; i < fieldMap.Length && i < parts.Length; i++)
                 {
-                    string field = string.Empty;
-                    if (cbxs[i].InvokeRequired)
-                    {
-                        cbxs[i].Invoke(new Action(() =>
-                        {
-                            field = cbxs[i].SelectedItem?.ToString() ?? string.Empty;
-                        }));
-                    }
-                    else
-                    {
-                        field = cbxs[i].SelectedItem?.ToString() ?? string.Empty;
-                    }
+                    string field = fieldMap[i];
                     string value = parts[i].Trim();
 
                     switch (field)
@@ -222,38 +256,29 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             {
                 if (accountContext.Update(accounts))
                 {
-                    AntdHelper.NotifySuccess(this, "Thành công", $"Đã cập nhật {accounts.Count} tài khoản.");
-                    this.Close();
+                    return new UpdateAccountsResult
+                    {
+                        Success = true,
+                        Message = $"Đã cập nhật {accounts.Count} tài khoản."
+                    };
                 }
-                else
+
+                return new UpdateAccountsResult
                 {
-                    AntdHelper.NotifyError(this, "Thao tác thất bại", "Cập nhật tài khoản thất bại.");
-                }
+                    Success = false,
+                    Message = "Cập nhật tài khoản thất bại."
+                };
             }
-            else
+
+            return new UpdateAccountsResult
             {
-                AntdHelper.NotifyError(this, "Thao tác thất bại", "Không có tài khoản nào đã được lưu để cập nhật");
-            }
+                Success = false,
+                Message = "Không có tài khoản nào đã được lưu để cập nhật"
+            };
         }
 
-        private async Task AddAccounts(List<string> lines)
+        private AddAccountsResult AddAccounts(List<string> lines, string selectText, string[] fieldMap)
         {
-            string selectText = string.Empty;
-            string[] fieldMap = Array.Empty<string>();
-            if (this.InvokeRequired)
-            {
-                this.Invoke(new Action(() =>
-                {
-                    selectText = select8.Text ?? string.Empty;
-                    fieldMap = cbxs.Select(c => c.SelectedItem?.ToString() ?? string.Empty).ToArray();
-                }));
-            }
-            else
-            {
-                selectText = select8.Text ?? string.Empty;
-                fieldMap = cbxs.Select(c => c.SelectedItem?.ToString() ?? string.Empty).ToArray();
-            }
-
             string nameFolder = selectText != "[ Không cần nhóm ]" ? selectText : string.Empty;
             List<Account> accounts = new List<Account>();
             string namefolder = selectText.Trim() == "[ Không cần nhóm ]" ? "" : selectText.Trim();
@@ -265,6 +290,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 Account account = new Account();
                 account.NameFolder = namefolder;
                 account.Platformt = _platform;
+                account.IsView = true;
                 string[] parts = line.Split('|');
 
                 for (int i = 0; i < fieldMap.Length && i < parts.Length; i++)
@@ -329,8 +355,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 }
             }
             var accountContext = new AccountContext();
-            var accountsOld = accountContext.GetAll(new List<string> { nameFolder }, _platform, true);
-            var oldUids = new HashSet<string>(accountsOld.Select(a => a.Uid));
+            var oldUids = accountContext.GetExistingUids(
+                string.IsNullOrEmpty(namefolder) ? new List<string>() : new List<string> { namefolder },
+                _platform,
+                true);
             var accountsToAdd = accounts
                 .Where(a => !string.IsNullOrEmpty(a.Uid) && !oldUids.Contains(a.Uid))
                 .ToList();
@@ -338,17 +366,21 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             {
                 if (accountContext.AddRange(accountsToAdd))
                 {
-                    AntdHelper.NotifySuccess(this, "Thành công", $"Đã thêm {accountsToAdd.Count} tài khoản mới vào.");
+                    return new AddAccountsResult { Added = accountsToAdd.Count };
                 }
-                else
+
+                return new AddAccountsResult
                 {
-                    AntdHelper.NotifyError(this, "Thao tác thất bại", "Thêm tài khoản thất bại.");
-                }
+                    Added = 0,
+                    ErrorMessage = "Thêm tài khoản thất bại."
+                };
             }
-            else
+
+            return new AddAccountsResult
             {
-                AntdHelper.NotifyError(this, "Thao tác thất bại", "Dữ liệu bị trùng.");
-            }
+                Added = 0,
+                ErrorMessage = "Dữ liệu bị trùng."
+            };
         }
         private void cbx_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -517,14 +549,6 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
         private void btn_setting_Click_2(object sender, EventArgs e)
         {
             this.Close();
-        }
-
-        private void btn_global_SelectedValueChanged_2(object sender, AntdUI.ObjectNEventArgs e)
-        {
-            if (this.WindowState == FormWindowState.Maximized)
-                this.WindowState = FormWindowState.Normal;
-            else
-                this.WindowState = FormWindowState.Maximized;
         }
 
         private void btn_global_Click_1(object sender, EventArgs e)

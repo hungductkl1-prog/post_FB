@@ -12,7 +12,7 @@ using System.Windows.Forms;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fSettingRegsiner : AntdUI.Window
+    public partial class fSettingRegsiner : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private string _platform = "";
         private Sunny.Subdy.Common.Json.ConfigHelper _configHelper;
@@ -64,7 +64,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 
             }), shouldExit: false);
             tabs3.SelectedIndex = 0;
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
         private void LoadForm()
         {

@@ -84,11 +84,7 @@
     người khác build trên máy khác có version VS khác). Chạy trước SetupOSSpecificProps
     để NativeLibrary item của ta được pickup vào LinkerArg.
   -->
-  <Target Name="BuildGCBridgeStub"
-          Condition=" '$(PublishAot)' == 'true' "
-          BeforeTargets="SetupOSSpecificProps"
-          Inputs="$(MSBuildThisFileDirectory)NativeAot\GCBridgeStub.cpp"
-          Outputs="$(IntermediateOutputPath)native\GCBridgeStub.obj">
+  <Target Name="BuildGCBridgeStub" Condition=" '$(PublishAot)' == 'true' " BeforeTargets="SetupOSSpecificProps" Inputs="$(MSBuildThisFileDirectory)NativeAot\GCBridgeStub.cpp" Outputs="$(IntermediateOutputPath)native\GCBridgeStub.obj">
     <PropertyGroup>
       <_GCBridgeStubObj>$(IntermediateOutputPath)native\GCBridgeStub.obj</_GCBridgeStubObj>
       <_GCBridgeStubSrc>$(MSBuildThisFileDirectory)NativeAot\GCBridgeStub.cpp</_GCBridgeStubSrc>
@@ -96,20 +92,15 @@
     </PropertyGroup>
     <MakeDir Directories="$(IntermediateOutputPath)native" />
     <Error Condition="!Exists('$(_VsWhere)')" Text="vswhere.exe không tìm thấy ở '$(_VsWhere)'. Cần Visual Studio C++ build tools để compile GCBridgeStub." />
-    <Exec Command='&quot;$(_VsWhere)&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath'
-          ConsoleToMSBuild="true" StandardOutputImportance="Low">
+    <Exec Command="&quot;$(_VsWhere)&quot; -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath" ConsoleToMSBuild="true" StandardOutputImportance="Low">
       <Output TaskParameter="ConsoleOutput" PropertyName="_VsInstallDir" />
     </Exec>
     <Error Condition="'$(_VsInstallDir)' == ''" Text="Không tìm thấy VS installation có C++ build tools. Cài Workload 'Desktop development with C++'." />
-    <Exec Command='call "$(_VsInstallDir)\VC\Auxiliary\Build\vcvarsall.bat" x64 &gt; nul &amp;&amp; cl.exe /nologo /c /O2 /MT /Fo"$(_GCBridgeStubObj)" "$(_GCBridgeStubSrc)"'
-          ConsoleToMSBuild="true" />
+    <Exec Command="call &quot;$(_VsInstallDir)\VC\Auxiliary\Build\vcvarsall.bat&quot; x64 &gt; nul &amp;&amp; cl.exe /nologo /c /O2 /MT /Fo&quot;$(_GCBridgeStubObj)&quot; &quot;$(_GCBridgeStubSrc)&quot;" ConsoleToMSBuild="true" />
   </Target>
 
   <!-- Đính obj vào NativeLibrary mỗi lần publish (kể cả khi BuildGCBridgeStub bị skip vì up-to-date) -->
-  <Target Name="IncludeGCBridgeStub"
-          Condition=" '$(PublishAot)' == 'true' "
-          BeforeTargets="SetupOSSpecificProps"
-          DependsOnTargets="BuildGCBridgeStub">
+  <Target Name="IncludeGCBridgeStub" Condition=" '$(PublishAot)' == 'true' " BeforeTargets="SetupOSSpecificProps" DependsOnTargets="BuildGCBridgeStub">
     <ItemGroup>
       <NativeLibrary Include="$(IntermediateOutputPath)native\GCBridgeStub.obj" />
     </ItemGroup>
@@ -121,7 +112,6 @@
     <ProjectReference Include="..\AntdUI.EmojiFluentFlat\AntdUI.EmojiFluentFlat.csproj" />
     <ProjectReference Include="..\ScrcpyNet\ScrcpyNet.csproj" />
     <ProjectReference Include="..\AutoAndroid\AutoAndroid.csproj" />
-    <ProjectReference Include="..\Sunny.Subdy.Data\Sunny.Subdy.Data.csproj" />
     <ProjectReference Include="..\Sunny.Subdy.Common\Sunny.Subdy.Common.csproj" />
   </ItemGroup>
 

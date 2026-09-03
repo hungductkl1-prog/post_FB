@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace Sunny.Subdy.Data.Models;
 
@@ -32,9 +33,13 @@ public sealed class ThrottledPropertyNotifier
     // Pending (owner, propertyName) pairs — set by any thread, cleared by Flush
     private static readonly ConcurrentDictionary<(INotifyPropertyChanged, string), byte> _dirty = new();
 
-    // Set of currently active owners — items are added on first MarkDirty, removed by Unregister.
-    // RaiseAll checks this before firing to skip owners removed between snapshot and invocation.
-    private static readonly ConcurrentDictionary<INotifyPropertyChanged, byte> _active = new();
+    // Set of currently active owners. ConditionalWeakTable holds keys WEAKLY: a transient owner
+    // (job/check-live/registration Account that mutated a property but is not held by the grid cache)
+    // becomes GC-eligible even if it was never explicitly Unregister-ed. Trước đây đây là
+    // ConcurrentDictionary giữ strong ref → mọi Account từng MarkDirty bị ghim vĩnh viễn (rò bộ nhớ
+    // O(số account đã chạy job) trong phiên dài). RaiseAll checks this before firing.
+    private static readonly ConditionalWeakTable<INotifyPropertyChanged, object> _active = new();
+    private static readonly object _activeMarker = new();
 
     private static readonly System.Threading.Timer _timer;
     // Captured from the UI thread in Initialize(). Used to Post RaiseAll back to the UI thread.
@@ -61,7 +66,7 @@ public sealed class ThrottledPropertyNotifier
     /// </summary>
     public static void MarkDirty(INotifyPropertyChanged owner, string propertyName)
     {
-        _active.TryAdd(owner, 0);
+        _active.AddOrUpdate(owner, _activeMarker);
         _dirty.TryAdd((owner, propertyName), 0);
     }
 
@@ -74,11 +79,27 @@ public sealed class ThrottledPropertyNotifier
     /// </summary>
     public static void Unregister(INotifyPropertyChanged owner)
     {
-        _active.TryRemove(owner, out _);
+        _active.Remove(owner);
         // Also clear any pending dirty entries to avoid unnecessary work
         foreach (var key in _dirty.Keys)
         {
             if (ReferenceEquals(key.Item1, owner))
+                _dirty.TryRemove(key, out _);
+        }
+    }
+
+    /// <summary>
+    /// Drop many owners in one pass (e.g. replacing a 30k scope list). Safe from any thread.
+    /// </summary>
+    public static void UnregisterMany(IEnumerable<INotifyPropertyChanged> owners)
+    {
+        foreach (var owner in owners)
+            _active.Remove(owner);
+
+        var keys = _dirty.Keys.ToArray();
+        foreach (var key in keys)
+        {
+            if (!_active.TryGetValue(key.Item1, out _))
                 _dirty.TryRemove(key, out _);
         }
     }
@@ -105,7 +126,7 @@ public sealed class ThrottledPropertyNotifier
         {
             // Skip if Unregister was called between Flush snapshot and this invocation.
             // This is the key guard that prevents raising PropertyChanged on removed items.
-            if (!_active.ContainsKey(owner)) continue;
+            if (!_active.TryGetValue(owner, out _)) continue;
 
             if (owner is IThrottledNotify t)
             {
@@ -113,7 +134,7 @@ public sealed class ThrottledPropertyNotifier
                 catch (ObjectDisposedException)
                 {
                     // Bound control was disposed between snapshot and raise — drop the owner.
-                    _active.TryRemove(owner, out _);
+                    _active.Remove(owner);
                 }
                 catch (InvalidOperationException)
                 {

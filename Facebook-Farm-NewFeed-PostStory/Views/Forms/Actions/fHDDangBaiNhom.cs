@@ -17,7 +17,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         public fHDDangBaiNhom(string scriptId, string actionId = "")
         {
             InitializeComponent();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             Facebook_Farm_NewFeed_PostStory.Utils.Design.FormResponsiveHelper.MakeScrollable(this);
             _context = new ScriptActionContext();
             this.scriptId = scriptId;

@@ -7,6 +7,7 @@
         CP_282,
         CP_956,
         LogOut,
+        WrongPassword,
         Error,
         Captcha,
         Block,

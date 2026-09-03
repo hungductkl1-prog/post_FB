@@ -7,18 +7,17 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
 {
     public class VipIGClient
     {
-        private readonly HttpClient _client;
+        // Shared singleton — HttpClient được thiết kế để tái dùng; tạo mới mỗi lần làm rò socket (TIME_WAIT).
+        private static readonly HttpClient _client = new HttpClient();
         private string _cookie = "";
         private readonly string _userAgent = "Mozilla/5.0";
 
         public VipIGClient()
         {
-            _client = new HttpClient();
         }
         public VipIGClient(string cookie)
         {
             _cookie = cookie;
-            _client = new HttpClient();
         }
         private void ApplyDefaultHeaders(HttpRequestMessage request, string? referer = null)
         {
@@ -222,7 +221,7 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
         {
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Get, "https://vipig.net/index.php");
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
@@ -246,7 +245,7 @@ namespace Sunny.Subdy.Common.API.Jobs.VipIG
         {
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Post, "https://vipig.net/register.php");
                 request.Headers.Add("x-requested-with", "XMLHttpRequest");
                 request.Headers.Add("Cookie", "PHPSESSID=h7o8aca4fvjdqc22k3hvshvel5");

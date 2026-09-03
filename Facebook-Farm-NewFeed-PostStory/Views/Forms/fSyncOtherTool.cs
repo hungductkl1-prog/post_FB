@@ -11,7 +11,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fSyncOtherTool : AntdUI.Window
+    public partial class fSyncOtherTool : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private readonly string _tool;
         private readonly string _platform;
@@ -41,7 +41,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             _folderContext = new FolderContext();
 
             BuildUi();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
 
             string saved = SafeReadConfig();
             if (!string.IsNullOrEmpty(saved)) txtUid.Text = saved;
@@ -416,6 +416,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 
         private static void ApplyTo(Account dst, OtherToolAccount src)
         {
+            // Thông tin đăng nhập
             dst.Uid = src.Uid ?? dst.Uid;
             if (!string.IsNullOrEmpty(src.Password)) dst.Password = src.Password;
             if (!string.IsNullOrEmpty(src.TwoFA)) dst.TowFA = src.TwoFA;
@@ -424,7 +425,24 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             if (!string.IsNullOrEmpty(src.Proxy)) dst.Proxy = src.Proxy;
             if (!string.IsNullOrEmpty(src.Email)) dst.EmailAddress = src.Email;
             if (!string.IsNullOrEmpty(src.PassMail)) dst.PassMail = src.PassMail;
+            if (!string.IsNullOrEmpty(src.MailRecovery)) dst.MailRecovery = src.MailRecovery;
             if (!string.IsNullOrEmpty(src.UserAgent)) dst.UserAgent = src.UserAgent;
+
+            // Hồ sơ / metadata đầy đủ theo schema MaxPhoneFarm
+            if (!string.IsNullOrEmpty(src.FullName)) dst.FullName = src.FullName;
+            if (!string.IsNullOrEmpty(src.Phone)) dst.Phone = src.Phone;
+            if (!string.IsNullOrEmpty(src.Birthday)) dst.Birthday = src.Birthday;
+            if (!string.IsNullOrEmpty(src.Gender)) dst.Gender = src.Gender;
+            if (!string.IsNullOrEmpty(src.Avatar)) dst.Avatar = src.Avatar;
+            if (!string.IsNullOrEmpty(src.Bio)) dst.Bio = src.Bio;
+            if (!string.IsNullOrEmpty(src.Friends)) dst.Friends = src.Friends;
+            if (!string.IsNullOrEmpty(src.Groups)) dst.Groups = src.Groups;
+            if (!string.IsNullOrEmpty(src.Follow)) dst.Follow = src.Follow;
+            if (!string.IsNullOrEmpty(src.Status)) dst.Status = src.Status;
+            if (!string.IsNullOrEmpty(src.Device)) dst.DeviceInfo = src.Device;
+            if (!string.IsNullOrEmpty(src.DateCreate)) dst.DateCreate = src.DateCreate;
+            if (!string.IsNullOrEmpty(src.Note)) dst.Note = src.Note;
+            if (!string.IsNullOrEmpty(src.RecentInteraction)) dst.RecentInteraction = src.RecentInteraction;
         }
 
         private static string SafeReadConfig()

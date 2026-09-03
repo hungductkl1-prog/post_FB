@@ -19,33 +19,44 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils
         private static DateTime? _ramOverThresholdSince;
         private static DateTime _lastCpuAlert = DateTime.MinValue;
         private static DateTime _lastRamAlert = DateTime.MinValue;
+        private static bool _cpuPerformanceCounterUnavailable;
 
         public static event Action<string, float>? OverloadDetected;
 
         public static async Task<float> GetCpuUsage()
         {
-            using (var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"))
+            if (_cpuPerformanceCounterUnavailable) return 0f;
+
+            try
             {
+                using var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
                 cpuCounter.NextValue();
-                await Task.Delay(500);
+                await Task.Delay(500).ConfigureAwait(false);
                 return cpuCounter.NextValue();
+            }
+            catch (Exception)
+            {
+                // Performance counters disabled or unavailable on this machine.
+                _cpuPerformanceCounterUnavailable = true;
+                return 0f;
             }
         }
 
         public static float GetRamUsage()
         {
-            using (var ramCounter = new PerformanceCounter("Memory", "Available MBytes"))
+            try
             {
-                float availableMb = ramCounter.NextValue();
-                float totalMb = GetTotalRamInMb();
+                var computerInfo = new ComputerInfo();
+                float totalMb = computerInfo.TotalPhysicalMemory / (1024f * 1024f);
+                if (totalMb <= 0f) return 0f;
+
+                float availableMb = computerInfo.AvailablePhysicalMemory / (1024f * 1024f);
                 return 100f - (availableMb / totalMb * 100f);
             }
-        }
-
-        private static float GetTotalRamInMb()
-        {
-            var computerInfo = new ComputerInfo();
-            return computerInfo.TotalPhysicalMemory / (1024f * 1024f);
+            catch (InvalidOperationException)
+            {
+                return 0f;
+            }
         }
 
         /// <summary>

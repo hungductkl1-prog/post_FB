@@ -47,7 +47,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
                 configJson = action?.Json ?? "";
             }
             jsonConfig = new JsonHelper(configJson, isJsonString: true);
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             this.Load += (s, e) => LoadFromJson();
             btnCancel.Click += (s, e) => Close();
             btnSave.Click += BtnSave_Click;

@@ -2,6 +2,7 @@
 using Sunny.Subd.Core.Facebook;
 using Sunny.Subd.Core.Facebook.ScriptActions;
 using Sunny.Subd.Core.Instagram;
+using Sunny.Subd.Core.Pandora;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Proxies;
 using Sunny.Subd.Core.Utils;
@@ -34,6 +35,10 @@ namespace Sunny.Subd.Core.Services
         public string _sate = string.Empty; // Trạng thái hiện tại của quá trình
         public Stopwatch _swTotal = new Stopwatch();
         private BackupRestoreHelper _backupRestoreHelper;
+        private bool _devicePrepared;
+        private bool _facebookPermissionsReady;
+        private bool _facebookReinstallAttempted;
+        private const int FacebookCrashReinstallThreshold = 3;
         // Constructor khởi tạo dịch vụ
         public MainService(string platform, ADBClient device, ConfigModel config, CancellationToken ct)
         {
@@ -50,6 +55,7 @@ namespace Sunny.Subd.Core.Services
             {
                 _facebookService = new InstagramService();
             }
+            // Pandora: no FacebookService needed
             _settingJob = config.SettingJob;
             _settingGeneral = config.SettingGeneral;
             _settingScriptAction = config.SettingJob;
@@ -114,19 +120,33 @@ namespace Sunny.Subd.Core.Services
 
             DateTime? startDateTime = _settingGeneral.GetValueDateTime("uiTimePicker1");
             DateTime? endDateTime = _settingGeneral.GetValueDateTime("uiTimePicker2");
-            if (startDateTime == null && endDateTime == null) return;
+            if (startDateTime == null || endDateTime == null) return;
             TimeSpan now = DateTime.Now.TimeOfDay;
             TimeSpan startTime = startDateTime.Value.TimeOfDay;
             TimeSpan endTime = endDateTime.Value.TimeOfDay;
 
-            if (startTime <= endTime && now >= startTime && now <= endTime)
+            bool inSleepWindow;
+            TimeSpan remaining;
+            if (startTime <= endTime)
             {
-                TimeSpan remaining = endTime - now;
+                // Ví dụ: 08:00 - 12:00
+                inSleepWindow = now >= startTime && now <= endTime;
+                remaining = endTime - now;
+            }
+            else
+            {
+                // Qua nửa đêm: ví dụ 23:00 - 06:00
+                inSleepWindow = now >= startTime || now <= endTime;
+                remaining = now <= endTime
+                    ? endTime - now
+                    : TimeSpan.FromHours(24) - now + endTime;
+            }
+
+            if (inSleepWindow && remaining.TotalSeconds > 0)
+            {
                 int totalSecondsInt = (int)remaining.TotalSeconds;
                 await DelayMessageAsync(totalSecondsInt, "Đã tới giờ nghỉ giải lao, phần mềm sẽ ngủ đông. Đợi {time} giây", 2);
             }
-
-
         }
         public async Task ExtractAndUpdateAuthenticationInfoAsync()
         {
@@ -279,11 +299,11 @@ namespace Sunny.Subd.Core.Services
         }
 
         // Thay đổi proxy
-        private async Task ChangeProxyAsync()
+        private async Task<bool> ChangeProxyAsync()
         {
             _sate = "Thay đổi IP/Proxy";
             SetStatus("Đang thay đổi IP/Proxy...", 2);
-            _client.Shell("settings put global http_proxy :0");
+            _client.Shell("settings", "put", "global", "http_proxy", ":0");
             _client.StopApp(VATProxyService.Package_Proxy);
             string proxy = string.Empty;
             var proxyType = GetProxyType();
@@ -291,7 +311,7 @@ namespace Sunny.Subd.Core.Services
             switch (proxyType)
             {
                 case ProxyService.NoIP:
-                    return;
+                    return true;
                 case ProxyService.Mobile4G:
                     await HandleMobile4GProxyAsync();
                     break;
@@ -308,22 +328,44 @@ namespace Sunny.Subd.Core.Services
                     proxy = await GetCustomProxyAsync();
                     break;
                 case ProxyService.ProxyAssigned:
-                    proxy = _account.Proxy;
+                    proxy = _account?.Proxy;
                     break;
             }
-            SetStatus($"Loại: [{proxyType}] - [{proxy}]", 2);
-            if (!string.IsNullOrEmpty(proxy))
-            {
-                _client.ConnectProxyADB(proxy);
-            }
-            int timeDelay = _settingGeneral.GetIntType("numericUpDown3", 10);
-            await DelayMessageAsync(timeDelay, "Đợi {time} giây kết nối.", 2);
+
+            SetStatus($"Loại: [{proxyType}] - proxy đã nhận", 2);
             if (proxyType == ProxyService.Mobile4G)
             {
                 _client.DisablePlane();
                 _client.Enabel4G();
                 await DelayMessageAsync(5, "Đợi {time} giây kết nối 4G.", 2);
+                return true;
             }
+
+            if (string.IsNullOrWhiteSpace(proxy))
+            {
+                SetStatus("Không lấy được proxy, bỏ qua tài khoản.", 1);
+                return false;
+            }
+
+            // Normal job chỉ dùng VAT Proxy đã cài sẵn; tuyệt đối không tải/cài trong vòng account.
+            if (!_client.AppList().Contains(VATProxyService.Package_Proxy))
+            {
+                SetStatus("Thiết bị không có APK VAT Proxy đã cài sẵn. Dừng thiết bị.", 1);
+                _client.Device.IsLive = false;
+                _client.Running = false;
+                return false;
+            }
+
+            if (!_client.ConnectProxyPreinstalled(proxy))
+            {
+                SetStatus("Kết nối proxy thất bại, bỏ qua tài khoản.", 1);
+                return false;
+            }
+
+            int timeDelay = _settingGeneral.GetIntType("numericUpDown3", 10);
+            if (timeDelay > 0)
+                await DelayMessageAsync(timeDelay, "Đợi {time} giây kết nối.", 2);
+            return true;
         }
 
         // Lấy loại proxy từ cấu hình
@@ -401,84 +443,55 @@ namespace Sunny.Subd.Core.Services
         private async Task<bool> OpenFacebookAsync()
         {
             _sate = $"Mở ứng dụng {_platform}";
-            string fileAPK = string.Empty;
-            if (_settingGeneral.GetBooleanValue("checkBox8", true))
+            string package = FacebookHander.Package(_platform);
+            int crashCount = 0;
+            for (int attempt = 1; attempt <= 10; attempt++)
             {
-                fileAPK = _settingGeneral.GetValuesFromInputString("textBox4", FacebookHander.FilePath(_platform));
-            }
-            for (int i = 1; i <= 10; i++)
-            {
-                SetStatus($"[{i}/10] Đang khởi động ứng dụng {_platform}...", 2);
-                _client.AppStart(FacebookHander.Package(_platform), true, true, true);
-                if (_client.ElementWithAttributes($"//*[@text=\"{_platform} keeps stopping\"]", 5, click: false))
-                {
-                    var s = _client.ElementWithAttributes("//*[@text=\"Close app\"]");
-                    SetStatus($"[{i}/{10}] Bị crash. Cài lại ứng dụng {_platform}.", 1);
-                    if (!File.Exists(fileAPK))
-                    {
-                        SetStatus($"[{i}/{10}] Bị crash. Cài lại ứng dụng {_platform}. Không tìm thấy apk [{fileAPK}]", 1);
-                        return false;
-                    }
-                    _client.UninstallApp(FacebookHander.Package(_platform));
-                    _client.InstallApp(fileAPK);
+                SetStatus($"[{attempt}/10] Đang khởi động ứng dụng {_platform}...", 2);
+                _client.AppStart(package, true, true, true);
+                if (_client.AppWait(package)) return true;
+
+                bool crashed = _client.ElementWithAttributes($"//*[@text=\"{_platform} keeps stopping\"]", 3, click: false);
+                if (!crashed) continue;
+
+                _client.ElementWithAttributes("//*[@text=\"Close app\"]");
+                crashCount++;
+                SetStatus($"[{crashCount}/{FacebookCrashReinstallThreshold}] Facebook crash; thử mở lại, chưa cài lại.", 1);
+
+                if (crashCount < FacebookCrashReinstallThreshold || _facebookReinstallAttempted)
                     continue;
-                }
-                if (_client.AppWait(FacebookHander.Package(_platform))) return true;
+
+                _facebookReinstallAttempted = true;
+                SetStatus("Facebook crash nhiều lần, đang cài lại APK...", 1);
+                if (!ReinstallFacebook()) return false;
+                if (!await PrepareDeviceOnceAsync()) return false;
+                crashCount = 0;
             }
-            return _client.AppWait(FacebookHander.Package(_platform));
+
+            return _client.AppWait(package);
         }
 
         // Kết nối và chuẩn bị thiết bị.
         // Trả về (ok, noInternet). noInternet=true khi fail VÌ thiết bị không lên được mạng
         // (caller dùng để đếm chu kỳ liên tiếp và bail out nếu quá ngưỡng). false nếu fail
         // vì lý do khác (không connect được adb, v.v.) hoặc khi thành công.
-        private async Task<(bool ok, bool noInternet)> ConnectAndPrepareDeviceAsync(bool changeProxy)
+        public async Task<(bool ok, bool noInternet)> ConnectAndPrepareDeviceAsync(bool changeProxy)
         {
-            if (!await ConnectDeviceAsync())
+            if (!await PrepareDeviceOnceAsync())
             {
-                SetStatus("Không thể kết nối thiết bị.", 1);
+                _client.Device.IsLive = false;
+                _client.Running = false;
                 return (false, false);
             }
 
             if (changeProxy)
             {
                 await ChangeInfoAsync();
-                await ChangeProxyAsync();
+                if (!await ChangeProxyAsync())
+                    return (false, false);
             }
 
-            if (_settingGeneral.GetBooleanValue("checkBox4", false))
-            {
-                int retryCount = _settingGeneral.GetIntType("numericUpDown1", 1);
-                bool triedJoinWifi = false;
-                for (int i = 0; i < retryCount; i++)
-                {
-                    if (await IsInternetAsync())
-                        return (true, false);
-
-                    // Mất mạng → nếu user đã cấu hình ssid/pass cho serial này thì
-                    // join wifi qua adb-join-wifi rồi thử lại. Chỉ chạy 1 lần để
-                    // tránh spam install/launch APK trong vòng lặp.
-                    if (!triedJoinWifi)
-                    {
-                        triedJoinWifi = true;
-                        if (await TryJoinConfiguredWifiAsync() && await IsInternetAsync())
-                            return (true, false);
-                    }
-                }
-
-                SetStatus($"Reboot khi mất mạng quá {retryCount} lần", 2);
-                _client.RebootAndWaitForDeviceReady();
-                return (false, true);
-            }
-
-            if (await IsInternetAsync()) return (true, false);
-
-            // Single-attempt branch: nếu fail và có ssid/pass cấu hình → thử join và re-check.
-            if (await TryJoinConfiguredWifiAsync() && await IsInternetAsync())
-                return (true, false);
-
-            SetStatus("Không có kết nối internet sau khi thử lại.", 1);
-            return (false, true);
+            return (true, false);
         }
 
         // Đọc wifi-credentials.json theo serial, dùng adb-join-wifi để thiết bị
@@ -515,7 +528,7 @@ namespace Sunny.Subd.Core.Services
             _sate = "Kết nối thiết bị";
             return _client.Connect();
         }
-        private async Task<bool> InstallFacebook()
+        private bool ReinstallFacebook()
         {
             string fileAPK = string.Empty;
             if (_settingGeneral.GetBooleanValue("checkBox8", true))
@@ -526,86 +539,95 @@ namespace Sunny.Subd.Core.Services
             {
                 fileAPK = FacebookHander.FilePath(_platform);
             }
-            for (int i = 1; i <= 10; i++)
-            {
 
-                SetStatus($"[{i}/10] Bị crash. Cài lại ứng dụng {_platform}.", 1);
-                if (!File.Exists(fileAPK))
-                {
-                    SetStatus($"[{i}/10] Đang tải APK...", 2);
-                    InitHelper.GithubDown(FacebookHander.DownloadUrl(_platform), fileAPK);
-                }
-                if (!File.Exists(fileAPK))
-                {
-                    throw new Exception($"Không thể tải APK [{fileAPK}]");
-                }
-                _client.InstallApp(fileAPK);
-                if (!_client.AppList().Contains(FacebookHander.Package(_platform))) continue;
-                SetStatus($"[{i}/10] Đang khởi động ứng dụng {_platform}...", 2);
-                _client.AppStart(FacebookHander.Package(_platform), true, true, true);
-                if (_client.AppWait(FacebookHander.Package(_platform))) return true;
-                continue;
+            if (!File.Exists(fileAPK))
+            {
+                SetStatus($"Không tìm thấy APK Facebook để khôi phục: [{fileAPK}]", 1);
+                return false;
             }
-            throw new Exception($"Không thể khởi động {_platform} sau 10 lần thử.");
+
+            _client.StopApp(FacebookHander.Package(_platform));
+            if (!_client.UninstallApp(FacebookHander.Package(_platform)))
+            {
+                SetStatus("Không thể gỡ Facebook để khôi phục sau nhiều lần crash.", 1);
+                return false;
+            }
+
+            if (!_client.InstallApp(fileAPK))
+            {
+                SetStatus("Không thể cài lại Facebook sau nhiều lần crash.", 1);
+                return false;
+            }
+
+            _facebookPermissionsReady = false;
+            _devicePrepared = false;
+            return true;
         }
-        // Chuẩn bị thiết bị
+
+        // Chuẩn bị APK/dependency một lần cho vòng đời worker.
+        // Normal job chỉ dùng APK đã cài sẵn; không tự download/cài Facebook hoặc VAT Proxy.
+        private async Task<bool> PrepareDeviceOnceAsync()
+        {
+            if (_devicePrepared) return true;
+
+            _sate = "Kiểm tra ứng dụng trên thiết bị";
+            SetStatus("Đang kiểm tra Facebook và VAT Proxy đã cài sẵn...", 2);
+            {
+                var installedPackages = new HashSet<string>(_client.AppList(), StringComparer.OrdinalIgnoreCase);
+                if (!installedPackages.Contains(FacebookHander.Package(_platform)))
+                {
+                    SetStatus("Thiết bị không có APK Facebook đã cài sẵn. Dừng thiết bị.", 1);
+                    _client.Device.IsLive = false;
+                    _client.Running = false;
+                    return false;
+                }
+
+                if (!installedPackages.Contains(VATProxyService.Package_Proxy))
+                {
+                    SetStatus("Thiết bị không có APK VAT Proxy đã cài sẵn. Dừng thiết bị.", 1);
+                    _client.Device.IsLive = false;
+                    _client.Running = false;
+                    return false;
+                }
+
+                // Quyền Facebook do người dùng cấp thủ công trước khi chạy job.
+                // Normal flow không kiểm tra hoặc cấp quyền lặp lại.
+            }
+
+            _devicePrepared = true;
+            return true;
+        }
+
+        // Chuẩn bị thiết bị. Hàm này chỉ giữ tương thích cho các luồng cũ;
+        // cleanup dữ liệu tài khoản được thực hiện riêng trong RunAsync.
         private async Task PrepareDeviceAsync(bool isContainNoDelete = true)
         {
-            _sate = "Chuẩn bị ứng dụng";
-            var check = _settingGeneral.GetBooleanValue("checkBox12", false);
-            if (!check)
+            if (!await PrepareDeviceOnceAsync())
             {
-                List<string> packages = new List<string>();
-                switch (_platform)
-                {
-                    case PlatformModel.Facebook:
-                        {
-                            if (!_client.AppList().Contains(FacebookHander.Package(_platform)))
-                            {
-                                _client.ElementWithAttributes("//*[@text=\"Close app\"]");
-                                _client.StopApp(FacebookHander.Package(_platform));
-                                _client.ElementWithAttributes("//*[@text=\"Close app\"]");
-                                _client.UninstallApp(FacebookHander.Package(_platform));
-                                await InstallFacebook();
-                            }
-                            packages = new List<string>
-                {
-                    "com.facebook.katana",
-                    "com.facebook.lite",
-                    "com.facebook.services",
-                    "com.facebook.appmanager",
-                    "com.facebook.system",
-                    "com.facebook.systemservice",
-                };
-                            if (FacebookHander.GetAuthenticationInfo(_client).Contains(_account.Uid) && isContainNoDelete)
-                            {
-                                packages.Clear();
-                            }
-                            break;
-                        }
-                    case "Instagram":
-                    case PlatformModel.Threads:
-                        {
-                            if (!_client.AppList().Contains(FacebookHander.Package(_platform)))
-                            {
-                                await InstallFacebook();
-                            }
-                            packages.Add(FacebookHander.Package(_platform));
-                            break;
-                        }
-                }
-
-                SetStatus("Đang xóa cache ứng dụng cũ...", 2);
-                foreach (var package in packages)
-                {
-                    _client.AppClear(package);
-                }
-
-                SetStatus("Đang cấp quyền ứng dụng...", 2);
-                _client.GrantAppPermissions(FacebookHander.Package(_platform));
+                _client.Device.IsLive = false;
+                _client.Running = false;
             }
-            if (!await OpenFacebookAsync()) throw new Exception($"Không thể mở {_platform}.");
-            _client.SetSize();
+        }
+
+        private async Task<bool> ClearPreviousAccountDataAsync()
+        {
+            if (_platform != PlatformModel.Facebook) return true;
+
+            _sate = "Xóa dữ liệu tài khoản Facebook cũ";
+            SetStatus("Đang xóa toàn bộ phiên Facebook cũ...", 2);
+            try
+            {
+                _client.ClearFacebookData();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManager.Error(ex);
+                SetStatus("Không thể xác nhận đã xóa phiên Facebook cũ; dừng thiết bị.", 1);
+                _client.Device.IsLive = false;
+                _client.Running = false;
+                return false;
+            }
         }
 
         // Kiểm tra trạng thái tài khoản
@@ -634,17 +656,23 @@ namespace Sunny.Subd.Core.Services
                         }
                         break;
                     }
+                case PlatformModel.Pandora:
+                    {
+                        // Pandora xác thực khi login app — bỏ qua check live HTTP
+                        check = true;
+                        break;
+                    }
             }
             if (check)
             {
                 _account.State = "LIVE";
-                SetStatus("Tài khoản facebook: LIVE", 2);
+                SetStatus($"Tài khoản {_platform}: LIVE", 2);
             }
             else
             {
                 _account.State = "DIE";
-                SetStatus("Tài khoản facebook: DIE", 1);
-                throw new SubdyExtension(SubdyEnum.DIE, "Tài khoản facebook: DIE");
+                SetStatus($"Tài khoản {_platform}: DIE", 1);
+                throw new SubdyExtension(SubdyEnum.DIE, $"Tài khoản {_platform}: DIE");
             }
             return check;
         }
@@ -661,21 +689,22 @@ namespace Sunny.Subd.Core.Services
             {
                 File.Delete(filezip);
             }
-            await PrepareDeviceAsync(false);
+            await ClearPreviousAccountDataAsync();
+            if (!await PrepareDeviceOnceAsync())
+            {
+                _client.Device.IsLive = false;
+                _client.Running = false;
+                return;
+            }
         }
         // Khôi phục dữ liệu Facebook
         public async Task<bool> RestoreFacebookAsync()
         {
-            await PrepareDeviceAsync();
-
-            _client.StopApp(FacebookHander.Package(_platform));
-            if (!_settingGeneral.GetBooleanValue("checkBox3", true) || !_client.IsRoot()) return await OpenFacebookAsync();
             string filezip = string.Empty;
             string profileDir = _settingGeneral.GetValuesFromInputString("textBox3", Path.Combine(AppContext.BaseDirectory, "Backup", "Profile", _platform));
             profileDir = Path.Combine(profileDir);
             Directory.CreateDirectory(profileDir);
             filezip = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
-            if (!File.Exists(filezip)) return await OpenFacebookAsync();
             _sate = $"Khôi phục dữ liệu {_platform}";
             try
             {
@@ -783,7 +812,7 @@ namespace Sunny.Subd.Core.Services
                     break;
                 case SubdyEnum.Success:
                     _account.Status = string.IsNullOrEmpty(subdyExtension.Message)
-                        ? "Thành công."
+                        ? "Đã chạy ✔"
                         : subdyExtension.Message;
                     _account.ColorType = 2;
                     break;
@@ -797,6 +826,38 @@ namespace Sunny.Subd.Core.Services
                     break;
             }
             new AccountContext().Update(_account);
+        }
+
+        // Bug 1: Phát hiện và giải phóng acc bị lag/đơ (Running=true quá 60 phút)
+        private void AutoRecoverStuckAccounts()
+        {
+            int stuckMinutes = _settingGeneral.GetIntType("numericUpDown_StuckTimeout", 60);
+            if (stuckMinutes <= 0) stuckMinutes = 60;
+
+            var context = new AccountContext();
+            var allAccounts = context.GetAll("SELECT * FROM Account");
+            var now = DateTime.Now;
+            var toRecover = new List<Account>();
+
+            foreach (var acc in allAccounts)
+            {
+                if (!acc.Running) continue;
+                if (string.IsNullOrEmpty(acc.RecentInteraction)) continue;
+                if (!DateTime.TryParse(acc.RecentInteraction, out DateTime lastTime)) continue;
+
+                double minutesPassed = (now - lastTime).TotalMinutes;
+                if (minutesPassed >= stuckMinutes)
+                {
+                    acc.Running = false;
+                    acc.Status = $"[Lag/Đơ] Tự động giải phóng sau {stuckMinutes} phút không hoạt động.";
+                    acc.ColorType = 1;
+                    toRecover.Add(acc);
+                }
+            }
+
+            if (!toRecover.Any()) return;
+            context.Update(toRecover);
+            _client.LogHelper.SUCCESS($"Đã giải phóng {toRecover.Count} tài khoản bị lag/đơ.");
         }
 
         private bool IsReboot()
@@ -815,62 +876,61 @@ namespace Sunny.Subd.Core.Services
             return false;
         }
 
+        // Bug 3: Tự động reset trạng thái - chạy định kỳ, đưa acc đã reset về queue
+        private void AutoResetAccountStates()
+        {
+            if (!_settingGeneral.GetBooleanValue("checkBox17", false)) return;
+
+            int hoursFrom = _settingGeneral.GetIntType("numericUpDown6", 12);
+            int hoursTo = _settingGeneral.GetIntType("numericUpDown5", 24);
+
+            var context = new AccountContext();
+            var allAccounts = context.GetAll("SELECT * FROM Account");
+            var now = DateTime.Now;
+            var toReset = new List<Account>();
+
+            foreach (var acc in allAccounts)
+            {
+                if (string.IsNullOrEmpty(acc.State)) continue;
+                if (acc.Running) continue;
+                if (string.IsNullOrEmpty(acc.RecentInteraction)) continue;
+                if (!DateTime.TryParse(acc.RecentInteraction, out DateTime lastTime)) continue;
+
+                double hoursPassed = (now - lastTime).TotalHours;
+                int threshold = SubdyHelper.RandomValue(hoursFrom, hoursTo);
+                if (hoursPassed >= threshold)
+                {
+                    acc.State = "";
+                    toReset.Add(acc);
+                }
+            }
+
+            if (!toReset.Any()) return;
+            context.Update(toReset);
+        }
+
         public async Task RunAsync()
         {
             _swTotal.Start();
-            // Đếm số chu kỳ LIÊN TIẾP thiết bị không có internet. Reset về 0 sau khi
-            // 1 account chạy qua được bước restore (xem dưới). Vượt ngưỡng → bail out
-            // để tránh loop vô hạn khi modem/wifi chết.
-            const int NO_INTERNET_LIMIT = 5;
-            int noInternetStreak = 0;
+            if (!await PrepareDeviceOnceAsync())
+            {
+                _stopwatch.Stop();
+                return;
+            }
+
             while (!_ct.IsCancellationRequested)
             {
-                if (noInternetStreak > NO_INTERNET_LIMIT)
-                {
-                    _client.LogHelper.ERROR("Thiết bị không có internet! Vui lòng tự cấu hình internet cho thiết bị");
-                    break;
-                }
                 _account = null;
                 if (!AccountServices.Accounts.Any())
                 {
                     _client.LogHelper.SUCCESS("Đã hoàn thành!");
                     break;
                 }
-                _client.DisconetProxyADB();
-                // Auto-reconnect wifi nếu host mất internet (throttled 30s).
-                // Chỉ guard, không block luôn nếu wifi config rỗng.
-                try
-                {
-                    if (!Sunny.Subdy.Common.Helper.WifiAutoConnect.IsInternetAvailable())
-                    {
-                        _sate = "Mất internet — thử reconnect wifi";
-                        SetStatus("Đang kết nối lại wifi…", 1);
-                        bool ok = await Sunny.Subdy.Common.Helper.WifiAutoConnect.EnsureInternetAsync(_ct);
-                        if (!ok)
-                        {
-                            // Chưa có internet — chờ 10s rồi loop lại check.
-                            await Task.Delay(10000, _ct);
-                            continue;
-                        }
-                    }
-                }
-                catch (System.Exception ex)
-                {
-                    Sunny.Subdy.Common.Logs.LogManager.Error(ex);
-                }
 
-                if (IsReboot()) continue;
-
-                _sate = "Kết nối thiết bị";
-                {
-                    var r = await ConnectAndPrepareDeviceAsync(false);
-                    if (!r.ok)
-                    {
-                        if (r.noInternet) noInternetStreak++;
-                        continue;
-                    }
-                }
-
+                // Chỉ cleanup session/account state theo từng account; không cài lại APK,
+                // không push lại sqlite3 và không cấp quyền lặp lại.
+                AutoResetAccountStates();
+                AutoRecoverStuckAccounts();
                 _sate = "Chuẩn bị tài khoản";
                 _account = AccountServices.GetAccount();
 
@@ -878,23 +938,23 @@ namespace Sunny.Subd.Core.Services
                 _account.Running = true;
                 try
                 {
-                    if (!await CheckLiveAsync()) continue;
+                    // 1. Dọn sạch cache/session/account Facebook cũ.
+                    if (!await ClearPreviousAccountDataAsync()) break;
 
-                    _sate = "Chuẩn bị thiết bị và proxy";
+                    // 2. Thay đổi thông tin thiết bị sau khi đã dọn sạch phiên cũ.
+                    await ChangeInfoAsync();
+
+                    // 3. Kết nối proxy qua VAT Proxy bằng broadcast, không mở giao diện.
+                    if (!await ChangeProxyAsync())
                     {
-                        var r = await ConnectAndPrepareDeviceAsync(true);
-                        if (!r.ok)
-                        {
-                            if (r.noInternet) noInternetStreak++;
-                            continue;
-                        }
+                        if (!_client.Running) break;
+                        continue;
                     }
 
-                    noInternetStreak = 0;
+                    // 4. Restore và mở Facebook.
                     if (!await RestoreFacebookAsync()) continue;
 
                     int index = _settingGeneral.GetIntType("comboBox1", 0);
-
                     _account.Uid_Email = index == 1 ? _account.Email : _account.Uid;
                     _account.Uid_Email ??= _account.Email ?? _account.Uid;
 
@@ -904,51 +964,15 @@ namespace Sunny.Subd.Core.Services
                     if (_settingGeneral.GetBooleanValue("checkBox11", true))
                     {
                         int second = SubdyHelper.RandomValue(_settingGeneral.GetIntType("numericUpDown25", 10), _settingGeneral.GetIntType("numericUpDown24", 20));
-
                         await DelayMessageAsync(second, "Đợi {time} giây sau khi đăng nhập trước khi thực hiện thao tác.", 2);
                     }
 
                     _sate = "Lấy thông tin xác thực";
                     await ExtractAndUpdateAuthenticationInfoAsync();
                     _sate = "Thực hiện kịch bản";
-                    if (_platform == PlatformModel.Facebook)
-                    {
-                        // Legacy ("FarmXu", "Farm-Xu-VIP") đã đổi tên hiển thị → "Làm Job QN".
-                        // Match cả tên cũ để account legacy chưa migrate vẫn chạy được.
-                        if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(_account.NameScript, "FarmXu", StringComparison.OrdinalIgnoreCase))
-                        {
-                            _config.JobService = "https://app.golike.net/";
-                            var farmxuVip = new SpamXuHandler(_platform, _client, _config, _ct, _config.SettingJob, _account);
-                            await farmxuVip.ExecuteAsync();
-                        }
-                        else
-                        {
-                            _config.JobService = "https://app.golike.net/";
-                            FacebookFarming farming = new FacebookFarming(this);
-                            await farming.ExecuteAsync();
-                        }
-                    }
-                    else if (_platform == PlatformModel.Instagram || _platform == PlatformModel.Threads)
-                    {
-                        // Mirror Facebook flow: script "Làm Job QN" → SpamXuHandler (QN API).
-                        // Các kịch bản custom IG → InstagramFarming.
-                        if (string.Equals(_account.NameScript, ScriptNames.FarmXuVip, StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(_account.NameScript, ScriptNames.FarmXuVipLegacy, StringComparison.OrdinalIgnoreCase)
-                            || string.Equals(_account.NameScript, "FarmXu", StringComparison.OrdinalIgnoreCase))
-                        {
-                            _config.JobService = "https://app.golike.net/";
-                            var farmxuVip = new SpamXuHandler(_platform, _client, _config, _ct, _config.SettingJob, _account);
-                            await farmxuVip.ExecuteAsync();
-                        }
-                        else
-                        {
-                            _config.JobService = "https://app.golike.net/";
-                            var farming = new Instagram.InstagramFarming(this);
-                            await farming.ExecuteAsync();
-                        }
-                    }
+                    _config.JobService = "https://app.golike.net/";
+                    FacebookFarming farming = new FacebookFarming(this);
+                    await farming.ExecuteAsync();
                 }
                 catch (Exception ex)
                 {
@@ -958,8 +982,59 @@ namespace Sunny.Subd.Core.Services
                 {
                     if (_account != null)
                     {
-                        _accountContext.Update(_account);
                         _account.Running = false;
+                        _accountContext.Update(_account);
+                    }
+                }
+            }
+            _stopwatch.Stop();
+        }
+
+        /// <summary>
+        /// Pandora-specific run loop — music app automation.
+        /// </summary>
+        public async Task RunPandoraAsync()
+        {
+            _swTotal.Start();
+            while (!_ct.IsCancellationRequested)
+            {
+                _account = null;
+                if (!AccountServices.Accounts.Any())
+                {
+                    _client.LogHelper.SUCCESS("Đã hoàn thành!");
+                    break;
+                }
+
+                await PrepareDeviceAsync();
+                AutoResetAccountStates();
+                AutoRecoverStuckAccounts();
+
+                _sate = "Chuẩn bị tài khoản";
+                _account = AccountServices.GetAccount();
+                if (_account == null) continue;
+
+                _account.Running = true;
+                try
+                {
+                    if (!await CheckLiveAsync()) continue;
+
+                    _sate = "Chuẩn bị thiết bị và proxy";
+                    await ConnectAndPrepareDeviceAsync(true);
+
+                    _sate = "Thực hiện kịch bản Pandora";
+                    PandoraFarming farming = new PandoraFarming(this);
+                    await farming.ExecuteAsync();
+                }
+                catch (Exception ex)
+                {
+                    HanderCase(ex);
+                }
+                finally
+                {
+                    if (_account != null)
+                    {
+                        _account.Running = false;
+                        _accountContext.Update(_account);
                     }
                 }
             }

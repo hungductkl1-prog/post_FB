@@ -17,7 +17,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         public fHDNhanTinBanBe(string scriptId, string actionId = "")
         {
             InitializeComponent();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             rbTrucTuyen.CheckedChanged += ckbDefault_CheckedChanged;
             ckbAnh.CheckedChanged += ckbDefault_CheckedChanged;
             BB1BBF1B.CheckedChanged += ckbDefault_CheckedChanged;

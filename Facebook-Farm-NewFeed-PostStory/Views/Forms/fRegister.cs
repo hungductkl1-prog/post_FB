@@ -1,11 +1,11 @@
-﻿using AntdUI;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Windows.Forms;
+using Facebook_Farm_NewFeed_PostStory.Utils;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fRegister : AntdUI.Window
+    public partial class fRegister : BaseForm
     {
         private const string QNRegisterUrl = "https://app.golike.net/register";
 
@@ -24,16 +24,15 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                     FileName = QNRegisterUrl,
                     UseShellExecute = true
                 });
-                AntdUI.Notification.success(this, "QN Thông Báo",
-                    "Đã mở trang đăng ký QN trên trình duyệt. Sau khi có tài khoản, hãy quay lại đăng nhập.",
-                    TAlignFrom.TR, Font);
+                WinFormsHelper.NotifySuccess(this, "QN Thông Báo",
+                    "Đã mở trang đăng ký QN trên trình duyệt. Sau khi có tài khoản, hãy quay lại đăng nhập.");
                 DialogResult = DialogResult.OK;
                 Close();
             }
             catch (Exception ex)
             {
-                AntdUI.Notification.error(this, "QN Thông Báo",
-                    "Không thể mở trang đăng ký QN: " + ex.Message, TAlignFrom.TR, Font);
+                WinFormsHelper.NotifyError(this, "QN Thông Báo",
+                    "Không thể mở trang đăng ký QN: " + ex.Message);
             }
         }
 

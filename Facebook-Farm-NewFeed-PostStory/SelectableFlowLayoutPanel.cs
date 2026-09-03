@@ -80,5 +80,15 @@ namespace Facebook_Farm_NewFeed_PostStory
                 e.Graphics.DrawRectangle(borderPen, selectionRect);
             }
         }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                fillBrush.Dispose();
+                borderPen.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 }

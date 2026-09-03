@@ -9,7 +9,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fSelectBrandModel : AntdUI.Window
+    public partial class fSelectBrandModel : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         public string Brands = string.Empty;
         public fSelectBrandModel(string brand)
@@ -18,7 +18,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             LoadBrands(brand);
             checkBox1.CheckedChanged += checkBox1_CheckedChanged;
             dgvDevices.CellClick += DgvDevices_CellClick;
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
         {

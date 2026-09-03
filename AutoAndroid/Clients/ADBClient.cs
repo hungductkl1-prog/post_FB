@@ -1,5 +1,6 @@
 ﻿using OpenCvSharp;
 using OpenCvSharp.Extensions;
+using Sunny.Subdy.Common.Services;
 using Sunny.Subdy.Data.Context;
 using Sunny.Subdy.Data.Models;
 using System.Collections.Generic;
@@ -12,6 +13,7 @@ using System.Threading;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.XPath;
+using AutoAndroid.Monitoring;
 namespace AutoAndroid
 {
     public class ADBClient
@@ -144,6 +146,10 @@ namespace AutoAndroid
             _atx = new ATXService(this);
             _logHelper = new LogHelper(Device);
             maxChange = new MaxChangeService(this);
+            // Thiếu 2 dòng dưới thì SendTextSlow()/CLearText()/GetClipboardText() ném
+            // NullReferenceException với client tạo bằng serial (ctor DeviceModel có đủ).
+            ADBKeyboardService = new ADBKeyboardService(this);
+            _clipboardService = new ClipboardService(this);
         }
         public async Task<string> GetClipboardText()
         {
@@ -232,10 +238,11 @@ namespace AutoAndroid
         }
         public string FindImageRegion(string imageFolder, Bitmap sourceImage = null, int timeoutSeconds = 0)
         {
+            bool ownsSource = sourceImage == null;   // chỉ dispose ảnh do hàm tự chụp, không đụng ảnh caller truyền vào
+            List<Bitmap> referenceImages = new List<Bitmap>();
             try
             {
                 // Load all bitmaps from the directory
-                List<Bitmap> referenceImages = new List<Bitmap>();
                 string resolvedFolder = ResolveAssetDirectory(imageFolder);
                 if (string.IsNullOrWhiteSpace(resolvedFolder) || !Directory.Exists(resolvedFolder))
                 {
@@ -271,6 +278,7 @@ namespace AutoAndroid
                     if (Environment.TickCount - startTick < timeoutSeconds * 1000)
                     {
                         Delay(1);
+                        if (ownsSource) sourceImage?.Dispose();   // giải phóng ảnh chụp vòng trước
                         sourceImage = Screenshot();
                         continue;
                     }
@@ -280,6 +288,12 @@ namespace AutoAndroid
             catch (Exception)
             {
                 // Consider logging error if needed
+            }
+            finally
+            {
+                if (ownsSource) sourceImage?.Dispose();
+                foreach (var reference in referenceImages)
+                    reference.Dispose();
             }
             return "";
         }
@@ -322,10 +336,11 @@ namespace AutoAndroid
         }
         public string FindImageOnScreen(string imageDirectory, Bitmap screenBitmap = null, int timeoutSeconds = 0)
         {
+            bool ownsScreen = screenBitmap == null;   // chỉ dispose ảnh tự chụp, giữ ảnh caller truyền vào
+            List<Bitmap> templates = new List<Bitmap>();
             try
             {
                 // Load toàn bộ ảnh mẫu trong thư mục
-                List<Bitmap> templates = new List<Bitmap>();
                 string resolvedDirectory = ResolveAssetDirectory(imageDirectory);
                 if (string.IsNullOrWhiteSpace(resolvedDirectory) || !Directory.Exists(resolvedDirectory))
                 {
@@ -363,6 +378,7 @@ namespace AutoAndroid
                     if (Environment.TickCount - startTime < timeoutSeconds * 1000)
                     {
                         Delay(1);
+                        if (ownsScreen) screenBitmap?.Dispose();   // giải phóng ảnh chụp vòng trước
                         screenBitmap = Screenshot();
                         continue;
                     }
@@ -374,6 +390,12 @@ namespace AutoAndroid
             catch (Exception)
             {
                 // Ignore errors
+            }
+            finally
+            {
+                if (ownsScreen) screenBitmap?.Dispose();
+                foreach (var template in templates)
+                    template.Dispose();
             }
 
             return "";
@@ -567,13 +589,20 @@ namespace AutoAndroid
         }
         public bool ConnectProxy(string proxy)
         {
-            LogHelper.SUCCESS($"Đang change proxy: {proxy}");
+            LogHelper.SUCCESS("Đang change proxy");
             VATProxyService proxyService = new VATProxyService(this);
             return proxyService.ConnectProxy(proxy);
         }
+
+        public bool ConnectProxyPreinstalled(string proxy)
+        {
+            LogHelper.SUCCESS("Đang change proxy đã cài sẵn");
+            VATProxyService proxyService = new VATProxyService(this);
+            return proxyService.ConnectProxy(proxy, installIfMissing: false);
+        }
         public bool ConnectProxyADB(string proxy)
         {
-            LogHelper.SUCCESS($"Đang connect proxy: {proxy}");
+            LogHelper.SUCCESS("Đang connect proxy");
             Shell($"settings put global http_proxy {proxy}");
             return true;
         }
@@ -672,33 +701,53 @@ namespace AutoAndroid
 
         public bool ConnectAdb()
         {
+            var devMetrics = DeviceMetricsRegistry.GetOrCreate(Device.Serial);
             LogHelper.Log($"Đang connect");
             int index = 0;
-            while (Running)
+            const int MAX_RETRY = 10; // Không reconnect vô hạn — tránh cascade failure
+            while (Running && index < MAX_RETRY)
             {
                 ThrowIfStopped();
                 index++;
-                string text = ProcessHelper.RunAdbWithTimeout($"-s {Device.Serial} shell service check settings", 5);
+                devMetrics.ConnectAdbLoopCount = index;
+                MetricsCollector.GaugeSet($"adb.connect.loop.{Device.Serial}", index);
+                string text = ProcessHelper.RunAdbMonitorCommand($"-s {Device.Serial} shell service check settings", 5);
                 // Phải có output hợp lệ (không phải empty/timeout) và không chứa "not found"
                 bool isOnline = !string.IsNullOrWhiteSpace(text) && !text.Contains("not found");
                 if (isOnline)
                 {
                     Device.IsAdbOnline = true;
+                    devMetrics.ConnectAdbSuccessCount++;
                     LogHelper.Log($"Đã connect");
                     return true;
                 }
-                Device.IsLive = false;
                 Device.IsAdbOnline = false;
                 string reason = string.IsNullOrWhiteSpace(text) ? "timeout/no response" : "Can't find service: settings";
-                LogHelper.Log($"Mất kết nối, chờ ExecuteAdb [{index}] cmd: {reason}");
+                devMetrics.LastError = reason;
+                devMetrics.LastErrorTimestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                // Log condensed: chỉ log mỗi 5 lần để tránh spam
+                if (index % 5 == 1 || index == MAX_RETRY)
+                    LogHelper.Log($"Mất kết nối, chờ ExecuteAdb [{index}/{MAX_RETRY}] cmd: {reason}");
                 ThrowIfStopped();
-                ProcessHelper.RunAdbCommand($"-s {Device.Serial} shell reconnect");
-                if (index > 10_000)
-                {
-                    index = 0;
-                }
+                if (index < MAX_RETRY)
+                    ProcessHelper.RunAdbCommand($"-s {Device.Serial} shell reconnect");
+                // Exponential backoff: 1s, 2s, 4s, 8s, ... tối đa 10s
+                int backoffMs = Math.Min(1000 * (1 << Math.Min(index - 1, 4)), 10_000);
+                InterruptibleSleep(backoffMs);
             }
             ThrowIfStopped();
+            // Hết MAX_RETRY lần. Kiểm tra ATX trước khi đánh dấu chết:
+            // nếu ATX còn sống (port 7912 mở) thì device vẫn hoạt động,
+            // chỉ là ADB đang chậm/treo tạm thời.
+            if (Device.Port > 0 && DeviceHealthCheckService.PingAtx(Device.Port, 2000))
+            {
+                LogHelper.Log($"Kết nối ADB thất bại nhưng ATX vẫn alive — giữ Live=true.");
+                return false;
+            }
+            Device.IsLive = false;
+            LogHelper.Log($"Kết nối ADB thất bại sau {MAX_RETRY} lần thử.");
+            devMetrics.LastError = $"Failed after {MAX_RETRY} retries";
+            devMetrics.LastErrorTimestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             return false;
         }
         public void AppClear(string package)
@@ -706,17 +755,38 @@ namespace AutoAndroid
             try
             {
                 LogHelper.SUCCESS($"Xóa dữ liệu app [{package}]");
+
+                // Force-stop app trước khi clear — app đang chạy có thể giữ lock trên data/accounts DB
+                try { Shell("am force-stop " + package); } catch { }
+                InterruptibleSleep(500);
+
+                bool isFacebook = package == "com.facebook.katana"
+                    || package == "com.facebook.lite"
+                    || package == "com.facebook.orca"
+                    || package == "com.facebook.messenger";
+
+                if (isFacebook)
+                {
+                    // Disable app TRƯỚC để authenticator không thể re-register accounts khi framework restart
+                    try { Shell($"pm disable-user --user 0 {package}"); } catch { }
+
+                    // Xóa external storage data (pm clear không đụng tới /sdcard/Android/data/)
+                    try { Shell($"su -c \"rm -rf /data/media/0/Android/data/{package}\""); } catch { }
+                    try { Shell($"su -c \"rm -rf /sdcard/Android/data/{package}\""); } catch { }
+                }
+
                 for (int i = 0; i < 5; i++)
                 {
-                    Shell("pm clear " + package, 3);
+                    Shell("pm clear " + package);
                     ADB.Shell("pm clear " + package, 5);
                 }
 
-                if (package == "com.facebook.katana" || package == "com.facebook.lite" || package == "com.facebook.orca")
+                if (isFacebook)
                 {
                     DeleteAccounts();
-                    Shell("pm disable-user --user 0 " + package, 3);
-                    Shell("pm enable --user 0 " + package, 3);
+
+                    // Chỉ enable lại app SAU KHI đã xóa accounts thành công
+                    try { Shell($"pm enable --user 0 {package}"); } catch { }
                 }
             }
             catch
@@ -726,31 +796,491 @@ namespace AutoAndroid
 
         }
 
-        private void DeleteAccounts()
+        public void ClearFacebookData()
+        {
+            string[] facebookPackages =
+            {
+                "com.facebook.katana",
+                "com.facebook.lite",
+                "com.facebook.services",
+                "com.facebook.appmanager",
+                "com.facebook.system",
+                "com.facebook.systemservice",
+                "com.facebook.orca",
+                "com.facebook.messenger"
+            };
+
+            try
+            {
+                LogHelper.SUCCESS("Xóa dữ liệu phiên Facebook cũ");
+
+                // Dừng và vô hiệu hóa tạm thời toàn bộ thành phần Facebook để
+                // không đăng ký lại Account Manager trong lúc đang dọn dữ liệu.
+                foreach (string package in facebookPackages)
+                {
+                    try { Shell("am", "force-stop", package); } catch { }
+                    try { Shell("pm", "disable-user", "--user", "0", package); } catch { }
+                }
+                InterruptibleSleep(500);
+
+                foreach (string package in facebookPackages)
+                {
+                    try { Shell("su", "-c", $"rm -rf /data/media/0/Android/data/{package}"); } catch { }
+                    try { Shell("su", "-c", $"rm -rf /sdcard/Android/data/{package}"); } catch { }
+                    try { Shell("pm", "clear", package); } catch { }
+                }
+
+                // Xóa một lần duy nhất cho mỗi account, thay vì lặp lại khi
+                // AppClear được gọi cho từng package Facebook phụ.
+                bool accountsCleared = DeleteAccounts();
+
+                foreach (string package in facebookPackages)
+                {
+                    try { Shell("pm", "enable", "--user", "0", package); } catch { }
+                }
+
+                if (!accountsCleared)
+                    throw new InvalidOperationException("Không thể xác nhận đã xóa dữ liệu tài khoản Facebook.");
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[ClearFacebookData] Lỗi: {ex.Message}");
+                throw;
+            }
+        }
+
+        private bool DeleteAccounts()
         {
             try
             {
-                string output = Shell("su -c \"sqlite3 /data/system_ce/0/accounts_ce.db 'SELECT _id FROM accounts;'\"", 5);
-                string[] rows = output.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string row in rows)
+                // Force-stop tất cả Facebook apps trước để authenticator không giữ lock trên accounts DB
+                string[] allFbPkgs = { "com.facebook.katana", "com.facebook.lite", "com.facebook.orca", "com.facebook.messenger" };
+                foreach (var pkg in allFbPkgs)
+                {
+                    try { Shell($"am force-stop {pkg}"); } catch { }
+                }
+                InterruptibleSleep(1000);
+
+                string sqlite = ResolveSqlite3();
+                if (string.IsNullOrEmpty(sqlite))
+                {
+                    LogHelper.Log("[DeleteAccounts] Không tìm thấy/không push được sqlite3 — không thể xác nhận xóa account.");
+                    return false;
+                }
+
+                // Nếu lần chạy trước đang giữ path push nhưng binary hỏng giữa chừng,
+                // xóa cache để lần sau resolve lại và chỉ push lại khi thật sự cần.
+                if (string.Equals(sqlite, PUSHED_SQLITE3_PATH, StringComparison.Ordinal) &&
+                    !IsPushedSqlite3Usable())
+                {
+                    _sqlite3Resolved = null;
+                    sqlite = ResolveSqlite3();
+                }
+                if (string.IsNullOrEmpty(sqlite))
+                {
+                    LogHelper.Log("[DeleteAccounts] sqlite3 không còn khả dụng — không thể xác nhận xóa account.");
+                    return false;
+                }
+
+                // Query accounts từ CẢ HAI database CE và DE
+                string query = "SELECT _id, name, type FROM accounts WHERE type LIKE 'com.facebook%';";
+                string output = Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db \\\"{query}\\\"\"");
+                string outputDe = Shell($"su -c \"{sqlite} /data/system_de/0/accounts_de.db \\\"{query}\\\"\"");
+
+                // Gộp kết quả từ cả 2 DB
+                var allRows = new List<string>();
+                if (!string.IsNullOrWhiteSpace(output))
+                    allRows.AddRange(output.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
+                if (!string.IsNullOrWhiteSpace(outputDe))
+                    allRows.AddRange(outputDe.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries));
+
+                if (allRows.Count == 0)
+                {
+                    LogHelper.Log("[DeleteAccounts] Không tìm thấy Facebook accounts nào (hoặc CE storage chưa unlock).");
+                    return true;
+                }
+
+                var ids = new List<int>();
+                foreach (string row in allRows)
+                {
+                    string[] parts = row.Split('|');
+                    if (parts.Length < 1 || !int.TryParse(parts[0].Trim(), out int id))
+                        continue;
+                    string accountName = parts.Length > 1 ? parts[1] : "unknown";
+                    string accountType = parts.Length > 2 ? parts[2] : "unknown";
+                    LogHelper.Log($"[DeleteAccounts] Sẽ xóa account: {accountType} ({accountName}) - ID={id}");
+                    ids.Add(id);
+                }
+
+                if (ids.Count == 0)
+                {
+                    LogHelper.Log("[DeleteAccounts] Không parse được account id nào từ output.");
+                    return false;
+                }
+
+                // Clear WebView cache TRƯỚC khi stop framework (pm cần system_server còn sống).
+                try
+                {
+                    Shell("pm clear com.android.webview");
+                    Shell("pm clear com.google.android.webview");
+                }
+                catch { }
+
+                // Stop framework để đóng toàn bộ connection tới accounts_*.db
+                bool stopped = StopFramework();
+                InterruptibleSleep(1000);
+
+                int deletedCount = 0;
+                foreach (int id in ids)
                 {
                     try
                     {
-                        int id = Convert.ToInt32(row.Trim());
-                        Shell($"su -c \"sqlite3 /data/system_de/0/accounts_de.db 'DELETE FROM accounts WHERE _id = {id};'\"", 5);
-                        Shell($"su -c \"sqlite3 /data/system_de/0/accounts_de.db 'DELETE FROM debug_table;'\"", 5);
-                        Shell($"su -c \"sqlite3 /data/system_de/0/accounts_de.db 'DELETE FROM meta;'\"", 5);
-                        Shell($"su -c \"sqlite3 /data/system_ce/0/accounts_ce.db 'DELETE FROM accounts WHERE _id = {id};'\"", 5);
-                        Shell($"su -c \"sqlite3 /data/system_ce/0/accounts_ce.db 'DELETE FROM sqlite_sequence WHERE seq = {id};'\"", 5);
+                        // Xóa từ accounts_de.db (device-encrypted)
+                        Shell($"su -c \"{sqlite} /data/system_de/0/accounts_de.db 'DELETE FROM accounts WHERE _id = {id};'\"");
+
+                        // Xóa cascade từ accounts_ce.db (credential-encrypted)
+                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM authtokens WHERE accounts_id = {id};'\"");
+                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM extras WHERE accounts_id = {id};'\"");
+                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM grants WHERE accounts_id = {id};'\"");
+                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM accounts WHERE _id = {id};'\"");
+
+                        deletedCount++;
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Log($"[DeleteAccounts] Lỗi xóa account ID={id}: {ex.Message}");
+                    }
                 }
+
+                if (deletedCount > 0)
+                {
+                    // Reset sequence counter
+                    Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM sqlite_sequence WHERE name = \\\"accounts\\\";'\"");
+
+                    // Checkpoint WAL (TRUNCATE)
+                    foreach (string db in new[] { "/data/system_ce/0/accounts_ce.db", "/data/system_de/0/accounts_de.db" })
+                        Shell($"su -c \"{sqlite} {db} 'PRAGMA wal_checkpoint(TRUNCATE);'\"");
+
+                    // Xóa trực tiếp file WAL/SHM/journal để chặn mọi khả năng phục hồi
+                    foreach (string db in new[] { "/data/system_ce/0/accounts_ce.db", "/data/system_de/0/accounts_de.db" })
+                    {
+                        try { Shell($"su -c \"rm -f {db}-wal {db}-shm {db}-journal\""); } catch { }
+                    }
+                }
+
+                // Start lại framework
+                if (stopped)
+                    StartFramework();
+                else
+                    KillSystemServer();
+
+                // VERIFY: kiểm tra accounts đã thực sự bị xóa sau khi framework restart
+                InterruptibleSleep(2000);
+                string verifyOutput = Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db \\\"{query}\\\"\"");
+                bool accountsRemain = !string.IsNullOrWhiteSpace(verifyOutput) && verifyOutput.Contains("com.facebook", StringComparison.OrdinalIgnoreCase);
+                if (accountsRemain)
+                {
+                    LogHelper.Log($"[DeleteAccounts] CẢNH BÁO: Accounts vẫn còn sau lần xóa đầu tiên! Thử xóa lại lần 2...");
+                    // Retry lần 2 với framework đã chạy (không cần stop nữa)
+                    foreach (string row in verifyOutput.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        string[] parts = row.Split('|');
+                        if (parts.Length < 1 || !int.TryParse(parts[0].Trim(), out int retryId))
+                            continue;
+                        try
+                        {
+                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM authtokens WHERE accounts_id = {retryId};'\"");
+                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM extras WHERE accounts_id = {retryId};'\"");
+                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM grants WHERE accounts_id = {retryId};'\"");
+                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM accounts WHERE _id = {retryId};'\"");
+                            Shell($"su -c \"{sqlite} /data/system_de/0/accounts_de.db 'DELETE FROM accounts WHERE _id = {retryId};'\"");
+                            LogHelper.Log($"[DeleteAccounts] Retry xóa account ID={retryId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            LogHelper.Log($"[DeleteAccounts] Retry lỗi ID={retryId}: {ex.Message}");
+                        }
+                    }
+                    // Xóa WAL lần nữa
+                    foreach (string db in new[] { "/data/system_ce/0/accounts_ce.db", "/data/system_de/0/accounts_de.db" })
+                    {
+                        try { Shell($"su -c \"{sqlite} {db} 'PRAGMA wal_checkpoint(TRUNCATE);'\""); } catch { }
+                        try { Shell($"su -c \"rm -f {db}-wal {db}-shm {db}-journal\""); } catch { }
+                    }
+
+                    verifyOutput = Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db \\\"{query}\\\"\"");
+                    accountsRemain = !string.IsNullOrWhiteSpace(verifyOutput) && verifyOutput.Contains("com.facebook", StringComparison.OrdinalIgnoreCase);
+                }
+
+                if (accountsRemain)
+                {
+                    LogHelper.Log("[DeleteAccounts] Vẫn còn Facebook account sau khi retry.");
+                    return false;
+                }
+
+                if (deletedCount > 0)
+                    LogHelper.SUCCESS($"[DeleteAccounts] Đã xóa {deletedCount} Facebook accounts.");
+                else
+                    LogHelper.Log("[DeleteAccounts] Không có Facebook accounts nào được xóa.");
+                return true;
             }
-            catch { }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[DeleteAccounts] Lỗi: {ex.Message}");
+                return false;
+            }
         }
+
+        /// <summary>
+        /// Dừng Android framework (`stop`) để system_server đóng connection tới accounts_*.db
+        /// trước khi sửa DB. Nhẹ hơn kill: giữ nguyên adbd/zygote, chỉ dừng các service Java.
+        /// Trả về true nếu đã phát lệnh stop thành công.
+        /// </summary>
+        private bool StopFramework()
+        {
+            try
+            {
+                LogHelper.Log("[DeleteAccounts] stop framework để đóng DB account...");
+                Shell("su -c \"stop\"");
+                Thread.Sleep(2000); // Đợi service Java tắt, DB được đóng.
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[DeleteAccounts] Không stop được framework: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>Khởi động lại framework sau khi đã stop + sửa DB.</summary>
+        private void StartFramework()
+        {
+            try
+            {
+                LogHelper.Log("[DeleteAccounts] start lại framework...");
+                Shell("su -c \"start\"");
+                Thread.Sleep(3000); // Đợi system_server + AccountManagerService lên lại.
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[DeleteAccounts] Không start lại được framework (có thể cần reboot thủ công): {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Fallback khi không stop được framework: kill system_server để zygote respawn,
+        /// buộc AccountManagerService đọc lại DB từ đĩa (xóa cache account cũ trong RAM).
+        /// Dùng pidof thay killall vì nhiều ROM tối giản không có killall.
+        /// </summary>
+        private void KillSystemServer()
+        {
+            try
+            {
+                LogHelper.Log("[DeleteAccounts] kill system_server để reload account database...");
+                // pidof có mặt trên hầu hết ROM (toybox); fallback sang killall nếu pidof rỗng.
+                Shell("su -c \"kill $(pidof system_server) 2>/dev/null || killall system_server\"");
+                Thread.Sleep(3000); // Đợi system_server respawn.
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[DeleteAccounts] Không kill được system_server (device có thể cần reboot thủ công): {ex.Message}");
+            }
+        }
+
+        // Đường dẫn sqlite3 đã push lên device (dùng khi ROM không kèm sẵn binary).
+        private const string PUSHED_SQLITE3_PATH = "/data/local/tmp/sqlite3";
+
+        // Cache kết quả resolve sqlite3 theo serial để không phải dò/push lại mỗi account.
+        private string _sqlite3Resolved;
+
+        /// <summary>
+        /// Trả về lệnh sqlite3 chạy được trên device:
+        /// - Nếu ROM đã có sqlite3 trong PATH → trả về "sqlite3".
+        /// - Nếu chưa có → push binary tĩnh (bundle theo tool, theo ABI) lên
+        ///   /data/local/tmp/sqlite3, chmod +x rồi trả về đường dẫn tuyệt đối.
+        /// - Không resolve được → chuỗi rỗng.
+        /// </summary>
+        private string ResolveSqlite3()
+        {
+            // Bản ROM sqlite3 không cần cache validation; bản đã push phải được
+            // kiểm tra lại để nếu file bị xóa giữa hai account thì chỉ resolve/push
+            // lại đúng lúc cần thiết.
+            if (string.Equals(_sqlite3Resolved, PUSHED_SQLITE3_PATH, StringComparison.Ordinal) &&
+                !IsPushedSqlite3Usable())
+            {
+                _sqlite3Resolved = null;
+            }
+
+            // Đã resolve trong phiên này rồi thì dùng lại (kể cả kết quả rỗng — tránh dò/push lại
+            // cho từng account khi máy vốn không có root/sqlite3).
+            if (_sqlite3Resolved != null)
+                return _sqlite3Resolved;
+
+            _sqlite3Resolved = ResolveSqlite3Core();
+            return _sqlite3Resolved;
+        }
+
+        private string ResolveSqlite3Core()
+        {
+            try
+            {
+                // 0) Có root không? Không root thì mọi bước dưới đều vô nghĩa — báo rõ để khỏi mơ hồ.
+                string rootCheck = Shell("su -c \"id -u\"");
+                if (string.IsNullOrWhiteSpace(rootCheck) || !rootCheck.Trim().StartsWith("0"))
+                {
+                    LogHelper.Log($"[ResolveSqlite3] Máy KHÔNG có quyền root (su trả về: '{rootCheck?.Trim()}'). " +
+                                  "Không thể xóa account bằng sqlite3. Cần device đã root + cấp quyền su cho shell.");
+                    return string.Empty;
+                }
+
+                // 1) sqlite3 có sẵn trên device (ROM kèm sẵn)?
+                string which = Shell("su -c \"command -v sqlite3 || which sqlite3\"");
+                if (!string.IsNullOrWhiteSpace(which) && which.Contains("sqlite3"))
+                {
+                    LogHelper.Log("[ResolveSqlite3] Dùng sqlite3 có sẵn trên ROM.");
+                    return "sqlite3";
+                }
+
+                // 2) Bản đã push trước đó còn chạy được không?
+                if (IsPushedSqlite3Usable())
+                {
+                    LogHelper.Log($"[ResolveSqlite3] Dùng lại bản đã push: {PUSHED_SQLITE3_PATH}");
+                    return PUSHED_SQLITE3_PATH;
+                }
+
+                // 3) Push binary bundle theo ABI (có retry — ADB sync có thể fail transient).
+                string local = LocalSqlite3BinaryPath();
+                if (string.IsNullOrEmpty(local) || !System.IO.File.Exists(local))
+                {
+                    LogHelper.Log("[ResolveSqlite3] Không có binary bundle để push (xem log LocalSqlite3BinaryPath ở trên).");
+                    return string.Empty;
+                }
+
+                LogHelper.Log($"[ResolveSqlite3] Push {local} → {PUSHED_SQLITE3_PATH}");
+                bool pushed = false;
+                const int maxPushRetry = 3;
+                for (int pushAttempt = 0; pushAttempt < maxPushRetry && !pushed; pushAttempt++)
+                {
+                    if (pushAttempt > 0)
+                    {
+                        LogHelper.Log($"[ResolveSqlite3] Retry push lần {pushAttempt + 1}/{maxPushRetry}...");
+                        InterruptibleSleep(1000);
+                        // Reconnect ADB trước khi retry — kết nối sync có thể đã bị đứt.
+                        ConnectAdb();
+                    }
+                    RunTime($"PUSH sqlite3 (attempt {pushAttempt + 1})", () => { pushed = Push(local, PUSHED_SQLITE3_PATH); });
+                }
+                if (!pushed)
+                {
+                    LogHelper.Log($"[ResolveSqlite3] Push thất bại sau {maxPushRetry} lần thử (không ghi được vào {PUSHED_SQLITE3_PATH}).");
+                    return string.Empty;
+                }
+                Shell($"su -c \"chmod 755 {PUSHED_SQLITE3_PATH}\"");
+
+                if (IsPushedSqlite3Usable())
+                {
+                    LogHelper.SUCCESS($"[ResolveSqlite3] Push + chạy OK: {PUSHED_SQLITE3_PATH}");
+                    return PUSHED_SQLITE3_PATH;
+                }
+
+                LogHelper.Log("[ResolveSqlite3] Đã push nhưng binary không chạy được. " +
+                              "Thường do: (a) sai ABI so với CPU device, hoặc (b) SELinux/noexec chặn thực thi ở /data/local/tmp.");
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[ResolveSqlite3] Lỗi: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        private bool IsPushedSqlite3Usable()
+        {
+            try
+            {
+                string ver = Shell($"su -c \"{PUSHED_SQLITE3_PATH} -version\"");
+                return !string.IsNullOrWhiteSpace(ver) && char.IsDigit(ver.TrimStart().FirstOrDefault());
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Đường dẫn binary sqlite3 bundle kèm tool, sắp theo ABI:
+        ///   {BaseDirectory}\resources\sqlite3\{abi}\sqlite3
+        /// Đặt sẵn file cho các ABI cần dùng (arm64-v8a, armeabi-v7a, x86, x86_64).
+        /// </summary>
+        private string LocalSqlite3BinaryPath()
+        {
+            try
+            {
+                string abi = GetProp("ro.product.cpu.abi").Trim();
+                if (string.IsNullOrWhiteSpace(abi))
+                {
+                    LogHelper.Log("[LocalSqlite3BinaryPath] Không detect được ABI.");
+                    return string.Empty;
+                }
+
+                // Map ABI → subfolder (x86_64 dùng chung binary 386 nếu thiếu).
+                string abiFolder = abi;
+                string fallbackFolder = null;
+
+                switch (abi)
+                {
+                    case "x86_64":
+                        abiFolder = "x86_64";
+                        fallbackFolder = "x86"; // fallback về x86 32-bit nếu thiếu 64-bit
+                        break;
+                    case "x86":
+                        abiFolder = "x86";
+                        break;
+                    case "arm64-v8a":
+                        abiFolder = "arm64-v8a";
+                        fallbackFolder = "armeabi-v7a";
+                        break;
+                    case "armeabi-v7a":
+                    case "armeabi":
+                        abiFolder = "armeabi-v7a";
+                        break;
+                    default:
+                        LogHelper.Log($"[LocalSqlite3BinaryPath] ABI '{abi}' chưa được support.");
+                        return string.Empty;
+                }
+
+                string resourcesRoot = System.IO.Path.Combine(AppContext.BaseDirectory, "resources", "sqlite3");
+                string primaryPath = System.IO.Path.Combine(resourcesRoot, abiFolder, "sqlite3");
+                if (System.IO.File.Exists(primaryPath))
+                    return primaryPath;
+
+                // Thử fallback nếu có.
+                if (!string.IsNullOrEmpty(fallbackFolder))
+                {
+                    string fallbackPath = System.IO.Path.Combine(resourcesRoot, fallbackFolder, "sqlite3");
+                    if (System.IO.File.Exists(fallbackPath))
+                    {
+                        LogHelper.Log($"[LocalSqlite3BinaryPath] Dùng fallback binary: {fallbackPath}");
+                        return fallbackPath;
+                    }
+                }
+
+                // Binary phải được bundle sẵn theo tool (build/publish copy vào resources\sqlite3\{abi}).
+                // KHÔNG auto-download nữa: bản Termux là dynamic-linked (cần libz/libreadline không có
+                // trên Android gốc) nên tải về cũng không chạy; ngoài ra GetAsync blocking 5 phút làm
+                // treo cả luồng job. Thiếu file ở đây = lỗi đóng gói, cần bổ sung binary vào resources.
+                LogHelper.Log($"[LocalSqlite3BinaryPath] Thiếu binary bundle cho ABI '{abi}'. Mong đợi: {primaryPath}. " +
+                              $"Kiểm tra thư mục resources\\sqlite3\\{abiFolder}\\sqlite3 cạnh file .exe.");
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[LocalSqlite3BinaryPath] Lỗi: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
         public string Shell(params object[] argv)
         {
             ThrowIfStopped();
+            var devMetrics = DeviceMetricsRegistry.GetOrCreate(Device.Serial);
             const int maxRetry = 3;
             int retry = 0;
             string result = "";
@@ -761,14 +1291,25 @@ namespace AutoAndroid
                 try
                 {
                     return ADBSocket.Shell(Device.Serial, argv);
-
-
                 }
                 catch (Exception ex)
                 {
+                    devMetrics.AdbShellRetryCount++;
+                    MetricsCollector.Increment("adb.shell.retry");
                     LogHelper.Log($"[Shell] Exception lần {retry + 1}: {ex.Message}");
                     ThrowIfStopped();
-                    Connect(CurrentAutomationType);
+
+                    // Chỉ gọi Connect (reconnect ADB+ATX) sau lần retry cuối cùng.
+                    // Trước đó chỉ delay ngắn rồi retry Shell — tránh gọi full reconnect
+                    // mỗi khi gặp transient error (semaphore bận, ATX chậm...).
+                    if (retry >= maxRetry - 1)
+                    {
+                        Connect(CurrentAutomationType);
+                    }
+                    else
+                    {
+                        InterruptibleSleep(500);
+                    }
                 }
 
                 retry++;
@@ -877,7 +1418,11 @@ namespace AutoAndroid
 
         public bool Push(string file, string path, int mode = 493)
         {
-            return ADBSocket.Push(Device.Serial, file, path, mode);
+            if(! ADBSocket.Push(Device.Serial, file, path, mode))
+            {
+                _adb.CMD($"push \"{file}\" \"{path}\"", 60);
+            }
+            return true;
         }
 
         public bool IsScreenOn()
@@ -1297,10 +1842,8 @@ namespace AutoAndroid
             {
                 CLearText(); // Xóa text trước khi nhập
             }
-            LogHelper.SUCCESS($"Đang send text : {text}");
-            string data = Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
-            string type = "ADB_INPUT_TEXT";
-            Shell("am", "broadcast", "-a", type, "--es", "text", data);
+            LogHelper.SUCCESS("Đang gửi nội dung nhập liệu");
+            Shell("input", "text", text);
         }
         public void SendTextADB(string xpath, string text, int timeout = 10, string xml = "", bool clear = true)
         {
@@ -1310,7 +1853,7 @@ namespace AutoAndroid
             {
                 CLearText();
             }
-            LogHelper.SUCCESS($"Đang send text : {text}");
+            LogHelper.SUCCESS("Đang gửi nội dung nhập liệu");
             Shell("input", "text", text);
         }
 
@@ -1385,7 +1928,7 @@ namespace AutoAndroid
                     try
                     {
                         // 1. Chụp ảnh màn hình theo engine hiện tại
-                        Bitmap screen = Screenshot();
+                        using Bitmap screen = Screenshot();
                         if (screen != null)
                         {
                             results = ImageScanOpenCV.FindColorCoordinates(screen, targetColor, tolerance, regionWidth, regionHeight);
@@ -1434,7 +1977,7 @@ namespace AutoAndroid
             {
                 CLearText(); // Xóa text trước khi nhập
             }
-            LogHelper.SUCCESS($"Đang send text : {text}");
+            LogHelper.SUCCESS("Đang gửi nội dung nhập liệu");
             ADBKeyboardService.Input(text.ToString(), false);
 
         }
@@ -1450,7 +1993,7 @@ namespace AutoAndroid
                     try
                     {
                         // 1. Chụp ảnh màn hình theo engine hiện tại
-                        Bitmap screen = Screenshot();
+                        using Bitmap screen = Screenshot();
                         // 2. Dùng OpenCV OCR để trích xuất text từ ảnh
                         string text = ImageScanOpenCV.GetTextFromImage(screen);
 
@@ -3048,6 +3591,43 @@ namespace AutoAndroid
                 return false;
             }
         }
+        public bool AreAppPermissionsGranted(string package)
+        {
+            try
+            {
+                string output = Shell("dumpsys", "package", package);
+                if (string.IsNullOrWhiteSpace(output)) return false;
+
+                // dumpsys package thay đổi format theo phiên bản Android. Chỉ kiểm
+                // tra các quyền runtime thật sự cần; MANAGE_EXTERNAL_STORAGE là
+                // app-op đặc biệt và không có dòng granted ổn định.
+                string[] permissions =
+                {
+                    "android.permission.READ_CONTACTS",
+                    "android.permission.READ_EXTERNAL_STORAGE",
+                    "android.permission.WRITE_EXTERNAL_STORAGE",
+                    "android.permission.CAMERA",
+                    "android.permission.RECORD_AUDIO",
+                    "android.permission.CALL_PHONE"
+                };
+
+                foreach (string permission in permissions)
+                {
+                    bool granted = Regex.IsMatch(
+                        output,
+                        $@"{Regex.Escape(permission)}\\s*:\\s*granted(?:=|\\s+)?true|{Regex.Escape(permission)}\\s*=\\s*granted|{Regex.Escape(permission)}\\s+granted=true",
+                        RegexOptions.IgnoreCase);
+                    if (!granted) return false;
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[AreAppPermissionsGranted] Lỗi: {ex.Message}");
+                return false;
+            }
+        }
+
         public void GrantAppPermissions(string package)
         {
             this.Shell(" pm grant " + package + " android.permission.READ_CONTACTS");

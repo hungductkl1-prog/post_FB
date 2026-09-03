@@ -102,7 +102,7 @@ namespace AutoAndroid
             bool flag = false;
             for (int i = 0; i < 10; i++)
             {
-                service.Push(filePath, "/sdcard");
+                service.Push(filePath, "/sdcard/");
                 string text2 = service.ADB.Shell($"su -c cp /sdcard/{fileName} /data/data/{package_MaxChange}/{fileName}");
                 text2 = service.ADB.Shell($"su -c tar -xzvf /data/data/{package_MaxChange}/{fileName}");
                 string text = "awk '{print $3\\\":\\\"$4}'\"";
@@ -139,7 +139,7 @@ namespace AutoAndroid
 
                         // Extract the values of 'fingerprint' and 'time_check' from the loaded XML
                         XmlNode fingerprintNode = xmlDocument.SelectSingleNode("//*[@name='fingerprint']");
-                        XmlNode timeCheckNode = xmlDocument.SelectSingleNode("//*[@name='time_check']");
+                        XmlNode timeCheckNode = xmlDocument.SelectSingleNode("//*[@name='build_time']");
 
                         // If both nodes are found and they have values, concatenate those values 
                         if (fingerprintNode != null && fingerprintNode.InnerText != "" &&

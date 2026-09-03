@@ -6,7 +6,9 @@ namespace AutoAndroid
 {
     public class SocketHelper : IDisposable
     {
-        private readonly Socket _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        // Không khởi tạo socket ở field initializer: constructor (string url) tạo socket riêng rồi
+        // gán đè _socket → socket của initializer bị bỏ rơi (rò 1 socket mỗi lần Create(url)).
+        private readonly Socket _socket;
         private readonly string _host;
         private readonly int _port;
         public static SocketHelper Create(string url)
@@ -32,6 +34,7 @@ namespace AutoAndroid
         {
             _port = port;
             _host = host;
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             _socket.Connect(_host, _port);
         }
 

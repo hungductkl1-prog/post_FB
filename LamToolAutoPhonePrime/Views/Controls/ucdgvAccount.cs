@@ -34,10 +34,16 @@ namespace LamToolAutoPhonePrime.Views.Controls
         private readonly ConfigHelper _configHelper;
         private readonly JobHistoryContext _jobHistoryContext;
         public List<Account> _accounts;
-        private SortableBindingList<Account> bindingList;
+        // VirtualMode: danh sách đang hiển thị (sau filter). Grid không còn DataSource;
+        // CellValueNeeded đọc trực tiếp từ _view[rowIndex]. Tránh tạo 50k DataGridViewRow.
+        private List<Account> _view = new List<Account>();
+        private int _sortColumnIndex = -1;
+        private SortOrder _sortOrder = SortOrder.None;
         private List<string> _folderNames = new List<string>();
         private readonly ScriptContext _scriptContext;
         private System.Windows.Forms.Timer _countsTimer;
+        private int _cachedCheckedCount = 0;
+        private int _cachedRunningCount = 0;
 
         // Cached column indices for performance
         private int _colIndexColorType = -1;
@@ -50,11 +56,30 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
             _accounts = new List<Account>();
             _scriptContext = new ScriptContext();
-            bindingList = new SortableBindingList<Account>(_accounts);
+            _view = new List<Account>();
             _jobHistoryContext = new JobHistoryContext();
 
             // Visual setup (style chung do GridStyleHelper + SsaTheme quản lý)
             dataGridView1.AutoGenerateColumns = false;
+            // VirtualMode: grid chỉ render rows đang hiển thị, lấy data từ _view qua
+            // CellValueNeeded → không tạo vật lý 50k+ DataGridViewRow (root cause đơ UI).
+            dataGridView1.VirtualMode = true;
+            dataGridView1.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
+
+            // Double buffering để giảm flicker với 20k rows
+            typeof(DataGridView).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty,
+                null, dataGridView1, new object[] { true });
+
+            var defaultFont = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold);
+            dataGridView1.DefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.White,
+                ForeColor = ColorTranslator.FromHtml("#1A1A1A"),
+                SelectionBackColor = Color.FromArgb(0, 120, 215),
+                SelectionForeColor = Color.White,
+                Font = defaultFont
+            };
             dataGridViewCheckBoxColumn1.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dataGridViewCheckBoxColumn1.DataPropertyName = nameof(Account.Checked);
 
@@ -67,6 +92,10 @@ namespace LamToolAutoPhonePrime.Views.Controls
             dataGridView1.SelectionChanged += DataGridView_SelectionChanged;
             dataGridView1.CellFormatting += uiDataGridView1_CellFormatting;
             dataGridView1.RowPrePaint += DataGridView1_RowPrePaint;
+            // VirtualMode: grid hỏi giá trị từng cell qua CellValueNeeded → đọc _view[rowIndex].
+            // CellClick toggle checkbox do NormalizeAccountSelectorColumn quản (custom paint).
+            dataGridView1.CellValueNeeded += DataGridView1_CellValueNeeded;
+            dataGridView1.ColumnHeaderMouseClick += DataGridView1_ColumnHeaderMouseClick;
             dataGridView1.RowTemplate.Height = Math.Max(22, dataGridView1.RowTemplate.Height);
 
             _folderContext = new FolderContext();
@@ -93,14 +122,20 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
             // Empty state: delegated to SsaTheme.ApplyUcAccount (SSA styled)
 
-            // Update checked/running counts via timer instead of CellFormatting
-            _countsTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            // Update checked/running counts via timer - dùng cached values, không LINQ mỗi giây
+            _countsTimer = new System.Windows.Forms.Timer { Interval = 2000 };
             _countsTimer.Tick += (s, e) =>
             {
                 var snapshot = _accounts;
                 if (snapshot == null) return;
-                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{snapshot.Count(x => x.Checked)}");
-                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel2, $"{snapshot.Count(x => x.Running)}");
+                // Chỉ đếm khi số lượng nhỏ (<= 5000), còn lại dùng cached
+                if (snapshot.Count <= 5000)
+                {
+                    _cachedCheckedCount = snapshot.Count(x => x.Checked);
+                    _cachedRunningCount = snapshot.Count(x => x.Running);
+                }
+                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
+                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel2, $"{_cachedRunningCount}");
             };
             _countsTimer.Start();
 
@@ -354,25 +389,19 @@ namespace LamToolAutoPhonePrime.Views.Controls
         {
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
             if (!IsAccountSelectorColumn(e.ColumnIndex)) return;
-            if (dataGridView1.Rows[e.RowIndex].DataBoundItem is not Account account) return;
+            // VirtualMode: DataBoundItem luôn null → map row index vào _view.
+            var account = AccountAtRow(e.RowIndex);
+            if (account == null) return;
 
             account.Checked = !account.Checked;
-            dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = account.Checked;
             dataGridView1.InvalidateCell(e.ColumnIndex, e.RowIndex);
-            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_accounts.Count(x => x.Checked)}");
+            _cachedCheckedCount = _accounts.Count(x => x.Checked);
+            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
         }
 
         private void DataGridView1_CurrentCellDirtyStateChanged(object? sender, EventArgs e)
         {
-            try
-            {
-                if (!dataGridView1.IsCurrentCellDirty) return;
-                if (dataGridView1.CurrentCell?.OwningColumn != dataGridViewCheckBoxColumn1) return;
-                dataGridView1.CommitEdit(DataGridViewDataErrorContexts.Commit);
-            }
-            catch
-            {
-            }
+            // VirtualMode: checkbox không còn editable binding → no-op, giữ để Normalize unsub an toàn.
         }
 
         private void DataGridView1_AccountCheckboxCellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -388,9 +417,11 @@ namespace LamToolAutoPhonePrime.Views.Controls
             {
                 isChecked = value;
             }
-            else if (dataGridView1.Rows[e.RowIndex].DataBoundItem is Account account)
+            else
             {
-                isChecked = account.Checked;
+                // VirtualMode: DataBoundItem null → map row index vào _view.
+                var account = AccountAtRow(e.RowIndex);
+                if (account != null) isChecked = account.Checked;
             }
 
             int boxSize = Math.Max(16, Math.Min(20, Math.Min(e.CellBounds.Width, e.CellBounds.Height) - 10));
@@ -510,25 +541,154 @@ namespace LamToolAutoPhonePrime.Views.Controls
         }
 
         /// <summary>
-        /// Tập rows được tick checkbox (Account.Checked = true). Mọi action (cập nhật,
+        /// Tập account được tick checkbox (Account.Checked = true). Mọi action (cập nhật,
         /// xoá, chạy job, đổi proxy, ...) phải dựa vào checkbox thay vì bôi đen row.
+        /// VirtualMode: đọc trực tiếp từ _accounts thay vì duyệt DataGridViewRow.
         /// </summary>
-        private IEnumerable<DataGridViewRow> CheckedRows
+        private IEnumerable<Account> CheckedAccounts => _accounts.Where(a => a.Checked);
+
+        /// <summary>Account ứng với row index hiện trên grid (VirtualMode: map vào _view).</summary>
+        private Account AccountAtRow(int rowIndex)
+            => (rowIndex >= 0 && rowIndex < _view.Count) ? _view[rowIndex] : null;
+
+        /// <summary>Account của các row đang bôi đen (highlight). VirtualMode: map theo row.Index vào _view.</summary>
+        private IEnumerable<Account> SelectedAccounts
         {
             get
             {
-                foreach (DataGridViewRow row in dataGridView1.Rows)
+                foreach (DataGridViewRow row in dataGridView1.SelectedRows)
                 {
-                    if (row.DataBoundItem is Account a && a.Checked)
-                        yield return row;
+                    var acc = AccountAtRow(row.Index);
+                    if (acc != null) yield return acc;
                 }
             }
         }
 
+        // ── VirtualMode core ───────────────────────────────────────────────────
+        // Gán danh sách hiển thị + cập nhật RowCount. KHÔNG tạo DataGridViewRow vật lý.
+        private void SetView(List<Account> view)
+        {
+            _view = view ?? new List<Account>();
+            _suppressSelectionChanged = true;
+            try
+            {
+                dataGridView1.RowCount = 0;
+                if (_view.Count > 0)
+                    dataGridView1.RowCount = _view.Count;
+            }
+            finally
+            {
+                _suppressSelectionChanged = false;
+            }
+            dataGridView1.Invalidate();
+        }
+
+        // Grid hỏi giá trị cell khi cần vẽ → trả về từ _view[rowIndex].
+        private void DataGridView1_CellValueNeeded(object? sender, DataGridViewCellValueEventArgs e)
+        {
+            var col = dataGridView1.Columns[e.ColumnIndex];
+            var acc = AccountAtRow(e.RowIndex);
+
+            // acc == null khi grid hỏi 1 row index đã vượt _view.Count (xảy ra trong lúc
+            // RowCount đang chuyển N→0→M lúc đổi nhóm/filter). PHẢI gán e.Value đúng kiểu.
+            if (acc == null)
+            {
+                if (col == dataGridViewCheckBoxColumn1) e.Value = false;
+                else if (col == dataGridViewTextBoxColumn1) e.Value = 0;
+                else e.Value = string.Empty;
+                return;
+            }
+
+            // Checkbox column: custom-painted, nhưng vẫn cấp bool để CellPainting đọc qua e.Value.
+            if (col == dataGridViewCheckBoxColumn1) { e.Value = acc.Checked; return; }
+            if (col == dataGridViewTextBoxColumn1) { e.Value = acc.STT; return; }
+
+            e.Value = GetAccountValue(acc, col.DataPropertyName);
+        }
+
+        // Sau khi tick/bỏ tick hàng loạt: VirtualMode không tự vẽ lại checkbox
+        // → Invalidate để CellValueNeeded đọc lại Checked, đồng thời cập nhật label đếm ngay.
+        private void RefreshCheckedVisual()
+        {
+            _cachedCheckedCount = _accounts.Count(x => x.Checked);
+            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
+            dataGridView1.Invalidate();
+        }
+
+        // VirtualMode không tự sort được → sort thủ công trên _view rồi refresh.
+        private void DataGridView1_ColumnHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+        {
+            var col = dataGridView1.Columns[e.ColumnIndex];
+            if (col == dataGridViewCheckBoxColumn1) return;
+            string prop = col == dataGridViewTextBoxColumn1 ? nameof(Account.STT) : col.DataPropertyName;
+            if (string.IsNullOrEmpty(prop)) return;
+
+            if (_sortColumnIndex == e.ColumnIndex)
+                _sortOrder = _sortOrder == SortOrder.Ascending ? SortOrder.Descending : SortOrder.Ascending;
+            else
+            {
+                _sortColumnIndex = e.ColumnIndex;
+                _sortOrder = SortOrder.Ascending;
+            }
+
+            int dir = _sortOrder == SortOrder.Ascending ? 1 : -1;
+            _view.Sort((x, y) => dir * Comparer<object>.Default.Compare(
+                GetAccountValue(x, prop), GetAccountValue(y, prop)));
+            dataGridView1.Invalidate();
+        }
+
+        // Đọc giá trị property theo tên cột (DataPropertyName). Tránh reflection trong hot path.
+        private static object GetAccountValue(Account a, string prop) => prop switch
+        {
+            nameof(Account.Uid) => a.Uid,
+            nameof(Account.FullName) => a.FullName,
+            nameof(Account.Password) => a.Password,
+            nameof(Account.TowFA) => a.TowFA,
+            nameof(Account.Cookie) => a.Cookie,
+            nameof(Account.Token) => a.Token,
+            nameof(Account.Gender) => a.Gender,
+            nameof(Account.Bio) => a.Bio,
+            nameof(Account.Friends) => a.Friends,
+            nameof(Account.PagePro5) => a.PagePro5,
+            nameof(Account.Groups) => a.Groups,
+            nameof(Account.Follow) => a.Follow,
+            nameof(Account.Birthday) => a.Birthday,
+            nameof(Account.DateCreate) => a.DateCreate,
+            nameof(Account.Avatar) => a.Avatar,
+            nameof(Account.Phone) => a.Phone,
+            nameof(Account.Email) => a.Email,
+            nameof(Account.PassMail) => a.PassMail,
+            nameof(Account.MailClientId) => a.MailClientId,
+            nameof(Account.MailRefreshToken) => a.MailRefreshToken,
+            nameof(Account.EmailAddress) => a.EmailAddress,
+            nameof(Account.UserAgent) => a.UserAgent,
+            nameof(Account.PassPrivateEmailAddress) => a.PassPrivateEmailAddress,
+            nameof(Account.DeviceInfo) => a.DeviceInfo,
+            nameof(Account.NameFolder) => a.NameFolder,
+            nameof(Account.NameScript) => a.NameScript,
+            nameof(Account.Proxy) => a.Proxy,
+            nameof(Account.Note) => a.Note,
+            nameof(Account.JobToday) => a.JobToday,
+            nameof(Account.JobTotal) => a.JobTotal,
+            nameof(Account.Summary) => a.Summary,
+            nameof(Account.Summary_Skip) => a.Summary_Skip,
+            nameof(Account.RecentInteraction) => a.RecentInteraction,
+            nameof(Account.Serial) => a.Serial,
+            nameof(Account.TokenJob) => a.TokenJob,
+            nameof(Account.XuToday) => a.XuToday,
+            nameof(Account.State) => a.State,
+            nameof(Account.Status) => a.Status,
+            nameof(Account.STT) => a.STT,
+            nameof(Account.Id) => a.Id,
+            nameof(Account.ColorType) => a.ColorType,
+            nameof(Account.Running) => a.Running,
+            _ => ""
+        };
+
         /// <summary>Warn khi user chưa tick checkbox nào — trả false để caller return sớm.</summary>
         private bool RequireChecked()
         {
-            if (CheckedRows.Any()) return true;
+            if (CheckedAccounts.Any()) return true;
             AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần thao tác.");
             return false;
         }
@@ -549,9 +709,9 @@ namespace LamToolAutoPhonePrime.Views.Controls
         {
             try
             {
-                if (e.RowIndex < 0 || e.RowIndex >= dataGridView1.Rows.Count) return;
+                if (e.RowIndex < 0 || e.RowIndex >= _view.Count) return;
                 var row = dataGridView1.Rows[e.RowIndex];
-                if (row.DataBoundItem is Account acc)
+                var acc = _view[e.RowIndex];
                 {
                     var style = row.DefaultCellStyle;
 
@@ -828,18 +988,22 @@ namespace LamToolAutoPhonePrime.Views.Controls
                     return list;
                 });
 
-                // Update UI
+                // Update UI - tránh block UI thread với số lượng lớn
                 _accounts = result;
                 toolStripLabel8.Text = _accounts.Count.ToMoneyString();
 
-                bindingList = new SortableBindingList<Account>(_accounts);
-                dataGridView1.SuspendLayout();
-                dataGridView1.DataSource = bindingList;
-                dataGridView1.ResumeLayout();
+                // Cập nhật cached counts trước (tính 1 lần thôi)
+                _cachedCheckedCount = _accounts.Count(x => x.Checked);
+                _cachedRunningCount = _accounts.Count(x => x.Running);
 
-                // Update running/checked counts once
-                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel2, $"{_accounts.Count(x => x.Running)}");
-                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_accounts.Count(x => x.Checked)}");
+                // VirtualMode: gán _view = bản sao _accounts, không tạo DataGridViewRow vật lý.
+                _sortColumnIndex = -1;
+                _sortOrder = SortOrder.None;
+                SetView(new List<Account>(_accounts));
+
+                // Update running/checked counts từ cache (không LINQ lại)
+                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel2, $"{_cachedRunningCount}");
+                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
 
                 // State counts
                 var stateCounts = _accounts.GroupBy(x => x.State)
@@ -961,11 +1125,14 @@ namespace LamToolAutoPhonePrime.Views.Controls
             List<int> matched = await Task.Run(() =>
             {
                 var list = new List<int>(128);
-                for (int i = 0; i < _accounts.Count; i++)
+                // VirtualMode: index phải khớp row trên grid → duyệt _view (đang hiển thị),
+                // không phải _accounts gốc. Snapshot để tránh race khi _view đổi giữa chừng.
+                var view = _view;
+                for (int i = 0; i < view.Count; i++)
                 {
                     if (token.IsCancellationRequested) return list;
 
-                    var acc = _accounts[i];
+                    var acc = view[i];
                     if (acc.Uid?.Contains(searchValue, StringComparison.OrdinalIgnoreCase) == true ||
                         acc.FullName?.Contains(searchValue, StringComparison.OrdinalIgnoreCase) == true ||
                         acc.Email?.Contains(searchValue, StringComparison.OrdinalIgnoreCase) == true ||
@@ -1114,11 +1281,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 // Đẩy off UI; nếu cần MessageBox lỗi thì marshal về UI thread.
                 await Task.Run(async () =>
                 {
-                    ConfigModel model = null;
-                    if (InvokeRequired)
-                        Invoke(new Action(() => model = GetConfigModel()));
-                    else
-                        model = GetConfigModel();
+                    ConfigModel model = await Task.Run(() => GetConfigModel());
 
                     if (model == null) return;
 
@@ -1144,7 +1307,6 @@ namespace LamToolAutoPhonePrime.Views.Controls
                     while (_accounts.Any(x => x.Checked))
                     {
                         if (ct.IsCancellationRequested) break;
-                        await XpathManagerFacebook.LoadFromApiAsync();
 
                         var tasks = new List<Task>();
                         foreach (var device in DeviceServices.DeviceModels.Where(x => x.Checked))
@@ -1152,6 +1314,10 @@ namespace LamToolAutoPhonePrime.Views.Controls
                             if (ct.IsCancellationRequested) break;
                             tasks.Add(Task.Run(async () => await RunningThread(ct, device, model)));
                         }
+
+                        // XPath mặc định đã có sẵn; tải bổ sung song song để không chặn
+                        // status ADB/package đầu tiên của các worker.
+                        _ = XpathManagerFacebook.LoadFromApiAsync();
 
                         // Chờ tất cả task — khi cancel, chờ tối đa 10s rồi abandon
                         try
@@ -1245,7 +1411,9 @@ namespace LamToolAutoPhonePrime.Views.Controls
             {
                 model.SettingGeneral = SettingsTool.GetSettings($"{nameof(fSettingRegsiner)}_{_platform}", true);
                 string text = select1.Text.Trim();
-                model.Accounts = bindingList;
+                // VirtualMode: không còn bindingList; field này không được consumer nào đọc,
+                // gán snapshot _view để giữ nguyên kiểu dữ liệu.
+                model.Accounts = new SortableBindingList<Account>(_view);
                 if (text == "[ Tất cả các nhóm ]" || text == "[ Chọn theo uid ]" || text == "[ Chọn nhiều nhóm ]" || text == "[ Tài khoản đã xóa ]")
                 {
                     model.JobService = "";
@@ -1291,11 +1459,19 @@ namespace LamToolAutoPhonePrime.Views.Controls
         {
             ADBClient client = new ADBClient(device);
             _activeClients.Add(client);
+            device.Status = "Đang khởi động worker...";
+            device.TypeColor = 2;
             try
             {
-                ChangeLanguageService changeLanguage = new ChangeLanguageService(client);
-                await changeLanguage.Change("en", "US");
-                await client.TurnOnADBKeyboard();
+                device.Status = "Đang kiểm tra kết nối ADB...";
+                if (!client.Connect())
+                {
+                    device.Status = "Không thể kết nối ADB, dừng thiết bị.";
+                    device.TypeColor = 1;
+                    return;
+                }
+
+                device.Status = "Đang kiểm tra Facebook và VAT Proxy...";
                 MainService service = new MainService(_platform, client, model, ct);
                 await service.RunAsync();
             }
@@ -1557,124 +1733,141 @@ namespace LamToolAutoPhonePrime.Views.Controls
             }
         }
 
+        private void UpdateCachedCounts()
+        {
+            var snapshot = _accounts;
+            if (snapshot == null) return;
+            _cachedCheckedCount = snapshot.Count(x => x.Checked);
+            _cachedRunningCount = snapshot.Count(x => x.Running);
+            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
+            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel2, $"{_cachedRunningCount}");
+            // VirtualMode: checkbox custom-painted không tự repaint sau mass tick/untick → Invalidate.
+            dataGridView1.Invalidate();
+        }
+
         private void RightKey(AntdUI.ContextMenuStripItem it)
         {
             // ── Chọn ──────────────────────────────────────────────────────────
             if (it.Text.Equals("Tất cả"))
             {
                 _accounts.ForEach(x => x.Checked = true);
+                UpdateCachedCounts();
             }
             else if (it.Text.Equals("Bôi đen"))
             {
                 // Convert rows đang bôi đen (highlight) → Checked = true
                 _accounts.ForEach(x => x.Checked = false);
-                foreach (DataGridViewRow row in dataGridView1.SelectedRows)
-                    if (row.DataBoundItem is Account a) a.Checked = true;
+                foreach (var a in SelectedAccounts) a.Checked = true;
+                UpdateCachedCounts();
             }
             else if (it.Text.Equals("Bỏ chọn tất cả") || it.Text.Equals("Bỏ chọn bôi đen"))
             {
                 if (it.Text.Equals("Bỏ chọn tất cả"))
                     _accounts.ForEach(x => x.Checked = false);
                 else
-                    foreach (DataGridViewRow row in dataGridView1.SelectedRows)
-                        if (row.DataBoundItem is Account a) a.Checked = false;
+                    foreach (var a in SelectedAccounts) a.Checked = false;
+                UpdateCachedCounts();
             }
             // ── Chọn theo tình trạng ─────────────────────────────────────────
             else if (it.Text.Equals("LIVE"))
             {
                 _accounts.ForEach(x => x.Checked = x.State?.Equals("live", StringComparison.OrdinalIgnoreCase) == true);
+                UpdateCachedCounts();
             }
             else if (it.Text.Equals("DIE"))
             {
                 _accounts.ForEach(x => x.Checked = x.State?.Equals("die", StringComparison.OrdinalIgnoreCase) == true);
+                UpdateCachedCounts();
             }
             else if (it.Text.Equals("Chưa xác định"))
             {
                 _accounts.ForEach(x => x.Checked = string.IsNullOrEmpty(x.State));
+                UpdateCachedCounts();
             }
             else if (it.Text.Equals("Đang chạy"))
             {
                 _accounts.ForEach(x => x.Checked = x.Running);
+                UpdateCachedCounts();
             }
             // ── Copy ──────────────────────────────────────────────────────────
             else if (it.Text.Equals("Copy email"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.Email), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.Email), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy pass"))
             {
                 if (!VerifySubdyPassword()) return;
-                ConvertHelper.CopyFormat(nameof(Account.Password), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.Password), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy code 2fa"))
             {
                 if (!VerifySubdyPassword()) return;
-                ConvertHelper.CopyFormat(nameof(Account.TowFA), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.TowFA), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy uid"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.Uid), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.Uid), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy name"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.FullName), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.FullName), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy mail"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy pass mail"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.PassMail), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.PassMail), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy mail recover"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy pass mail recover"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.PassPrivateEmailAddress), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.PassPrivateEmailAddress), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy phone"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.Phone), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.Phone), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy cookie"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.Cookie), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.Cookie), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy token"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.Token), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.Token), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy proxy"))
             {
-                ConvertHelper.CopyFormat(nameof(Account.Proxy), dataGridView1);
+                ConvertHelper.CopyFormat(nameof(Account.Proxy), CheckedAccounts);
             }
             else if (it.Text.Equals("Copy uid|pass"))
             {
                 if (!VerifySubdyPassword()) return;
-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}", dataGridView1);
+                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}", CheckedAccounts);
             }
             else if (it.Text.Equals("Copy uid|pass|2fa"))
             {
                 if (!VerifySubdyPassword()) return;
-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}", dataGridView1);
+                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}", CheckedAccounts);
             }
             else if (it.Text.Equals("Copy uid|pass|2fa|cookie"))
             {
                 if (!VerifySubdyPassword()) return;
-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}|{nameof(Account.Cookie)}", dataGridView1);
+                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}|{nameof(Account.Cookie)}", CheckedAccounts);
             }
             else if (it.Text.Equals("Copy uid|pass|cookie"))
             {
                 if (!VerifySubdyPassword()) return;
-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}", dataGridView1);
+                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}", CheckedAccounts);
             }
             else if (it.Text.Equals("Copy uid|pass|cookie|2fa"))
             {
                 if (!VerifySubdyPassword()) return;
-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}|{nameof(Account.TowFA)}", dataGridView1);
+                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}|{nameof(Account.TowFA)}", CheckedAccounts);
             }
             else if (it.Text.Equals("Copy tk bị checkpoint"))
             {
@@ -1700,8 +1893,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Show password"))
             {
                 if (!VerifySubdyPassword()) return;
-                var selected = CheckedRows.Cast<DataGridViewRow>()
-                    .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+                var selected = CheckedAccounts.ToList();
                 if (!selected.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần xem."); return; }
                 using var dlg = new Form
                 {
@@ -1731,8 +1923,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Reset trạng thái"))
             {
                 var toUpdate = new List<Account>();
-                foreach (DataGridViewRow row in CheckedRows)
-                    if (row.DataBoundItem is Account a) { a.State = ""; toUpdate.Add(a); }
+                foreach (var a in CheckedAccounts) { a.State = ""; toUpdate.Add(a); }
                 if (!toUpdate.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần reset."); return; }
                 _accountContext.Update(toUpdate);
                 _ = LoadAccounts();
@@ -1740,8 +1931,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             }
             else if (it.Text.Equals("Copy debug lỗi"))
             {
-                var targets = CheckedRows.Cast<DataGridViewRow>()
-                    .Select(r => r.DataBoundItem as Account).OfType<Account>()
+                var targets = CheckedAccounts
                     .Where(a => a.Running).ToList();
                 if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Không có tài khoản nào vừa tick vừa đang chạy."); return; }
                 var sb = new System.Text.StringBuilder();
@@ -1753,8 +1943,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Xóa định danh thiết bị"))
             {
                 var toUpdate = new List<Account>();
-                foreach (DataGridViewRow row in CheckedRows)
-                    if (row.DataBoundItem is Account a) { a.DeviceInfo = ""; toUpdate.Add(a); }
+                foreach (var a in CheckedAccounts) { a.DeviceInfo = ""; toUpdate.Add(a); }
                 if (toUpdate.Any()) { _accountContext.Update(toUpdate); _ = LoadAccounts(); }
             }
             else if (it.Text.Equals("Check live"))
@@ -1826,8 +2015,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("[Không cần kịch bản]"))
             {
                 var toUpdate = new List<Account>();
-                foreach (DataGridViewRow row in CheckedRows)
-                    if (row.DataBoundItem is Account a) { a.NameScript = ""; toUpdate.Add(a); }
+                foreach (var a in CheckedAccounts) { a.NameScript = ""; toUpdate.Add(a); }
                 if (toUpdate.Any()) _accountContext.Update(toUpdate);
             }
             // ── Cập nhật dữ liệu ──────────────────────────────────────────────
@@ -1841,8 +2029,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Proxy"))
             {
                 var ids = new List<Guid>();
-                foreach (DataGridViewRow row in CheckedRows)
-                    if (row.DataBoundItem is Account a) ids.Add(a.Id);
+                foreach (var a in CheckedAccounts) ids.Add(a.Id);
                 if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần cập nhật."); return; }
                 new fImportProxy(ids).ShowDialog();
                 _ = LoadAccounts();
@@ -1850,8 +2037,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Xóa Name"))
             {
                 var toUpdate = new List<Account>();
-                foreach (DataGridViewRow row in CheckedRows)
-                    if (row.DataBoundItem is Account a) { a.FullName = ""; toUpdate.Add(a); }
+                foreach (var a in CheckedAccounts) { a.FullName = ""; toUpdate.Add(a); }
                 if (!toUpdate.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần xóa."); return; }
                 if (!AntdHelper.Confirm(_form, "Xác nhận", $"Xóa Name của {toUpdate.Count} tài khoản?")) return;
                 _accountContext.Update(toUpdate);
@@ -1901,8 +2087,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Khôi phục về nhóm cũ"))
             {
                 var ids = new List<Guid>();
-                foreach (DataGridViewRow row in CheckedRows)
-                    if (row.DataBoundItem is Account a && !a.IsView) ids.Add(a.Id);
+                foreach (var a in CheckedAccounts) if (!a.IsView) ids.Add(a.Id);
                 if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần khôi phục."); return; }
                 if (!AntdHelper.Confirm(_form, "Xác nhận", $"Bạn có chắc chắn muốn khôi phục {ids.Count} tài khoản?")) return;
                 if (_accountContext.UpdateIsViewTrue(ids)) AntdHelper.MsgSuccess(_form, "Đã khôi phục thành công.");
@@ -1912,8 +2097,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else if (it.Text.Equals("Cập nhật token job"))
             {
                 var ids = new List<string>();
-                foreach (DataGridViewRow row in CheckedRows)
-                    if (row.DataBoundItem is Account a) ids.Add(a.Id.ToString());
+                foreach (var a in CheckedAccounts) ids.Add(a.Id.ToString());
                 if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần cập nhật."); return; }
                 new fUpdateData(ids, fUpdateData.TokenJob, _platform).ShowDialog();
                 _ = LoadAccounts();
@@ -1926,9 +2110,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 if (matchFolder != null)
                 {
                     string folderName = matchFolder.Name ?? "";
-                    var toUpdate = new List<Account>();
-                    foreach (DataGridViewRow row in CheckedRows)
-                        if (row.DataBoundItem is Account a) toUpdate.Add(a);
+                    var toUpdate = CheckedAccounts.ToList();
                     if (!toUpdate.Any())
                     {
                         AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần chuyển nhóm.");
@@ -1951,9 +2133,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 {
                     string scriptName = matchScript.Name ?? "";
                     // "Làm Job QN" giờ dùng token login QN — bỏ popup nhập token.
-                    var toUpdate = new List<Account>();
-                    foreach (DataGridViewRow row in CheckedRows)
-                        if (row.DataBoundItem is Account a) { a.NameScript = scriptName; toUpdate.Add(a); }
+                    var toUpdate = CheckedAccounts.ToList();
+                    foreach (var a in toUpdate) a.NameScript = scriptName;
                     if (toUpdate.Any()) _accountContext.Update(toUpdate);
                     return;
                 }
@@ -2007,14 +2188,18 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         public void AddAccountThreadSafe(Account acc)
         {
-            acc.STT = dataGridView1.RowCount + 1;
             if (InvokeRequired)
             {
                 Invoke(new Action<Account>(AddAccountThreadSafe), acc);
             }
             else
             {
-                bindingList.Add(acc);
+                // VirtualMode: append vào cả _accounts (nguồn) lẫn _view (đang hiển thị)
+                // rồi tăng RowCount — không tạo DataGridViewRow vật lý.
+                acc.STT = _accounts.Count + 1;
+                _accounts.Add(acc);
+                _view.Add(acc);
+                dataGridView1.RowCount = _view.Count;
             }
         }
 
@@ -2104,10 +2289,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 accounts = _accounts.Where(x => x.State.ToLower() == state.ToLower()).ToList();
             }
             // Đây là UI event handler — gọi trực tiếp, không cần Invoke
-            bindingList = new SortableBindingList<Account>(accounts);
-            dataGridView1.SuspendLayout();
-            dataGridView1.DataSource = bindingList;
-            dataGridView1.ResumeLayout();
+            SetView(new List<Account>(accounts));
         }
 
         private void CboFilterAccount_SelectedValueChanged(object sender, AntdUI.ObjectsEventArgs e)
@@ -2165,20 +2347,14 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private void ApplyFilterResult(List<Account> accounts)
         {
-            bindingList = new SortableBindingList<Account>(accounts);
-            dataGridView1.SuspendLayout();
-            dataGridView1.DataSource = bindingList;
-            dataGridView1.ResumeLayout();
+            // Copy sang list mới: SetView/sort thao tác in-place trên _view,
+            // không được làm xáo trộn thứ tự _accounts gốc.
+            SetView(new List<Account>(accounts));
         }
 
         private void ShowUpdateFieldPopup(string fieldLabel)
         {
-            var selectedAccounts = CheckedRows
-                .Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account)
-                .Where(a => a != null)
-                .Cast<Account>()
-                .ToList();
+            var selectedAccounts = CheckedAccounts.ToList();
 
             if (!selectedAccounts.Any())
             {
@@ -2431,7 +2607,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
             bool needsAuth = selectedProps.Any(p => p == nameof(Account.Password) || p == nameof(Account.TowFA));
             if (needsAuth && !VerifySubdyPassword()) return;
 
-            ConvertHelper.CopyFormat(string.Join("|", selectedProps), dataGridView1);
+            ConvertHelper.CopyFormat(string.Join("|", selectedProps), CheckedAccounts);
         }
 
         // Lưu thứ tự 10 slot (kể cả slot rỗng) theo nền tảng hiện tại
@@ -2615,14 +2791,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Space)
-            { 
-                foreach (DataGridViewRow row in CheckedRows)
-                {
-                    if (row.DataBoundItem is Account account)
-                    {
-                        account.Checked = !account.Checked;
-                    }
-                }
+            {
+                // Toggle Checked của các dòng đang bôi đen (SelectedRows). VirtualMode:
+                // map row index → _view, không dùng DataBoundItem.
+                foreach (var account in SelectedAccounts)
+                    account.Checked = !account.Checked;
+                RefreshCheckedVisual();
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Escape)
@@ -2634,8 +2808,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         // ── Chức năng: Check live / Kiểm tra avatar ────────────────────────────
         private async Task RunCheckLiveAsync(bool checkAvatarMode)
         {
-            var targets = CheckedRows.Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+            var targets = CheckedAccounts.ToList();
             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần kiểm tra."); return; }
 
             int live = 0, total = targets.Count, done = 0;
@@ -2678,8 +2851,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         // ── Chức năng: Kiểm tra cookie ─────────────────────────────────────────
         private async Task RunCheckCookieAsync()
         {
-            var targets = CheckedRows.Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account).OfType<Account>()
+            var targets = CheckedAccounts
                 .Where(a => !string.IsNullOrEmpty(a.Cookie)).ToList();
             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Không có tài khoản nào đã tick có cookie."); return; }
 
@@ -2711,8 +2883,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         // ── Chức năng: Check name VN ───────────────────────────────────────────
         private void RunCheckNameVN()
         {
-            var targets = CheckedRows.Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+            var targets = CheckedAccounts.ToList();
             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần kiểm tra."); return; }
 
             int vnCount = targets.Count(a => IsVietnameseName(a.FullName));
@@ -2722,8 +2893,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         // ── Chức năng: Kiểm tra live proxy ────────────────────────────────────
         private async Task RunCheckProxyAsync()
         {
-            var targets = CheckedRows.Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+            var targets = CheckedAccounts.ToList();
             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần kiểm tra."); return; }
 
             var noProxy = targets.Where(a => string.IsNullOrEmpty(a.Proxy)).ToList();
@@ -2841,7 +3011,8 @@ namespace LamToolAutoPhonePrime.Views.Controls
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        // 2. QUẢN LÝ BACKUP PROFILE / DEVICE
+        // 2. QUẢN LÝ
+        // PROFILE / DEVICE
         // ══════════════════════════════════════════════════════════════════════
         private enum BackupType { Profile, Device, Both }
         private enum BackupOp   { Check, Delete, Copy }
@@ -2859,10 +3030,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
 
         private void BackupAction(BackupType type, BackupOp op)
         {
-            var selected = CheckedRows
-                .Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account)
-                .OfType<Account>()
+            var selected = CheckedAccounts
                 .Where(a => !string.IsNullOrEmpty(a.Uid))
                 .ToList();
 
@@ -3005,10 +3173,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         // ── Dọn dẹp backup dư thừa ───────────────────────────────────────────
         private void CleanupRedundantBackups()
         {
-            var selectedUids = CheckedRows
-                .Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account)
-                .OfType<Account>()
+            var selectedUids = CheckedAccounts
                 .Where(a => !string.IsNullOrEmpty(a.Uid))
                 .Select(a => a.Uid!)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -3137,15 +3302,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
         // ══════════════════════════════════════════════════════════════════════
         private void TrashSelectedAccounts()
         {
-            var ids = CheckedRows
-                .Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account)
-                .OfType<Account>()
+            var ids = CheckedAccounts
                 .Where(a => a.IsView)
                 .Select(a => a.Id)
                 .ToList();
             if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần xóa vào thùng rác."); return; }
-            int total = CheckedRows.Count();
+            int total = CheckedAccounts.Count();
             if (!AntdHelper.Confirm(_form, "Xóa vào thùng rác", $"Đưa {ids.Count}/{total} tài khoản vào thùng rác?")) return;
             if (_accountContext.UpdateIsViewFalse(ids))
             {
@@ -3160,10 +3322,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
         // ══════════════════════════════════════════════════════════════════════
         private void DeleteAccountsPermanently()
         {
-            var ids = CheckedRows
-                .Cast<DataGridViewRow>()
-                .Select(r => r.DataBoundItem as Account)
-                .OfType<Account>()
+            var ids = CheckedAccounts
                 .Select(a => a.Id)
                 .ToList();
             if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần xóa vĩnh viễn."); return; }
@@ -3178,12 +3337,12 @@ namespace LamToolAutoPhonePrime.Views.Controls
             else AntdHelper.MsgError(_form, "Đã xảy ra lỗi khi xóa.");
         }
 
-        // Dropdown kịch bản (toolbar): mass-apply NameScript cho tất cả account trong bindingList hiện tại.
+        // Dropdown kịch bản (toolbar): mass-apply NameScript cho tất cả account trong view hiện tại.
         public void ApplyScriptToAll(string scriptName)
         {
-            if (string.IsNullOrEmpty(scriptName) || bindingList == null) return;
+            if (string.IsNullOrEmpty(scriptName) || _view == null) return;
             var toUpdate = new List<Account>();
-            foreach (var acc in bindingList)
+            foreach (var acc in _view)
             {
                 if (acc == null) continue;
                 if (acc.NameScript == scriptName) continue;
@@ -3191,7 +3350,7 @@ namespace LamToolAutoPhonePrime.Views.Controls
                 toUpdate.Add(acc);
             }
             if (toUpdate.Any()) _accountContext.Update(toUpdate);
-            dataGridView1.Refresh();
+            dataGridView1.Invalidate();
         }
 
         // Dropdown "Tùy chọn": reload bindingList từ DB để restore NameScript gốc.

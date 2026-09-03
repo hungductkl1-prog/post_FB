@@ -1,4 +1,4 @@
-using AutoAndroid;
+﻿using AutoAndroid;
 using Sunny.Subd.Core.Models;
 using Sunny.Subd.Core.Services;
 using Sunny.Subd.Core.Utils;
@@ -408,7 +408,12 @@ namespace Sunny.Subd.Core.Facebook
 
                 if (extension.SubdyEnum == SubdyEnum.LogOut)
                 {
-                    await _mainService._facebookService.Login(_client, _account, _mainService._ct, 400, _mainService);
+                    var loginResult = await _mainService._facebookService.Login(_client, _account, _mainService._ct, 400, _mainService);
+                    if (loginResult?.SubdyEnum == SubdyEnum.Success)
+                    {
+                        error = string.Empty;
+                        return;
+                    }
                 }
                 error = $"Thất bại ({extension.Message})";
                 if (extension.SubdyEnum != SubdyEnum.JobFail)
@@ -3047,6 +3052,10 @@ namespace Sunny.Subd.Core.Facebook
             int delayFrom = Math.Max(1, settings.GetIntType("nudTimeFrom", 10));
             int delayTo = Math.Max(delayFrom, settings.GetIntType("nudTimeTo", 30));
 
+            // Delay trước/sau khi lướt newfeed — trước đây hardcode 20s + 20s (tổng 40s).
+            int delayTruoc = Math.Max(0, settings.GetIntType("nudDelayTruoc", 20));
+            int delaySau = Math.Max(0, settings.GetIntType("nudDelaySau", 20));
+
 
             bool shouldInteract = settings.GetBooleanValue("ckbInteract");
             int interactCount = SubdyHelper.RandomValue(settings.GetIntType("nudInteractFrom", 1), settings.GetIntType("nudInteractTo", 1));
@@ -3107,10 +3116,14 @@ namespace Sunny.Subd.Core.Facebook
                 OpenFacebookTimeline();
             }
 
+            // Xem bài viết trước khi bắt đầu lướt newsfeed (delay cấu hình được).
+            if (delayTruoc > 0)
+                await _mainService.DelayMessageAsync(delayTruoc, "Xem bài viết trước khi lướt, đợi {time}s...", 2);
+
             int tickCount = Environment.TickCount;
             while (!_mainService._ct.IsCancellationRequested)
             {
-                await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayFrom, delayTo), $"Xem bài viết, đợi {{time}}s...", 2);
+              //  await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayFrom, delayTo), $"Xem bài viết, đợi {{time}}s...", 2);
                 if (follow && followCount > 0)
                 {
                     if (_client.ElementWithAttributes(new List<string> { "//*[@content-desc=\"People you may know\"]", "//*[@text=\"People you may know\"]", }, 1, click: false))
@@ -3193,6 +3206,11 @@ namespace Sunny.Subd.Core.Facebook
                 }
                 ScrollScreen(1, SubdyHelper.RandomValue(5, 30), SubdyHelper.RandomValue(200, 800));
             }
+
+            // Dừng sau khi lướt xong trước khi backup (delay cấu hình được).
+            if (delaySau > 0)
+                await _mainService.DelayMessageAsync(delaySau, "Lướt xong, đợi {time}s trước khi backup...", 2);
+
             int result = 0;
             return result;
         }
@@ -9091,7 +9109,7 @@ namespace Sunny.Subd.Core.Facebook
             int targetCount = SubdyHelper.RandomValue(settings.GetIntType("C913DC8A", 1), settings.GetIntType("F391713F", 3) + 1);
             int delayFrom = settings.GetIntType("nudKhoangCachFrom", 5);
             int delayTo = settings.GetIntType("nudKhoangCachTo", 10);
-
+            bool isPublic = settings.GetBooleanValue("ckbPublic");
             bool isText = settings.GetBooleanValue("rbDangText");
             bool isMedia = settings.GetBooleanValue("rbDangAnhVideo");
             bool isMusic = settings.GetBooleanValue("rbDangNhac");
@@ -9220,6 +9238,8 @@ namespace Sunny.Subd.Core.Facebook
                     {
                         xpaths = new List<string>
                         {
+                            "//*[@text='Stories']",
+                            "//*[@content-desc='Stories']",
                             "//*[@content-desc='Add to story']",
                             "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
                             "//*[@class='androidx.recyclerview.widget.RecyclerView']/descendant::android.widget.Button[@clickable='true' and string-length(@content-desc)>0]",
@@ -9240,6 +9260,8 @@ namespace Sunny.Subd.Core.Facebook
                     {
                         xpaths = new List<string>
                         {
+                            "//*[@text='Stories']",
+                            "//*[@content-desc='Stories']",
                             "//*[@text='Create story' or @content-desc='Create story']",
                             "//*[@content-desc='Add to story']",
                             "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
@@ -9267,6 +9289,8 @@ namespace Sunny.Subd.Core.Facebook
                     {
                         xpaths = new List<string>
                         {
+                            "//*[@text='Stories']",
+                            "//*[@content-desc='Stories']",
                            "//*[@text='Create story' or @content-desc='Create story']",
                             "//*[@content-desc='Add to story']",
                             "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
@@ -9290,6 +9314,8 @@ namespace Sunny.Subd.Core.Facebook
 
                         switch (foundElement)
                         {
+                            case "//*[@text='Stories']":
+                            case"//*[@content-desc='Stories']":
                             case "//*[@text='Create story' or @content-desc='Create story']":
                             case "//*[@content-desc='Add to story']":
                                 hasClickedAddToStory = true;
@@ -9377,7 +9403,6 @@ namespace Sunny.Subd.Core.Facebook
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chọn ảnh kèm nhạc...", 2);
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
                                 break;
-
                             case "//*[@class='android.widget.EditText' and (starts-with(@text,'Search') or starts-with(@content-desc,'Search'))]":
                                 if (!musicRandom && musicQueue.Any() && !musicSelected)
                                 {
@@ -9415,7 +9440,6 @@ namespace Sunny.Subd.Core.Facebook
                                     musicSelected = true;
                                 }
                                 break;
-
                             case "//*[@content-desc='Song preview']":
                                 {
                                     _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chọn bài hát...", 2);
@@ -9438,7 +9462,6 @@ namespace Sunny.Subd.Core.Facebook
                                     MoveMusicStickerRandom();
                                     break;
                                 }
-                            case "//*[@content-desc=\"Share\"]":
                             case "//*[@text='Done']":
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Done...", 2);
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
@@ -9449,6 +9472,10 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 break;
                             case "//*[contains(@text, 'Settings') or contains(@content-desc, 'Settings')]":
+                                if (!isPublic)
+                                {
+                                    break;
+                                }
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Public...", 2);
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
                                 _client.Delay(2);
@@ -9456,13 +9483,25 @@ namespace Sunny.Subd.Core.Facebook
                                 _client.Delay(2);
                                 _client.ElementWithAttributes("//*[@text='Public' or @content-desc='Public']", 10, "");
                                 _client.Delay(2);
-                                _client.ElementWithAttributes(new List<string> { "//*[@text='SAVE' or @content-desc='SAVE']", "//*[@text='CHANGE' or @content-desc='CHANGE']", "//*[@text='CHANGE' or @text='SAVE'] or @content-desc='CHANGE'] or @content-desc='SAVE']" }, 5, xmlSource);
-                                _client.Delay(2);
+                                var xpathsPublic = new List<string> { "//*[@text='SAVE' or @content-desc='SAVE']", "//*[@text='CHANGE' or @content-desc='CHANGE']", "//*[@text='CHANGE' or @text='SAVE'] or @content-desc='CHANGE'] or @content-desc='SAVE']", "//*[@text='Go to setting' or @content-desc='Go to setting']", "//*[@text='Add Public option' or @content-desc='Add Public option']" };
+                                for(int i = 0; i < 3; i++)
+                                {
+                                    if (_client.ElementWithAttributes(xpathsPublic, 5, ""))
+                                    {
+                                        _client.Delay(2);
+                                        continue;
+                                    }
+                                    _client.Delay(5);
+                                }
                                 _client.ElementWithAttributes("//*[@content-desc='Back']", 10, "");
                                 _client.Delay(2);
                                 WaitForPostComplete(60);
                                 break;
                             case "//*[@text='Privacy' or @content-desc='Privacy']":
+                                if (!isPublic)
+                                {
+                                    break;
+                                }
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Public...", 2);
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
                                 _client.Delay(2);
@@ -9474,13 +9513,18 @@ namespace Sunny.Subd.Core.Facebook
                                 _client.Delay(2);
                                 WaitForPostComplete(60);
                                 break;
-
                             case "//*[@text='Public' or @content-desc='Public']":
+                                if (!isPublic)
+                                {
+                                    break;
+                                }
                                 _client.ElementWithAttributes("//*[@text='CHANGE' or @text='SAVE']", 5, "");
                                 _client.ElementWithAttributes("//*[@content-desc='Back']", 1, xmlSource);
                                 WaitForPostComplete(60);
                                 break;
+                            case "//*[@content-desc=\"Share\"]":
                             case "//*[@class='android.widget.Button' and (starts-with(@text,'Share') or starts-with(@content-desc,'Share'))]":
+                                successCount++;
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Share...", 2);
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
                                 _client.Delay(2);
@@ -9488,38 +9532,31 @@ namespace Sunny.Subd.Core.Facebook
                                 {
                                     await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(3, 6), $"({successCount + 1}/{targetCount}), Đợi {{time}}s...", 2);
                                 }
+                                postSuccess = true;
                                 if (hasClickedAddToStory)
                                 {
                                     OpenFacebookTimeline();
                                     _client.Delay(3);
                                 }
-                                if (WaitForPostComplete(isMedia ? 300 : 60))
-                                {
-                                    successCount++;
-                                    postSuccess = true;
-
-                                }
+                                //WaitForPostComplete(isMedia ? 300 : 60);
                                 break;
                             case "//*[@content-desc=\"Finishing up…\"]":
                             case "//android.widget.ProgressBar":
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Loading...", 2);
                                 WaitForPostComplete(60);
                                 break;
-
                             default:
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Scroll...", 2);
                                 _client.Delay(2);
                                 if (!_client.IsRunningApp(PlatformModel.Facebook))
                                 {
-                                    await _mainService._facebookService.HanderAccount(_client, _account, 60, _mainService._ct, _mainService);
+                                    await _mainService._facebookService.HanderAccount(_client, _account, 1, _mainService._ct, _mainService);
                                     isFirstLoop = false;
                                 }
 
                                 break;
                         }
-
                         if (postSuccess || !isFirstLoop) break;
-
                         if (!string.IsNullOrEmpty(foundElement) && foundElement != "//android.widget.ProgressBar")
                         {
                             xpaths.Remove(foundElement);

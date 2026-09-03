@@ -18,7 +18,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         public fHDGuiLoiMoiKetBan(string scriptId, string actionId = "")
         {
             InitializeComponent();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             ckbDefault.CheckedChanged += ckbDefault_CheckedChanged;
             ckbChiDinh.CheckedChanged += ckbDefault_CheckedChanged;
             ckbTuKhoa.CheckedChanged += ckbDefault_CheckedChanged;

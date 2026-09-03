@@ -8,7 +8,7 @@ using Sunny.Subdy.Common.Models;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fActions : AntdUI.Window
+    public partial class fActions : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private string scriptId = "";
         public fActions(string scriptId)
@@ -19,7 +19,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             txt_search.PrefixClick += txt_search_PrefixClick;
             txt_search.TextChanged += txt_search_TextChanged;
             virtualPanel.ItemClick += ItemClick;
-            FontUtil.ApplyFontToAllControls(this);
+            windowBar.BackClick += btn_back_Click;
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
@@ -129,7 +130,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             base.OnLoad(e);
             windowBar.Loading = true;
             LoadList();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
 
         void LoadList()

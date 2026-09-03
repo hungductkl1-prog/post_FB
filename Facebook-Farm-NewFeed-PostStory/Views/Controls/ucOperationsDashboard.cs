@@ -26,6 +26,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
         private const int CardGap    = 12;
         private const int CardCount  = 6;
 
+        private static readonly Font _labelFont = new Font(FontScale.FamilyName, 8.5F, FontStyle.Regular);
+        private static readonly Font _valueFont = TryMonoFont(22F);
+
         private readonly System.Windows.Forms.Timer _timer;
         private readonly DashCard[] _cards;
 
@@ -39,7 +42,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
 
             _cards = new[]
             {
-                new DashCard("Today Jobs",      ColorPalette.Primary,        "RocketOutlined",        () => CountTodayJobs()),
+                new DashCard("Active Queue",     ColorPalette.Primary,        "RocketOutlined",        () => CountTodayJobs()),
                 new DashCard("Running Devices", ColorPalette.StateRunning,   "MobileOutlined",        () => CountRunningDevices()),
                 new DashCard("Alerts",          ColorPalette.Error,          "WarningOutlined",       () => CountAlerts()),
                 new DashCard("Queue",           ColorPalette.StateWaitingOtp,"ClockCircleOutlined",   () => CountQueue()),
@@ -89,7 +92,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             // Surface với rounded corners + subtle shadow
             using (var path = RoundedRect(rect, Radius.Lg))
             {
-                using var shadowBrush = new SolidBrush(Color.FromArgb(10, 0, 0, 0));
+                using var shadowBrush = new SolidBrush(Color.FromArgb(22, 0, 0, 0));
                 var shadow = new Rectangle(rect.X, rect.Y + 2, rect.Width, rect.Height);
                 using var shadowPath = RoundedRect(shadow, Radius.Lg);
                 g.FillPath(shadowBrush, shadowPath);
@@ -111,18 +114,16 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             int padY = Spacing.Md + 4;
 
             // Label (caption)
-            using var labelFont = new Font(FontScale.FamilyName, 8.5F, FontStyle.Regular);
             using var labelBrush = new SolidBrush(ColorPalette.TextTertiary);
-            g.DrawString(card.Label.ToUpperInvariant(), labelFont, labelBrush,
+            g.DrawString(card.Label.ToUpperInvariant(), _labelFont, labelBrush,
                 rect.X + padX, rect.Y + padY);
 
             // Value (big number, monospace)
             int val = SafeGet(card);
             string valueStr = card.IsPercent ? $"{val}%" : val.ToString("N0");
 
-            using var valueFont = TryMonoFont(22F);
             using var valueBrush = new SolidBrush(card.Accent);
-            g.DrawString(valueStr, valueFont, valueBrush,
+            g.DrawString(valueStr, _valueFont, valueBrush,
                 rect.X + padX, rect.Y + padY + 18);
         }
 
@@ -154,6 +155,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             try { return new Font("Cascadia Mono", size, FontStyle.Bold); }
             catch { return new Font("Consolas", size, FontStyle.Bold); }
         }
+
 
         // ── Data sources ──────────────────────────────────────
         private static int CountRunningDevices()

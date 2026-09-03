@@ -1,5 +1,4 @@
-﻿using AntdUI;
-using Facebook_Farm_NewFeed_PostStory.Views.Controls;
+﻿using Facebook_Farm_NewFeed_PostStory.Views.Controls;
 using Sunny.Subd.Core.Models;
 using Sunny.Subdy.UI.View.Pages;
 using System.Drawing;
@@ -36,17 +35,17 @@ namespace Facebook_Farm_NewFeed_PostStory
         /// </summary>
         private void InitializeComponent()
         {
-            windowBar = new PageHeader();
-            label1 = new AntdUI.Label();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
+            label1 = new Label();
             toolStrip1 = new ToolStrip();
             uiLabel6 = new ToolStripLabel();
             toolStripLabel2 = new ToolStripLabel();
             uiLabel5 = new ToolStripLabel();
             toolStripLabel4 = new ToolStripLabel();
             toolStripLabel5 = new ToolStripLabel();
-            btn_mode = new AntdUI.Button();
-            btn_global = new AntdUI.Button();
-            btn_setting = new AntdUI.Button();
+            btn_mode = new Button();
+            btn_global = new Button();
+            btn_setting = new Button();
             panel1 = new System.Windows.Forms.Panel();
             pMenu = new System.Windows.Forms.Panel();
             pContent = new System.Windows.Forms.Panel();
@@ -58,31 +57,21 @@ namespace Facebook_Farm_NewFeed_PostStory
             // windowBar
             // 
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(label1);
             windowBar.Controls.Add(toolStrip1);
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
             windowBar.Cursor = Cursors.Default;
-            windowBar.DividerMargin = 1;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Icon = Properties.Resources.logo_lamtool_v3_dark_16;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
-            windowBar.ShowIcon = true;
             windowBar.Size = new Size(1300, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", 6.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            windowBar.SubGap = 1;
-            windowBar.SubText = "v18.12.08.2025";
             windowBar.TabIndex = 7;
             windowBar.Text = "QN Phone Farm";
-            windowBar.UseSystemStyleColor = true;
-            windowBar.UseTextBold = false;
             // 
             // label1
             // 
@@ -158,41 +147,28 @@ namespace Facebook_Farm_NewFeed_PostStory
             // btn_mode
             // 
             btn_mode.Dock = DockStyle.Right;
-            btn_mode.Ghost = true;
-            btn_mode.IconSvg = "MinusOutlined";
             btn_mode.Location = new Point(1192, 0);
             btn_mode.Name = "btn_mode";
-            btn_mode.Radius = 0;
             btn_mode.Size = new Size(36, 35);
             btn_mode.TabIndex = 6;
-            btn_mode.ToggleIconSvg = "";
-            btn_mode.WaveSize = 0;
             btn_mode.Click += btn_mode_Click;
             // 
             // btn_global
             // 
             btn_global.Dock = DockStyle.Right;
-            btn_global.Ghost = true;
-            btn_global.IconSvg = "ExpandOutlined";
             btn_global.Location = new Point(1228, 0);
             btn_global.Name = "btn_global";
-            btn_global.Radius = 0;
             btn_global.Size = new Size(36, 35);
             btn_global.TabIndex = 7;
-            btn_global.WaveSize = 0;
             btn_global.Click += btn_global_SelectedValueChanged;
             // 
             // btn_setting
             // 
             btn_setting.Dock = DockStyle.Right;
-            btn_setting.Ghost = true;
-            btn_setting.IconSvg = "CloseOutlined";
             btn_setting.Location = new Point(1264, 0);
             btn_setting.Name = "btn_setting";
-            btn_setting.Radius = 0;
             btn_setting.Size = new Size(36, 35);
             btn_setting.TabIndex = 8;
-            btn_setting.WaveSize = 0;
             btn_setting.Click += btn_setting_Click;
             // 
             // panel1
@@ -233,13 +209,11 @@ namespace Facebook_Farm_NewFeed_PostStory
             Controls.Add(pContent);
             Controls.Add(panel1);
             Controls.Add(windowBar);
-            Dark = true;
             Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
             ForeColor = Color.Black;
             FormBorderStyle = FormBorderStyle.None;
             KeyPreview = true;
             MinimumSize = new Size(1280, 720);
-            Mode = TAMode.Dark;
             Name = "fMain";
             ShowIcon = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -252,10 +226,10 @@ namespace Facebook_Farm_NewFeed_PostStory
         }
 
         #endregion
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Button btn_mode;
-        private AntdUI.Button btn_setting;
-        private AntdUI.Button btn_global;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Button btn_mode;
+        private Button btn_setting;
+        private Button btn_global;
         private ToolStrip toolStrip1;
         private ToolStripLabel uiLabel6;
         private ToolStripLabel toolStripLabel2;
@@ -264,10 +238,11 @@ namespace Facebook_Farm_NewFeed_PostStory
         private ToolStripLabel toolStripLabel5;
 
         private ucdgvAccount _ucFacebook;
+        private ucdgvAccount _ucPandora;
         public ucManagerDevices _ucDevices;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel pMenu;
-        private AntdUI.Label label1;
+        private Label label1;
         public System.Windows.Forms.Panel pContent;
     }
 }

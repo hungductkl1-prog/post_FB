@@ -120,6 +120,10 @@ namespace Sunny.Subd.Core.Facebook
                             subyEnum = SubdyEnum.Block;
                             message = $"Tài khoản bị chặn [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
+                        case var c when XpathManagerFacebook.Get(XpathType.WrongPassword).Contains(c):
+                            subyEnum = SubdyEnum.WrongPassword;
+                            message = $"Sai mật khẩu hoặc tài khoản [{ExtractReadable(c)}]";
+                            throw new SubdyExtension(subyEnum, message);
                         case var c when XpathManagerFacebook.Get(XpathType.Logout).Contains(c):
                             subyEnum = SubdyEnum.LogOut;
                             message = $"Tài khoản bị đăng xuất [{ExtractReadable(c)}]";
@@ -155,6 +159,7 @@ namespace Sunny.Subd.Core.Facebook
                             await HandleNoInternet();
                             break;
                     }
+                    client.Delay(3);
 
                 }
             }
@@ -177,16 +182,16 @@ namespace Sunny.Subd.Core.Facebook
             var elements = _client.FindElements(10, "", "//*[@class='android.widget.EditText']");
             if (!elements.Any()) return;
             SetStatus("Đang nhập tên đăng nhập...", 2);
+            // Facebook hiện chỉ có 1 EditText ở màn nhập username; password ở màn tiếp theo
             _client.SendTextSlow("//*[@class='android.widget.EditText']", uid, xml: elements[0].OuterXml);
+            SetStatus("Đang xác nhận...", 2);
             if (elements.Count >= 2)
             {
-                SetStatus("Đang nhập mật khẩu...", 2);
                 _client.SendTextSlow("//*[@class='android.widget.EditText']", _account.Password, xml: elements[1].OuterXml);
             }
-            SetStatus("Đang xác nhận đăng nhập...", 2);
             _client.ElementWithAttributes(XpathManagerFacebook.Get(XpathType.NavigationButton));
             SetStatus("Đợi phản hồi từ Facebook...", 2);
-            _client.Delay(7);
+            _client.Delay(5);
             return;
         }
         private async Task ImportPassword()
@@ -366,6 +371,10 @@ namespace Sunny.Subd.Core.Facebook
                         subyEnum = SubdyEnum.Block;
                         message = $"Tài khoản bị chặn [{ExtractReadable(c)}]";
                         throw new SubdyExtension(subyEnum, message);
+                    case var c when XpathManagerFacebook.Get(XpathType.WrongPassword).Contains(c):
+                        subyEnum = SubdyEnum.WrongPassword;
+                        message = $"Sai mật khẩu hoặc tài khoản [{ExtractReadable(c)}]";
+                        throw new SubdyExtension(subyEnum, message);
                     case var c when XpathManagerFacebook.Get(XpathType.Logout).Contains(c):
                     case var c2 when XpathManagerFacebook.Get(XpathType.InputUserName).Contains(c2):
                     case var c3 when XpathManagerFacebook.Get(XpathType.InputPassword).Contains(c3):
@@ -380,8 +389,11 @@ namespace Sunny.Subd.Core.Facebook
                         SetStatus($"Phát hiện bị đăng xuất [{ExtractReadable(_case)}], đang đăng nhập lại (lần {reloginAttempts}/{MAX_RELOGIN_ATTEMPTS})...", 2,
                             logDetail: $"[FacebookService.HanderAccount] Relogin attempt {reloginAttempts}/{MAX_RELOGIN_ATTEMPTS}, case={_case}");
                         await main.SessionExpired();
-                        await Login(client, account, ct, timeout, main);
-                        await main.ExtractAndUpdateAuthenticationInfoAsync();
+                        var reloginResult = await Login(client, account, ct, timeout, main);
+                        if (reloginResult?.SubdyEnum == SubdyEnum.Success)
+                        {
+                            await main.ExtractAndUpdateAuthenticationInfoAsync();
+                        }
                         _sate = "Kiểm tra trạng thái tài khoản";
                         break;
                     case var c when XpathManagerFacebook.Get(XpathType.Success).Contains(c):

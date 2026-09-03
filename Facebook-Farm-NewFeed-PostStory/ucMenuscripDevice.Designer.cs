@@ -26,6 +26,7 @@
             toolStripButton10 = new ToolStripButton();
             toolStripButton9 = new ToolStripButton();
             toolStripButton8 = new ToolStripButton();
+            toolStripButton_TestChangeDevice = new ToolStripButton();
             toolStripDropDownButton1 = new ToolStripDropDownButton();
             toolStripMenuItem1 = new ToolStripMenuItem();
             toolStripButton3 = new ToolStripButton();
@@ -102,7 +103,12 @@
             // 
             toolStripButton8.Name = "toolStripButton8";
             toolStripButton8.Size = new Size(172, 4);
-            // 
+            //
+            // toolStripButton_TestChangeDevice
+            //
+            toolStripButton_TestChangeDevice.Name = "toolStripButton_TestChangeDevice";
+            toolStripButton_TestChangeDevice.Size = new Size(172, 4);
+            //
             // toolStripDropDownButton1
             // 
             toolStripDropDownButton1.Name = "toolStripDropDownButton1";
@@ -182,7 +188,7 @@
             // 
             toolStrip1.BackColor = Color.White;
             toolStrip1.GripStyle = ToolStripGripStyle.Hidden;
-            toolStrip1.Items.AddRange(new ToolStripItem[] { toolStripButton1, toolStripButton6, toolStripButton5, toolStripButton4, toolStripButton2, toolStripButton12, toolStripButton11, toolStripButton10, toolStripButton9, toolStripButton8, toolStripButton3, toolStripSeparator1, toolStripLabel1, toolStripDropDownButton1 });
+            toolStrip1.Items.AddRange(new ToolStripItem[] { toolStripButton1, toolStripButton6, toolStripButton5, toolStripButton4, toolStripButton2, toolStripButton12, toolStripButton11, toolStripButton10, toolStripButton9, toolStripButton8, toolStripButton_TestChangeDevice, toolStripButton3, toolStripSeparator1, toolStripLabel1, toolStripDropDownButton1 });
             toolStrip1.LayoutStyle = ToolStripLayoutStyle.VerticalStackWithOverflow;
             toolStrip1.Location = new Point(0, 0);
             toolStrip1.Name = "toolStrip1";
@@ -299,6 +305,7 @@
         private AntdUI.Label label2;
         private AntdUI.Button button9;
         private Panel panelScroll;
+        private ToolStripButton toolStripButton_TestChangeDevice;
         // Helpers for uniform setup
 
     }

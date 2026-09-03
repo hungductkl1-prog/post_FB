@@ -10,8 +10,8 @@ using Microsoft.Data.Sqlite;
 namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
 {
     /// <summary>
-    /// Map exception → thông điệp tiếng Việt thân thiện. Hiện qua AntdUI.Notification.error
-    /// (non-blocking, góc dưới phải). Stack trace log ra Debug cho dev.
+    /// Map exception → thông điệp tiếng Việt thân thiện. Hiện qua toast (non-blocking).
+    /// Stack trace log ra Debug cho dev.
     /// </summary>
     public static class ErrorHandler
     {
@@ -42,7 +42,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
             try
             {
                 if (form != null && !form.IsDisposed)
-                    AntdUI.Notification.error(form, title, msg, AntdUI.TAlignFrom.BR);
+                    WinFormsHelper.NotifyError(form, title, msg);
             }
             catch { /* ignore notification render errors */ }
 

@@ -37,6 +37,12 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             EF2F5A11 = new Panel();
             numericUpDown1 = new NumericUpDown();
             numericUpDown2 = new NumericUpDown();
+            lblDelayTruoc = new Label();
+            nudDelayTruoc = new NumericUpDown();
+            lblDelayTruocGiay = new Label();
+            lblDelaySau = new Label();
+            nudDelaySau = new NumericUpDown();
+            lblDelaySauGiay = new Label();
             label19 = new Label();
             label21 = new Label();
             label22 = new Label();
@@ -104,10 +110,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             A82CCFBF = new RadioButton();
             EF8F9F95 = new RadioButton();
             label26 = new Label();
-            windowBar = new AntdUI.PageHeader();
-            btn_mode = new AntdUI.Button();
-            btn_global = new AntdUI.Button();
-            btn_setting = new AntdUI.Button();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
+            btn_mode = new Button();
+            btn_global = new Button();
+            btn_setting = new Button();
             txtTenHanhDong = new TextBox();
             label1 = new Label();
             btnCancel = new Button();
@@ -128,6 +134,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             EF2F5A11.SuspendLayout();
             ((ISupportInitialize)numericUpDown1).BeginInit();
             ((ISupportInitialize)numericUpDown2).BeginInit();
+            ((ISupportInitialize)nudDelayTruoc).BeginInit();
+            ((ISupportInitialize)nudDelaySau).BeginInit();
             groupBox1.SuspendLayout();
             panel4.SuspendLayout();
             ((ISupportInitialize)nudCommentTo).BeginInit();
@@ -198,9 +206,22 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             EF2F5A11.BorderStyle = BorderStyle.FixedSingle;
             EF2F5A11.Controls.Add(numericUpDown1);
             EF2F5A11.Controls.Add(numericUpDown2);
+            EF2F5A11.Controls.Add(lblDelayTruoc);
+            EF2F5A11.Controls.Add(nudDelayTruoc);
+            EF2F5A11.Controls.Add(lblDelayTruocGiay);
+            EF2F5A11.Controls.Add(lblDelaySau);
+            EF2F5A11.Controls.Add(nudDelaySau);
+            EF2F5A11.Controls.Add(lblDelaySauGiay);
             EF2F5A11.Controls.Add(label19);
             EF2F5A11.Controls.Add(label21);
             EF2F5A11.Controls.Add(label22);
+            EF2F5A11.Controls.Add(nudTimeTo);
+            EF2F5A11.Controls.Add(nudTimeFrom);
+            EF2F5A11.Controls.Add(CFAD1134);
+            EF2F5A11.Controls.Add(label6);
+            EF2F5A11.Controls.Add(F888D5B0);
+            EF2F5A11.Controls.Add(checkBox1);
+            EF2F5A11.Controls.Add(panel8);
             EF2F5A11.Controls.Add(groupBox1);
             EF2F5A11.Controls.Add(windowBar);
             EF2F5A11.Controls.Add(txtTenHanhDong);
@@ -210,7 +231,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             EF2F5A11.Dock = DockStyle.Fill;
             EF2F5A11.Location = new Point(0, 0);
             EF2F5A11.Name = "EF2F5A11";
-            EF2F5A11.Size = new Size(450, 810);
+            EF2F5A11.Size = new Size(450, 866);
             EF2F5A11.TabIndex = 0;
             // 
             // numericUpDown1
@@ -257,7 +278,61 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             label22.Size = new Size(91, 16);
             label22.TabIndex = 204;
             label22.Text = "Thời gian lướt:";
-            // 
+            //
+            // lblDelayTruoc
+            //
+            lblDelayTruoc.AutoSize = true;
+            lblDelayTruoc.Location = new Point(20, 114);
+            lblDelayTruoc.Name = "lblDelayTruoc";
+            lblDelayTruoc.Size = new Size(140, 16);
+            lblDelayTruoc.TabIndex = 210;
+            lblDelayTruoc.Text = "Delay trước khi lướt:";
+            //
+            // nudDelayTruoc
+            //
+            nudDelayTruoc.Location = new Point(166, 111);
+            nudDelayTruoc.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
+            nudDelayTruoc.Name = "nudDelayTruoc";
+            nudDelayTruoc.Size = new Size(56, 23);
+            nudDelayTruoc.TabIndex = 211;
+            nudDelayTruoc.Value = new decimal(new int[] { 20, 0, 0, 0 });
+            //
+            // lblDelayTruocGiay
+            //
+            lblDelayTruocGiay.Location = new Point(223, 113);
+            lblDelayTruocGiay.Name = "lblDelayTruocGiay";
+            lblDelayTruocGiay.Size = new Size(44, 21);
+            lblDelayTruocGiay.TabIndex = 212;
+            lblDelayTruocGiay.Text = "giây";
+            lblDelayTruocGiay.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // lblDelaySau
+            //
+            lblDelaySau.AutoSize = true;
+            lblDelaySau.Location = new Point(20, 143);
+            lblDelaySau.Name = "lblDelaySau";
+            lblDelaySau.Size = new Size(140, 16);
+            lblDelaySau.TabIndex = 213;
+            lblDelaySau.Text = "Delay sau khi lướt:";
+            //
+            // nudDelaySau
+            //
+            nudDelaySau.Location = new Point(166, 140);
+            nudDelaySau.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
+            nudDelaySau.Name = "nudDelaySau";
+            nudDelaySau.Size = new Size(56, 23);
+            nudDelaySau.TabIndex = 214;
+            nudDelaySau.Value = new decimal(new int[] { 20, 0, 0, 0 });
+            //
+            // lblDelaySauGiay
+            //
+            lblDelaySauGiay.Location = new Point(223, 142);
+            lblDelaySauGiay.Name = "lblDelaySauGiay";
+            lblDelaySauGiay.Size = new Size(44, 21);
+            lblDelaySauGiay.TabIndex = 215;
+            lblDelaySauGiay.Text = "giây";
+            lblDelaySauGiay.TextAlign = ContentAlignment.MiddleLeft;
+            //
             // groupBox1
             // 
             groupBox1.Controls.Add(ckbInteract);
@@ -268,7 +343,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             groupBox1.Controls.Add(panel1);
             groupBox1.Controls.Add(EDA1511C);
             groupBox1.Controls.Add(plInteract);
-            groupBox1.Location = new Point(13, 113);
+            groupBox1.Location = new Point(13, 169);
             groupBox1.Name = "groupBox1";
             groupBox1.Size = new Size(424, 650);
             groupBox1.TabIndex = 192;
@@ -976,69 +1051,46 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             // windowBar
             // 
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
             windowBar.Cursor = Cursors.Hand;
-            windowBar.DividerMargin = 1;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Icon = Resources.logo_lamtool_v3_dark_16;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
-            windowBar.ShowIcon = true;
             windowBar.Size = new Size(448, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            windowBar.SubGap = 1;
-            windowBar.SubText = "";
             windowBar.TabIndex = 186;
             windowBar.Text = "Cấu hình tương tác";
-            windowBar.UseSystemStyleColor = true;
-            windowBar.UseTextBold = false;
             // 
             // btn_mode
             // 
             btn_mode.Dock = DockStyle.Right;
-            btn_mode.Ghost = true;
-            btn_mode.Icon = Resources.icons8_circle_16_Green;
-            btn_mode.IconSvg = "";
+            btn_mode.Image = Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(368, 0);
             btn_mode.Name = "btn_mode";
-            btn_mode.Radius = 0;
             btn_mode.Size = new Size(26, 35);
             btn_mode.TabIndex = 6;
-            btn_mode.ToggleIconSvg = "MoonOutlined";
-            btn_mode.WaveSize = 0;
             // 
             // btn_global
             // 
             btn_global.Dock = DockStyle.Right;
-            btn_global.Ghost = true;
-            btn_global.Icon = Resources.icons8_circle_16_Yellow;
-            btn_global.IconSvg = "";
+            btn_global.Image = Resources.icons8_circle_16_Yellow;
             btn_global.Location = new Point(394, 0);
             btn_global.Name = "btn_global";
-            btn_global.Radius = 0;
             btn_global.Size = new Size(24, 35);
             btn_global.TabIndex = 7;
-            btn_global.WaveSize = 0;
             // 
             // btn_setting
             // 
             btn_setting.Dock = DockStyle.Right;
-            btn_setting.Ghost = true;
-            btn_setting.Icon = Resources.icons8_circle_16_Red;
-            btn_setting.IconSvg = "";
+            btn_setting.Image = Resources.icons8_circle_16_Red;
             btn_setting.Location = new Point(418, 0);
             btn_setting.Name = "btn_setting";
-            btn_setting.Radius = 0;
             btn_setting.Size = new Size(30, 35);
             btn_setting.TabIndex = 8;
-            btn_setting.WaveSize = 0;
             // 
             // txtTenHanhDong
             // 
@@ -1065,7 +1117,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             btnCancel.FlatStyle = FlatStyle.Flat;
             btnCancel.Font = new Font("Tahoma", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             btnCancel.ForeColor = Color.White;
-            btnCancel.Location = new Point(232, 768);
+            btnCancel.Location = new Point(232, 824);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(92, 29);
             btnCancel.TabIndex = 10;
@@ -1081,7 +1133,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             btnSave.FlatStyle = FlatStyle.Flat;
             btnSave.Font = new Font("Tahoma", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             btnSave.ForeColor = Color.White;
-            btnSave.Location = new Point(125, 768);
+            btnSave.Location = new Point(125, 824);
             btnSave.Name = "btnSave";
             btnSave.Size = new Size(92, 29);
             btnSave.TabIndex = 9;
@@ -1198,7 +1250,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             // fHDTuongTacNewfeed
             // 
             AutoScaleMode = AutoScaleMode.None;
-            ClientSize = new Size(450, 810);
+            ClientSize = new Size(450, 866);
             Controls.Add(EF2F5A11);
             Font = new Font("Tahoma", 9.75F, FontStyle.Regular, GraphicsUnit.Point, 0);
             FormBorderStyle = FormBorderStyle.None;
@@ -1212,6 +1264,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             EF2F5A11.PerformLayout();
             ((ISupportInitialize)numericUpDown1).EndInit();
             ((ISupportInitialize)numericUpDown2).EndInit();
+            ((ISupportInitialize)nudDelayTruoc).EndInit();
+            ((ISupportInitialize)nudDelaySau).EndInit();
             groupBox1.ResumeLayout(false);
             groupBox1.PerformLayout();
             panel4.ResumeLayout(false);
@@ -1244,6 +1298,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             ((ISupportInitialize)nudTuKhoaFrom).EndInit();
             ((ISupportInitialize)nudTimeTo).EndInit();
             ((ISupportInitialize)nudTimeFrom).EndInit();
+            EF2F5A11.PerformLayout();
             ResumeLayout(false);
         }
         internal Panel EF2F5A11;
@@ -1293,12 +1348,18 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         internal Label label2;
 
         internal Label label11;
+        internal Label lblDelayTruoc;
+        internal NumericUpDown nudDelayTruoc;
+        internal Label lblDelayTruocGiay;
+        internal Label lblDelaySau;
+        internal NumericUpDown nudDelaySau;
+        internal Label lblDelaySauGiay;
         #endregion
 
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Button btn_mode;
-        private AntdUI.Button btn_global;
-        private AntdUI.Button btn_setting;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Button btn_mode;
+        private Button btn_global;
+        private Button btn_setting;
         internal Panel plInteract;
         internal CheckBox ckbGian;
         internal CheckBox ckbBuon;

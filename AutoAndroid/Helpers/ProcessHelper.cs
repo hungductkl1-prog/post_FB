@@ -2,14 +2,19 @@
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
+using AutoAndroid.Monitoring;
 
 namespace AutoAndroid
 {
     public class ProcessHelper
     {
-        public const int MaxConcurrentCmdProcesses = 20;
+        public const int MaxConcurrentCmdProcesses = 200;
         public static string ADBPath = "C:\\QNHelper\\sdk\\platform-tools\\";
         private static readonly SemaphoreSlim CmdSemaphore = new SemaphoreSlim(MaxConcurrentCmdProcesses, MaxConcurrentCmdProcesses);
+
+        // Semaphore riêng cho lệnh monitoring (adb devices, service check settings).
+        // Đảm bảo lệnh monitoring không bao giờ bị block bởi automation scripts.
+        private static readonly SemaphoreSlim MonitorSemaphore = new SemaphoreSlim(15, 15);
 
         public sealed class CommandExecutionResult
         {
@@ -44,6 +49,13 @@ namespace AutoAndroid
             return RunProcessWithResult(exe, adbCommand, timeoutSeconds);
         }
 
+        /// <summary>Giống RunAdbWithResult nhưng KHÔNG qua CmdSemaphore — dùng nội bộ bởi RunAdbMonitorCommand.</summary>
+        private static CommandExecutionResult RunAdbWithResultDirect(string adbCommand, int timeoutSeconds = 10)
+        {
+            string exe = Path.Combine(ADBPath, "adb.exe");
+            return RunProcessDirect(exe, adbCommand, timeoutSeconds);
+        }
+
         public static CommandExecutionResult RunRawCmdWithResult(string cmd, int timeoutSeconds = 0)
         {
             // Lệnh raw có thể chứa pipe (|), redirection hoặc built-in của cmd
@@ -74,6 +86,32 @@ namespace AutoAndroid
             }
         }
 
+        /// <summary>
+        /// Chạy lệnh ADB dùng MonitorSemaphore (riêng biệt với CmdSemaphore).
+        /// Dùng cho lệnh monitoring (adb devices, service check settings) để
+        /// không bị block bởi automation scripts đang chiếm CmdSemaphore.
+        /// </summary>
+        public static string RunAdbMonitorCommand(string adbCommand, int timeoutSeconds = 5)
+        {
+            MonitorSemaphore.Wait();
+            try
+            {
+                CommandExecutionResult result = RunAdbWithResultDirect(adbCommand, timeoutSeconds);
+                if (result.TimedOut) return string.Empty;
+                if (!string.IsNullOrWhiteSpace(result.Error) && string.IsNullOrWhiteSpace(result.Output))
+                    return string.Empty;
+                return result.Output.Trim();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+            finally
+            {
+                MonitorSemaphore.Release();
+            }
+        }
+
         // Theo dõi số lần 'devices' bị timeout liên tiếp để tự restart ADB khi server chết hoàn toàn
         private static int _consecutiveDevicesTimeout = 0;
         private static readonly object _adbRestartLock = new object();
@@ -81,10 +119,6 @@ namespace AutoAndroid
 
         public static string RunAdbWithTimeout(string adbCommand, int timeoutSeconds = 10)
         {
-            // Kiểm tra connection leak định kỳ (throttled 30s), bỏ qua nếu đang dùng netstat để tránh đệ quy
-            if (!adbCommand.Contains("start-server") && !adbCommand.Contains("kill-server"))
-                ADBHelper.CheckAndFixConnectionLeak();
-
             const int maxRetries = 3;
             const int retryDelayMs = 1000;
             int retryCount = 0;
@@ -100,6 +134,8 @@ namespace AutoAndroid
 
                     if (result.TimedOut)
                     {
+                        MetricsCollector.Increment("adb.command.timeout");
+                        MetricsCollector.Increment("adb.retry.count");
                         LogError($"[ADB Timeout] '{adbCommand}' timeout sau {timeoutSeconds}s. Thử lại {retryCount + 1}/{maxRetries}");
                         timeoutsThisCall++;
                         retryCount++;
@@ -209,7 +245,15 @@ namespace AutoAndroid
 
         private static CommandExecutionResult RunProcessWithResult(string fileName, string arguments, int timeoutSeconds)
         {
+            // Track queue length BEFORE wait
+            MetricsCollector.GaugeSet("semaphore.queue.depth", CmdSemaphore.CurrentCount);
+            var semWaitSw = Stopwatch.StartNew();
             CmdSemaphore.Wait();
+            semWaitSw.Stop();
+            MetricsCollector.RecordTiming("semaphore.wait.ms", semWaitSw.ElapsedMilliseconds);
+            MetricsCollector.GaugeSet("semaphore.queue.depth", CmdSemaphore.CurrentCount);
+            MetricsCollector.Increment("adb.command.total");
+            var cmdSw = Stopwatch.StartNew();
             try
             {
                 using Process process = new Process
@@ -250,8 +294,11 @@ namespace AutoAndroid
                 process.BeginErrorReadLine();
 
                 bool exited = timeoutSeconds <= 0 || process.WaitForExit(timeoutSeconds * 1000);
+                cmdSw.Stop();
+                MetricsCollector.RecordTiming("adb.command.execution.ms", cmdSw.ElapsedMilliseconds);
                 if (!exited)
                 {
+                    MetricsCollector.Increment("adb.command.timeout");
                     TryKillProcess(process);
                     return new CommandExecutionResult
                     {
@@ -278,6 +325,69 @@ namespace AutoAndroid
             finally
             {
                 CmdSemaphore.Release();
+                MetricsCollector.GaugeSet("semaphore.queue.depth", CmdSemaphore.CurrentCount);
+            }
+        }
+
+        /// <summary>Giống RunProcessWithResult nhưng KHÔNG qua CmdSemaphore — dùng nội bộ bởi RunAdbMonitorCommand.</summary>
+        private static CommandExecutionResult RunProcessDirect(string fileName, string arguments, int timeoutSeconds)
+        {
+            MetricsCollector.Increment("adb.command.total");
+            try
+            {
+                using Process process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = fileName,
+                        Arguments = arguments,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        StandardOutputEncoding = Encoding.UTF8,
+                        StandardErrorEncoding = Encoding.UTF8
+                    }
+                };
+
+                StringBuilder outputBuilder = new StringBuilder();
+                StringBuilder errorBuilder = new StringBuilder();
+
+                process.OutputDataReceived += (s, e) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(e.Data)) outputBuilder.AppendLine(e.Data);
+                };
+                process.ErrorDataReceived += (s, e) =>
+                {
+                    if (!string.IsNullOrWhiteSpace(e.Data)) errorBuilder.AppendLine(e.Data);
+                };
+
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                bool exited = timeoutSeconds <= 0 || process.WaitForExit(timeoutSeconds * 1000);
+                if (!exited)
+                {
+                    MetricsCollector.Increment("adb.command.timeout");
+                    TryKillProcess(process);
+                    return new CommandExecutionResult
+                    {
+                        TimedOut = true, ExitCode = -1,
+                        Output = outputBuilder.ToString(), Error = errorBuilder.ToString()
+                    };
+                }
+
+                process.WaitForExit(2000);
+                return new CommandExecutionResult
+                {
+                    TimedOut = false, ExitCode = process.ExitCode,
+                    Output = outputBuilder.ToString(), Error = errorBuilder.ToString()
+                };
+            }
+            catch
+            {
+                return new CommandExecutionResult { TimedOut = true, ExitCode = -1 };
             }
         }
 

@@ -214,7 +214,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             Dictionary<string, string> result = new Dictionary<string, string>();
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Get, "https://gateway.golike.net/api/instagram-account");
                 request.Headers.Add("authorization", $"Bearer {token}");
                 request.Headers.Add("t", "VFZSak1VNUVUVEpPZW1kNFRsRTlQUT09");
@@ -254,7 +254,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             Dictionary<string, string> result = new Dictionary<string, string>();
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Post, "https://gateway.golike.net/api/instagram-account/verify-account");
                 request.Headers.Add("authorization", $"Bearer {token}");
                 request.Headers.Add("t", "VFZSak1VMTZZek5OVkVFd1RuYzlQUT09");
@@ -286,7 +286,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             Dictionary<string, string> result = new Dictionary<string, string>();
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Get, "https://gateway.golike.net/api/users/me");
                 request.Headers.Add("authorization", $"Bearer {token}");
                 request.Headers.Add("t", "VFZSak1VMTZZek5OVkVFd1RuYzlQUT09");
@@ -319,7 +319,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
         {
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://gateway.golike.net/api/advertising/publishers/instagram/jobs?instagram_account_id={idAccount}&data=null");
                 request.Headers.Add("authorization", $"Bearer {token}");
                 request.Headers.Add("t", "VFZSak1VMTZZek5OYW1NMFQwRTlQUT09");
@@ -358,7 +358,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             Dictionary<string, string> result = new Dictionary<string, string>();
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Post, "https://gateway.golike.net/api/report/send");
                 request.Headers.Add("authorization", $"Bearer {token}");
                 request.Headers.Add("t", "VFZSak1VMTZZek5OVkVFd1RuYzlQUT09");
@@ -390,7 +390,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             Dictionary<string, string> result = new Dictionary<string, string>();
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Post, "https://gateway.golike.net/api/advertising/publishers/instagram/complete-jobs");
                 request.Headers.Add("authorization", $"Bearer {token}");
                 request.Headers.Add("t", "VFZSak1VMTZZek5OVkVFd1RuYzlQUT09");
@@ -426,7 +426,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
         {
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Get,
                     $"https://gateway.golike.net/api/advertising/publishers/threads/_private/get-jobs?threads_username={username}");
                 request.Headers.Add("authorization", $"Bearer {token}");
@@ -488,7 +488,7 @@ namespace Sunny.Subdy.Common.API.Jobs.GoLike
             Dictionary<string, string> result = new Dictionary<string, string>();
             try
             {
-                var client = new HttpClient();
+                using var client = new HttpClient();
                 var request = new HttpRequestMessage(HttpMethod.Post,
                     "https://gateway.golike.net/api/advertising/publishers/threads/_private/complete-jobs");
                 request.Headers.Add("authorization", $"Bearer {token}");

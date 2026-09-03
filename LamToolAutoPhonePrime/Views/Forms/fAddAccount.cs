@@ -373,13 +373,34 @@ namespace LamToolAutoPhonePrime.Views.Forms
         }
         private void txtLines_TextChanged_1(object sender, EventArgs e)
         {
-            label3.Text = $"Danh sách tài khoản ({txtLines.Lines.Count()}):";
-            AutoDetectFields();
+            // Đếm dòng bằng cách quét ký tự thay vì txtLines.Lines (tránh cấp phát mảng 50k chuỗi mỗi lần gõ/dán).
+            string text = txtLines.Text;
+            int lineCount = string.IsNullOrEmpty(text) ? 0 : 1;
+            for (int i = 0; i < text.Length; i++)
+                if (text[i] == '\n') lineCount++;
+
+            label3.Text = $"Danh sách tài khoản ({lineCount}):";
+            AutoDetectFields(text);
         }
 
-        private void AutoDetectFields()
+        private void AutoDetectFields(string text)
         {
-            var firstLine = txtLines.Lines.FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
+            // Chỉ lấy dòng đầu không rỗng, không split toàn bộ buffer.
+            string firstLine = null;
+            int start = 0;
+            while (start < text.Length)
+            {
+                int nl = text.IndexOf('\n', start);
+                int end = nl < 0 ? text.Length : nl;
+                string candidate = text.Substring(start, end - start).Trim('\r', ' ', '\t');
+                if (!string.IsNullOrWhiteSpace(candidate))
+                {
+                    firstLine = candidate;
+                    break;
+                }
+                if (nl < 0) break;
+                start = nl + 1;
+            }
             if (string.IsNullOrEmpty(firstLine)) return;
 
             string[] parts = firstLine.Split('|');

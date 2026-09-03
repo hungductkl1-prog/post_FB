@@ -1,7 +1,10 @@
 {
   "profiles": {
     "LamToolAutoPhonePrime": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "environmentVariables": {
+        "ACCOUNT_GRID_DIAG": "1"
+      }
     }
   }
 }

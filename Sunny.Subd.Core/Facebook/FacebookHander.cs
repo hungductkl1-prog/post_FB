@@ -53,6 +53,8 @@ namespace Sunny.Subd.Core.Facebook
                     return "com.instagram.android";
                 case PlatformModel.Threads:
                     return "com.instagram.barcelona";
+                case PlatformModel.Pandora:
+                    return "com.pandora.android";
                 default:
                     throw new ArgumentException("Unsupported platform: " + platform);
             }
@@ -66,13 +68,15 @@ namespace Sunny.Subd.Core.Facebook
                     XpathType.Captcha,
                     XpathType.CP956,
                     XpathType.Logout,
+                    XpathType.WrongPassword,
                     XpathType.Block,
                     XpathType.Success,
                     XpathType.CashApp,
                     XpathType.TowFA,
                     XpathType.InputUserName,
                     XpathType.InputPassword,
-                    XpathType.NavigationButton
+                    XpathType.NavigationButton,
+                    XpathType.No_Internet
                 );
             return xpaths;
         }

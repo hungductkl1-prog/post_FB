@@ -17,7 +17,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         public fHDRoiNhom(string scriptId, string actionId = "")
         {
             InitializeComponent();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             rbRoiTheoDieuKien.CheckedChanged += ckbDefault_CheckedChanged;
             C7178894.CheckedChanged += ckbDefault_CheckedChanged;
             txtTuKhoa.TextChanged += txtLinks_TextChanged;

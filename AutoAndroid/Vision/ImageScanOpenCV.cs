@@ -228,25 +228,29 @@ namespace AutoAndroid
             OpenCvSharp.Mat source = BitmapToMat(mainBitmap);
             OpenCvSharp.Mat template = BitmapToMat(subBitmap);
             OpenCvSharp.Mat imageToShow = source.Clone();
-
-            // Perform template matching
             OpenCvSharp.Mat result = new OpenCvSharp.Mat();
-            Cv2.MatchTemplate(source, template, result, TemplateMatchModes.CCoeffNormed);
-
-            // Get the min/max values
-            Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
-
-            if (maxVal > percent)
+            try
             {
+                // Perform template matching
+                Cv2.MatchTemplate(source, template, result, TemplateMatchModes.CCoeffNormed);
+
+                // Get the min/max values
+                Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
+
+                if (maxVal <= percent)
+                    return null;
+
                 // Draw rectangle around match
                 Cv2.Rectangle(imageToShow, maxLoc, new OpenCvSharp.Point(maxLoc.X + template.Width, maxLoc.Y + template.Height), new Scalar(0, 0, 255), 2);
+                return MatToBitmap(imageToShow);
             }
-            else
+            finally
             {
-                imageToShow = null;
+                source.Dispose();
+                template.Dispose();
+                imageToShow.Dispose();
+                result.Dispose();
             }
-
-            return (imageToShow == null) ? null : MatToBitmap(imageToShow);
         }
 
         [DllImport("gdi32.dll")]
@@ -262,19 +266,27 @@ namespace AutoAndroid
 
             OpenCvSharp.Mat source = BitmapToMat(mainBitmap);
             OpenCvSharp.Mat template = BitmapToMat(subBitmap);
-
             OpenCvSharp.Mat result = new OpenCvSharp.Mat();
-            Cv2.MatchTemplate(source, template, result, TemplateMatchModes.CCoeffNormed);
-
-            Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
-
-            if (maxVal > percent)
+            try
             {
-                // Convert OpenCvSharp.Point to System.Drawing.Point
-                return new System.Drawing.Point(maxLoc.X, maxLoc.Y);
-            }
+                Cv2.MatchTemplate(source, template, result, TemplateMatchModes.CCoeffNormed);
 
-            return null;
+                Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
+
+                if (maxVal > percent)
+                {
+                    // Convert OpenCvSharp.Point to System.Drawing.Point
+                    return new System.Drawing.Point(maxLoc.X, maxLoc.Y);
+                }
+
+                return null;
+            }
+            finally
+            {
+                source.Dispose();
+                template.Dispose();
+                result.Dispose();
+            }
         }
 
         public static List<Point> FindOutPoints(Bitmap mainBitmap, Bitmap subBitmap, double percent = 0.9)
@@ -283,18 +295,26 @@ namespace AutoAndroid
             OpenCvSharp.Mat template = BitmapToMat(subBitmap);
             List<Point> resPoints = new List<Point>();
 
-            while (true)
+            try
             {
-                OpenCvSharp.Mat result = new OpenCvSharp.Mat();
-                Cv2.MatchTemplate(source, template, result, TemplateMatchModes.CCoeffNormed);
-                Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
+                while (true)
+                {
+                    using OpenCvSharp.Mat result = new OpenCvSharp.Mat();
+                    Cv2.MatchTemplate(source, template, result, TemplateMatchModes.CCoeffNormed);
+                    Cv2.MinMaxLoc(result, out _, out double maxVal, out _, out OpenCvSharp.Point maxLoc);
 
-                if (maxVal <= percent)
-                    break;
+                    if (maxVal <= percent)
+                        break;
 
-                // Draw rectangle around match and add the location
-                Cv2.Rectangle(source, maxLoc, new OpenCvSharp.Point(maxLoc.X + template.Width, maxLoc.Y + template.Height), new Scalar(0, 0, 255), 2);
-                resPoints.Add(new System.Drawing.Point(maxLoc.X, maxLoc.Y));
+                    // Draw rectangle around match and add the location
+                    Cv2.Rectangle(source, maxLoc, new OpenCvSharp.Point(maxLoc.X + template.Width, maxLoc.Y + template.Height), new Scalar(0, 0, 255), 2);
+                    resPoints.Add(new System.Drawing.Point(maxLoc.X, maxLoc.Y));
+                }
+            }
+            finally
+            {
+                source.Dispose();
+                template.Dispose();
             }
 
             return resPoints;
@@ -307,7 +327,7 @@ namespace AutoAndroid
 
             try
             {
-                OpenCvSharp.Mat mat = BitmapToMat(mainBitmap);
+                using OpenCvSharp.Mat mat = BitmapToMat(mainBitmap);
                 for (int y = 0; y < mat.Rows; y++)
                 {
                     for (int x = 0; x < mat.Cols; x++)
@@ -347,8 +367,8 @@ namespace AutoAndroid
 
         public static Bitmap ThreshHoldBinary(Bitmap bmp, byte threshold = 190)
         {
-            OpenCvSharp.Mat img = BitmapToMat(bmp);
-            OpenCvSharp.Mat thresholded = new OpenCvSharp.Mat();
+            using OpenCvSharp.Mat img = BitmapToMat(bmp);
+            using OpenCvSharp.Mat thresholded = new OpenCvSharp.Mat();
 
             // Apply binary threshold
             Cv2.Threshold(img, thresholded, threshold, 255, ThresholdTypes.Binary);
@@ -373,7 +393,7 @@ namespace AutoAndroid
 
         private static Bitmap PixelReplacement(Bitmap bmp, Func<System.Drawing.Color, bool> condition, System.Drawing.Color replacementColor)
         {
-            OpenCvSharp.Mat mat = BitmapToMat(bmp);
+            using OpenCvSharp.Mat mat = BitmapToMat(bmp);
             for (int y = 0; y < mat.Rows; y++)
             {
                 for (int x = 0; x < mat.Cols; x++)
@@ -433,7 +453,7 @@ namespace AutoAndroid
             try
             {
                 // Convert Bitmap to Mat
-                Mat image = BitmapToMat(bitmap);
+                using Mat image = BitmapToMat(bitmap);
 
                 // Check if image is successfully loaded
                 if (image.Empty())
@@ -462,8 +482,8 @@ namespace AutoAndroid
                             return string.Empty;
                         }
 
-                        var result = engine.Process(pix);
-                        return result.GetText();
+                        using (var result = engine.Process(pix))
+                            return result.GetText();
                     }
                 }
             }

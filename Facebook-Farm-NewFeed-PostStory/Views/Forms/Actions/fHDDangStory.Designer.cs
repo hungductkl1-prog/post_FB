@@ -43,10 +43,15 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             label17 = new Label();
             F391713F = new NumericUpDown();
             FD150C04 = new Label();
-            windowBar = new AntdUI.PageHeader();
-            btn_mode = new AntdUI.Button();
-            btn_global = new AntdUI.Button();
-            btn_setting = new AntdUI.Button();
+            lblKhoangCach = new Label();
+            nudKhoangCachFrom = new NumericUpDown();
+            lblKhoangCachDen = new Label();
+            nudKhoangCachTo = new NumericUpDown();
+            lblKhoangCachGiay = new Label();
+            windowBar = new Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel();
+            btn_mode = new Button();
+            btn_global = new Button();
+            btn_setting = new Button();
             // Cột trái: chọn loại story
             rbDangText = new RadioButton();
             rbDangAnhVideo = new RadioButton();
@@ -85,6 +90,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             ckbRandomEffects = new CheckBox();
             ckbTagNeuBat = new CheckBox();
             ckbTagMoiNguoi = new CheckBox();
+            ckbPublic = new CheckBox();
             button2 = new Button();
             button3 = new Button();
             button4 = new Button();
@@ -101,6 +107,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             plAnhNhac.SuspendLayout();
             ((ISupportInitialize)F391713F).BeginInit();
             ((ISupportInitialize)C913DC8A).BeginInit();
+            ((ISupportInitialize)nudKhoangCachFrom).BeginInit();
+            ((ISupportInitialize)nudKhoangCachTo).BeginInit();
             plVanBan.SuspendLayout();
             SuspendLayout();
             //
@@ -152,6 +160,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             panel1.Controls.Add(label17);
             panel1.Controls.Add(F391713F);
             panel1.Controls.Add(FD150C04);
+            panel1.Controls.Add(lblKhoangCach);
+            panel1.Controls.Add(nudKhoangCachFrom);
+            panel1.Controls.Add(lblKhoangCachDen);
+            panel1.Controls.Add(nudKhoangCachTo);
+            panel1.Controls.Add(lblKhoangCachGiay);
             panel1.Controls.Add(rbDangText);
             panel1.Controls.Add(rbDangAnhVideo);
             panel1.Controls.Add(rbDangNhac);
@@ -171,69 +184,46 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             // windowBar
             //
             windowBar.BackColor = Color.White;
-            windowBar.BackgroundImageLayout = ImageLayout.Stretch;
-            windowBar.CloseSize = 30;
             windowBar.Controls.Add(btn_mode);
             windowBar.Controls.Add(btn_global);
             windowBar.Controls.Add(btn_setting);
             windowBar.Cursor = Cursors.Hand;
-            windowBar.DividerMargin = 1;
             windowBar.Dock = DockStyle.Top;
             windowBar.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 0);
             windowBar.ForeColor = Color.Black;
             windowBar.Icon = Resources.logo_lamtool_v3_dark_16;
             windowBar.Location = new Point(0, 0);
-            windowBar.MDI = true;
             windowBar.Name = "windowBar";
-            windowBar.ShowIcon = true;
             windowBar.Size = new Size(838, 35);
-            windowBar.SubFont = new Font("Microsoft Sans Serif", Facebook_Farm_NewFeed_PostStory.Utils.Design.FontScale.Caption, FontStyle.Regular, GraphicsUnit.Point, 0);
-            windowBar.SubGap = 1;
-            windowBar.SubText = "";
             windowBar.TabIndex = 202;
             windowBar.Text = "Thêm tương tác đăng story";
-            windowBar.UseSystemStyleColor = true;
-            windowBar.UseTextBold = false;
             //
             // btn_mode
             //
             btn_mode.Dock = DockStyle.Right;
-            btn_mode.Ghost = true;
-            btn_mode.Icon = Resources.icons8_circle_16_Green;
-            btn_mode.IconSvg = "";
+            btn_mode.Image = Resources.icons8_circle_16_Green;
             btn_mode.Location = new Point(758, 0);
             btn_mode.Name = "btn_mode";
-            btn_mode.Radius = 0;
             btn_mode.Size = new Size(26, 35);
             btn_mode.TabIndex = 6;
-            btn_mode.ToggleIconSvg = "MoonOutlined";
-            btn_mode.WaveSize = 0;
             //
             // btn_global
             //
             btn_global.Dock = DockStyle.Right;
-            btn_global.Ghost = true;
-            btn_global.Icon = Resources.icons8_circle_16_Yellow;
-            btn_global.IconSvg = "";
+            btn_global.Image = Resources.icons8_circle_16_Yellow;
             btn_global.Location = new Point(784, 0);
             btn_global.Name = "btn_global";
-            btn_global.Radius = 0;
             btn_global.Size = new Size(24, 35);
             btn_global.TabIndex = 7;
-            btn_global.WaveSize = 0;
             //
             // btn_setting
             //
             btn_setting.Dock = DockStyle.Right;
-            btn_setting.Ghost = true;
-            btn_setting.Icon = Resources.icons8_circle_16_Red;
-            btn_setting.IconSvg = "";
+            btn_setting.Image = Resources.icons8_circle_16_Red;
             btn_setting.Location = new Point(808, 0);
             btn_setting.Name = "btn_setting";
-            btn_setting.Radius = 0;
             btn_setting.Size = new Size(30, 35);
             btn_setting.TabIndex = 8;
-            btn_setting.WaveSize = 0;
             //
             // txtTenHanhDong
             //
@@ -293,6 +283,51 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             FD150C04.Size = new Size(30, 16);
             FD150C04.TabIndex = 39;
             FD150C04.Text = "story";
+            //
+            // lblKhoangCach
+            //
+            lblKhoangCach.AutoSize = true;
+            lblKhoangCach.Location = new Point(453, 52);
+            lblKhoangCach.Name = "lblKhoangCach";
+            lblKhoangCach.Size = new Size(140, 16);
+            lblKhoangCach.TabIndex = 240;
+            lblKhoangCach.Text = "Cách nhau giữa 2 story:";
+            //
+            // nudKhoangCachFrom
+            //
+            nudKhoangCachFrom.Location = new Point(600, 49);
+            nudKhoangCachFrom.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
+            nudKhoangCachFrom.Name = "nudKhoangCachFrom";
+            nudKhoangCachFrom.Size = new Size(56, 23);
+            nudKhoangCachFrom.TabIndex = 241;
+            nudKhoangCachFrom.Value = new decimal(new int[] { 5, 0, 0, 0 });
+            //
+            // lblKhoangCachDen
+            //
+            lblKhoangCachDen.Location = new Point(657, 51);
+            lblKhoangCachDen.Name = "lblKhoangCachDen";
+            lblKhoangCachDen.Size = new Size(30, 21);
+            lblKhoangCachDen.TabIndex = 242;
+            lblKhoangCachDen.Text = "đến";
+            lblKhoangCachDen.TextAlign = ContentAlignment.MiddleCenter;
+            //
+            // nudKhoangCachTo
+            //
+            nudKhoangCachTo.Location = new Point(690, 49);
+            nudKhoangCachTo.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
+            nudKhoangCachTo.Name = "nudKhoangCachTo";
+            nudKhoangCachTo.Size = new Size(56, 23);
+            nudKhoangCachTo.TabIndex = 243;
+            nudKhoangCachTo.Value = new decimal(new int[] { 10, 0, 0, 0 });
+            //
+            // lblKhoangCachGiay
+            //
+            lblKhoangCachGiay.Location = new Point(748, 51);
+            lblKhoangCachGiay.Name = "lblKhoangCachGiay";
+            lblKhoangCachGiay.Size = new Size(40, 21);
+            lblKhoangCachGiay.TabIndex = 244;
+            lblKhoangCachGiay.Text = "giây";
+            lblKhoangCachGiay.TextAlign = ContentAlignment.MiddleLeft;
             //
             // rbDangText
             //
@@ -531,6 +566,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             plVanBan.Controls.Add(ckbRandomEffects);
             plVanBan.Controls.Add(ckbTagNeuBat);
             plVanBan.Controls.Add(ckbTagMoiNguoi);
+            plVanBan.Controls.Add(ckbPublic);
             plVanBan.Controls.Add(button2);
             plVanBan.Controls.Add(button3);
             plVanBan.Controls.Add(button4);
@@ -692,6 +728,17 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             ckbTagMoiNguoi.Text = "Tag mọi người/followers";
             ckbTagMoiNguoi.UseVisualStyleBackColor = true;
             //
+            // ckbPublic
+            //
+            ckbPublic.AutoSize = true;
+            ckbPublic.Cursor = Cursors.Hand;
+            ckbPublic.Location = new Point(8, 470);
+            ckbPublic.Name = "ckbPublic";
+            ckbPublic.Size = new Size(140, 20);
+            ckbPublic.TabIndex = 43;
+            ckbPublic.Text = "đăng public story";
+            ckbPublic.UseVisualStyleBackColor = true;
+            //
             // button2 (?)
             //
             button2.Cursor = Cursors.Help;
@@ -793,6 +840,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             plAnhNhac.PerformLayout();
             ((ISupportInitialize)F391713F).EndInit();
             ((ISupportInitialize)C913DC8A).EndInit();
+            ((ISupportInitialize)nudKhoangCachFrom).EndInit();
+            ((ISupportInitialize)nudKhoangCachTo).EndInit();
             plVanBan.ResumeLayout(false);
             plVanBan.PerformLayout();
             ResumeLayout(false);
@@ -826,10 +875,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         internal Label label3;
         #endregion
 
-        private AntdUI.PageHeader windowBar;
-        private AntdUI.Button btn_mode;
-        private AntdUI.Button btn_global;
-        private AntdUI.Button btn_setting;
+        private Facebook_Farm_NewFeed_PostStory.Utils.TitleBarPanel windowBar;
+        private Button btn_mode;
+        private Button btn_global;
+        private Button btn_setting;
         internal Button button4;
         internal CheckBox checkBox1;
         private TextBox txtLinks;
@@ -856,5 +905,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         internal CheckBox ckbRandomEffects;
         internal CheckBox ckbTagNeuBat;
         internal CheckBox ckbTagMoiNguoi;
+        internal CheckBox ckbPublic;
+        internal Label lblKhoangCach;
+        internal NumericUpDown nudKhoangCachFrom;
+        internal Label lblKhoangCachDen;
+        internal NumericUpDown nudKhoangCachTo;
+        internal Label lblKhoangCachGiay;
     }
 }

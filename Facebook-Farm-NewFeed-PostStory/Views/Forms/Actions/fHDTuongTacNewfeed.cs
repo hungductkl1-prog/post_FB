@@ -19,7 +19,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         public fHDTuongTacNewfeed(string scriptId, string actionId = "")
         {
             InitializeComponent();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             Facebook_Farm_NewFeed_PostStory.Utils.Design.FormResponsiveHelper.MakeScrollable(this);
             checkBox1.CheckedChanged += ckbDefault_CheckedChanged;
             ckbInteract.CheckedChanged += ckbDefault_CheckedChanged;

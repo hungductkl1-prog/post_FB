@@ -7,7 +7,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fFolder : AntdUI.Window
+    public partial class fFolder : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private FolderContext _folderContext;
         private ScriptContext _scriptContext;
@@ -34,7 +34,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                         break;
                     }
             }
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
         public fFolder(string type, string nameFolder, string platform)
         {
@@ -68,7 +68,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                         break;
                     }
             }
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
 
 

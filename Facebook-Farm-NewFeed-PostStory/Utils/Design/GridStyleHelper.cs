@@ -8,6 +8,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
     /// </summary>
     public static class GridStyleHelper
     {
+        private static readonly HashSet<DataGridView> RowHoverDisabled = new();
+
         public const int RowHeightComfort = 36;
         public const int RowHeightDense   = 32;
         public const int RowHeightRelaxed = 44;
@@ -47,6 +49,34 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
             dgv.CellMouseLeave -= OnCellMouseLeave;
             dgv.CellMouseEnter += OnCellMouseEnter;
             dgv.CellMouseLeave += OnCellMouseLeave;
+
+            // Khi grid bị dispose: gỡ handler + xóa khỏi static set để không pin instance đã chết.
+            dgv.Disposed -= OnGridDisposed;
+            dgv.Disposed += OnGridDisposed;
+        }
+
+        private static void OnGridDisposed(object? sender, EventArgs e)
+        {
+            if (sender is not DataGridView dgv) return;
+            dgv.CellMouseEnter -= OnCellMouseEnter;
+            dgv.CellMouseLeave -= OnCellMouseLeave;
+            dgv.Disposed -= OnGridDisposed;
+            lock (RowHoverDisabled)
+                RowHoverDisabled.Remove(dgv);
+        }
+
+        /// <summary>
+        /// VirtualMode + truy cập dgv.Rows[index] sẽ materialize row → đơ với 50k+ dòng.
+        /// Gọi false trong large-list perf mode.
+        /// </summary>
+        public static void SetRowHoverEnabled(DataGridView dgv, bool enabled)
+        {
+            if (dgv == null) return;
+            lock (RowHoverDisabled)
+            {
+                if (enabled) RowHoverDisabled.Remove(dgv);
+                else RowHoverDisabled.Add(dgv);
+            }
         }
 
         // ── private ───────────────────────────────────────────
@@ -74,9 +104,17 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
             WrapMode           = DataGridViewTriState.False
         };
 
+        private static bool IsRowHoverEnabled(DataGridView dgv)
+        {
+            lock (RowHoverDisabled)
+                return !RowHoverDisabled.Contains(dgv);
+        }
+
         private static void OnCellMouseEnter(object? sender, DataGridViewCellEventArgs e)
         {
             if (sender is not DataGridView dgv) return;
+            if (!IsRowHoverEnabled(dgv)) return;
+            if (dgv.VirtualMode) return;
             if (e.RowIndex < 0 || e.RowIndex >= dgv.Rows.Count) return;
             var row = dgv.Rows[e.RowIndex];
             if (row.Selected) return;
@@ -86,6 +124,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Utils.Design
         private static void OnCellMouseLeave(object? sender, DataGridViewCellEventArgs e)
         {
             if (sender is not DataGridView dgv) return;
+            if (!IsRowHoverEnabled(dgv)) return;
+            if (dgv.VirtualMode) return;
             if (e.RowIndex < 0 || e.RowIndex >= dgv.Rows.Count) return;
             var row = dgv.Rows[e.RowIndex];
             if (row.Selected) return;

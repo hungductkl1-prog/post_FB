@@ -7,6 +7,8 @@ namespace Sunny.Subd.Core.Utils
     public class XpathManagerFacebook
     {
         private static readonly ConcurrentDictionary<XpathType, List<string>> _xpathGroups = new();
+        private static readonly object _loadLock = new();
+        private static Task? _loadTask;
         static XpathManagerFacebook()
         {
             _xpathGroups.TryAdd(XpathType.Captcha, new List<string>
@@ -40,6 +42,17 @@ namespace Sunny.Subd.Core.Utils
              $"//*[contains(@text, \"read more about this rule\")]",
              $"//*[contains(@text, \"Upload image or take photo\")]",
              $"//*[contains(@text, \"Account Temporarily Unavailable\")]",
+             // Bug 5: Màn hình "Kiểm tra tài khoản" / Srcool khi đăng story lần 2
+             $"//*[contains(@text, \"Review Recent Login\")]",
+             $"//*[contains(@text, \"Confirm Your Identity\")]",
+             $"//*[contains(@text, \"Verify your identity\")]",
+             $"//*[contains(@text, \"We need to verify your account\")]",
+             $"//*[contains(@text, \"Help us confirm\")]",
+             $"//*[contains(@text, \"Confirm your account\")]",
+             $"//*[contains(@text, \"Review Your Account\")]",
+             $"//*[contains(@text, \"Secure Your Account\")]",
+             $"//*[contains(@text, \"Protect Your Account\")]",
+             $"//*[contains(@text, \"Account Review\")]",
           });
             _xpathGroups.TryAdd(XpathType.CP956, new List<string>
           {
@@ -56,24 +69,50 @@ namespace Sunny.Subd.Core.Utils
             _xpathGroups.TryAdd(XpathType.Success, new List<string>
           {
             "//*[contains(@content-desc, 'Go to profile')]",
-             "//*[@text=\"Add a profile picture\"]",
-             "//*[@text=\"Add a mobile number to your account\"]"
+            //"//*[@text=\"Add a profile picture\"]",
+            //"//*[@text=\"Add a mobile number to your account\"]",
+            //"//*[@content-desc=\"News Feed\"]",
+            //"//*[@content-desc=\"Home\"]",
+            //"//*[contains(@content-desc, 'Newsfeed')]",
+            //"//*[@content-desc=\"Marketplace\"]",
+            //"//*[@content-desc=\"Notifications\"]",
+            //"//*[@content-desc=\"Watch\"]",
+            //"//*[@content-desc=\"Menu\"]",
+            //"//*[@content-desc=\"Search Facebook\"]",
+            //"//*[contains(@content-desc, 'What')]",
           });
             _xpathGroups.TryAdd(XpathType.Loading, new List<string>
       {
           "//*[@content-desc=\"Đang tải\"]",
-          "//*[@content-desc=\"Loading…\"]"
       });
             _xpathGroups.TryAdd(XpathType.Logout, new List<string>
+      {
+          "//*[contains(@text, \"You've been logged out\")]",
+          $"//*[contains(@text, \"Please log in again\")]",
+          $"//*[contains(@text, \"Log in to continue\")]",
+          $"//*[contains(@text, \"Your session has expired\")]",
+      });
+            _xpathGroups.TryAdd(XpathType.WrongPassword, new List<string>
       {
           "//*[contains(@text, \"Unable to log in\")]",
           $"//*[contains(@text, \"Wrong Credentials\")]",
           $"//*[contains(@text, \"Invalid username or password\")]",
           $"//*[contains(@text, \"The password you entered is incorrect\")]",
-          $"//*[contains(@text, \"Unable to log in\")]",
+          $"//*[contains(@text, \"incorrect password\")]",
+          $"//*[contains(@text, \"password is incorrect\")]",
       });
             _xpathGroups.TryAdd(XpathType.NavigationButton, new List<string>
       {
+                "//*[contains(@text, \"Alow all\")]",
+              "//*[contains(@content-desc, \"Alow all\")]",
+             "//*[contains(@text, \"Use for free with\")]",
+              "//*[contains(@content-desc, \"Use for free with\")]",
+          "//*[@content-desc=\"Manage quiet mode\"]",
+          "//*[@text=\"Manage quiet mode\"]",
+
+          "//*[@content-desc=\"End quiet mode\"]",
+          "//*[@text=\"End quiet mode\"]",
+
           "//*[@text=\"Dismiss\"]",
          "//*[@text=\"I already have a profile\"]",
          "//*[@text=\"Use another profile\"]",
@@ -229,7 +268,15 @@ namespace Sunny.Subd.Core.Utils
             _xpathGroups[key] = xpaths;
         }
 
-        public static async Task LoadFromApiAsync(string apiUrl = "https://dev.subdy.net/api/case")
+        public static Task LoadFromApiAsync(string apiUrl = "https://dev.subdy.net/api/case")
+        {
+            lock (_loadLock)
+            {
+                return _loadTask ??= LoadFromApiCoreAsync(apiUrl);
+            }
+        }
+
+        private static async Task LoadFromApiCoreAsync(string apiUrl)
         {
             try
             {

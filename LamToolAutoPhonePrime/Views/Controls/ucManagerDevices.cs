@@ -1300,12 +1300,7 @@ namespace Sunny.Subdy.UI.View.Pages
                 // Recompute lần cuối — đề phòng HasInternet được set trễ sau ConnectAll.
                 foreach (var dev in DeviceServices.DeviceModels)
                 {
-                    if (!dev.IsAdbOnline)
-                    {
-                        dev.IsRowEnabled = false;
-                        continue;
-                    }
-                    dev.IsRowEnabled = dev.HasInternet && dev.IsLive;
+                    dev.IsRowEnabled = true;
                 }
 
                 // UI refresh trên UI thread.
@@ -1942,7 +1937,7 @@ namespace Sunny.Subdy.UI.View.Pages
                         }
                         var match = System.Text.RegularExpressions.Regex.Match(xml, @"access_token[^>]*>([^<]+)<");
                         if (match.Success)
-                            c.LogHelper.SUCCESS($"Token: {match.Groups[1].Value}");
+                            c.LogHelper.SUCCESS("Đã lấy access token Facebook.");
                         else
                             c.LogHelper.ERROR("Không tìm thấy access_token trong prefs.");
                         await Task.CompletedTask;

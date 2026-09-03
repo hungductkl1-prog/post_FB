@@ -4,7 +4,7 @@ using System.Diagnostics;
 
 namespace Facebook_Farm_NewFeed_PostStory
 {
-    public partial class fShowThongBao : AntdUI.Window
+    public partial class fShowThongBao : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         bool close = false;
         public fShowThongBao(string title, string message)
@@ -13,7 +13,7 @@ namespace Facebook_Farm_NewFeed_PostStory
             alert10.TextTitle = title;
             alert10.Text = message;
             this.FormClosing += fShowThongBao_FormClosing;
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             _ = UpdateUI(120);
         }
         private async Task UpdateUI(int second)

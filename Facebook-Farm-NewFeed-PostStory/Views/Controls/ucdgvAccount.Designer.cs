@@ -24,6 +24,32 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
                 _countsTimer?.Stop();
                 _countsTimer?.Dispose();
                 _countsTimer = null;
+                try { FlushStatusesToDb(sync: true); } catch { }
+                _statusFlushTimer?.Stop();
+                _statusFlushTimer?.Dispose();
+                _statusFlushTimer = null;
+                _diagSnapshotTimer?.Stop();
+                _diagSnapshotTimer?.Dispose();
+                _diagSnapshotTimer = null;
+                _gridMetrics?.Dispose();
+                _gridMetrics = null;
+                Facebook_Farm_NewFeed_PostStory.Utils.UiThreadProfiler.Stop(); // flush final operational window
+                _reloadDebounceTimer?.Stop();
+                _reloadDebounceTimer?.Dispose();
+                _reloadDebounceTimer = null;
+                _liveRepaintTimer?.Stop();
+                _liveRepaintTimer?.Dispose();
+                _liveRepaintTimer = null;
+                _loadCts?.Cancel();
+                _loadCts?.Dispose();
+                _loadCts = null;
+                _searchCts?.Cancel();
+                _searchCts?.Dispose();
+                _searchCts = null;
+                _cache?.Dispose();
+                _cache = null;
+                _cachedNativeMenu?.Dispose();
+                _cachedNativeMenu = null;
                 components?.Dispose();
             }
             base.Dispose(disposing);
@@ -462,7 +488,6 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dataGridView1.Size = new Size(800, 215);
             dataGridView1.TabIndex = 12;
-            dataGridView1.MouseClick += Control_MouseClick;
             // 
             // dataGridViewCheckBoxColumn1
             // 

@@ -11,7 +11,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fChiTietKichBan : AntdUI.Window
+    public partial class fChiTietKichBan : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private int rowIndexFromMouseDown;
         private int rowIndexOfItemUnderMouseToDrop;
@@ -62,7 +62,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             LoadColumnsDataGridView();
             AddActionButtons();
 
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             LoadData();
         }
 
@@ -100,6 +100,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 {
                     act.MieuTa = trDesc;
                 }
+                else if (PandoraFarmingType.DescriptionAction.TryGetValue(act.Type, out var pdDesc))
+                {
+                    act.MieuTa = pdDesc;
+                }
                 else
                 {
                     act.MieuTa = "Không có mô tả";
@@ -120,6 +124,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                 {
                     PlatformModel.Instagram => new fActionsInstagram(_idScript.ToString()),
                     PlatformModel.Threads => (Form)new fActionsThreads(_idScript.ToString()),
+                    PlatformModel.Pandora => new fActionsPandora(_idScript.ToString()),
                     _ => new fActions(_idScript.ToString())
                 };
                 this.Cursor = Cursors.Default;
@@ -637,6 +642,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                     break;
                 case ThreadsFarmingType.TRCapNhatThongTin:
                     form = new fTRCapNhatThongTin(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
+
+                // Pandora
+                case PandoraFarmingType.HDNgheNhac:
+                    form = new fPandoraNgheNhac(action.ScriptId.ToString(), action.Id.ToString());
                     break;
             }
             if (form == null) return;

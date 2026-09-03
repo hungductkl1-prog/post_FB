@@ -65,6 +65,16 @@
             button16 = new AntdUI.Button();
 
             windowBar.SuspendLayout();
+            numericUpDown1 = new NumericUpDown();
+            numericUpDown2 = new NumericUpDown();
+            lblDelayHanhDong = new Label();
+            lblDenDelay = new Label();
+            lblGiayDelay = new Label();
+            nudGioiHanTKFrom = new NumericUpDown();
+            nudGioiHanTKTo = new NumericUpDown();
+            lblGioiHanTK = new Label();
+            lblDenGioiHanTK = new Label();
+            lblPhutGioiHanTK = new Label();
             panel4.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)nudSoLanLap).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudChoLuotFrom).BeginInit();
@@ -73,6 +83,10 @@
             ((System.ComponentModel.ISupportInitialize)nudTaiKhoanTo).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudKichBanFrom).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudKichBanTo).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)numericUpDown1).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)numericUpDown2).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudGioiHanTKFrom).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)nudGioiHanTKTo).BeginInit();
             SuspendLayout();
 
             // windowBar
@@ -165,7 +179,7 @@
             panel4.Name = "panel4";
             panel4.padding = new Padding(16);
             panel4.Radius = 16;
-            panel4.Size = new Size(1300, 200);
+            panel4.Size = new Size(1300, 250);
             panel4.TabIndex = 11;
             panel4.Text = "panel4";
 
@@ -387,9 +401,77 @@
             timepickerTo.Text = "09:46:23";
             timepickerTo.ValueTimeHorizontal = true;
 
+            // Delay giữa các hành động
+            lblDelayHanhDong.AutoSize = true;
+            lblDelayHanhDong.Location = new Point(560, 148);
+            lblDelayHanhDong.Name = "lblDelayHanhDong";
+            lblDelayHanhDong.Text = "Delay giữa các hành động:";
+
+            numericUpDown2.Enabled = true;
+            numericUpDown2.Location = new Point(800, 145);
+            numericUpDown2.Minimum = 1;
+            numericUpDown2.Maximum = 9999;
+            numericUpDown2.Value = 5;
+            numericUpDown2.Name = "numericUpDown2";
+            numericUpDown2.Size = new Size(46, 23);
+            numericUpDown2.TabIndex = 23;
+
+            lblDenDelay.AutoSize = true;
+            lblDenDelay.Location = new Point(850, 148);
+            lblDenDelay.Name = "lblDenDelay";
+            lblDenDelay.Text = "đến";
+
+            numericUpDown1.Enabled = true;
+            numericUpDown1.Location = new Point(878, 145);
+            numericUpDown1.Minimum = 1;
+            numericUpDown1.Maximum = 9999;
+            numericUpDown1.Value = 15;
+            numericUpDown1.Name = "numericUpDown1";
+            numericUpDown1.Size = new Size(46, 23);
+            numericUpDown1.TabIndex = 24;
+
+            lblGiayDelay.AutoSize = true;
+            lblGiayDelay.Location = new Point(928, 148);
+            lblGiayDelay.Name = "lblGiayDelay";
+            lblGiayDelay.Text = "giây";
+
+            // Giới hạn thời gian 1 tài khoản
+            lblGioiHanTK.AutoSize = true;
+            lblGioiHanTK.Location = new Point(560, 174);
+            lblGioiHanTK.Name = "lblGioiHanTK";
+            lblGioiHanTK.Text = "Giới hạn thời gian 1 tài khoản:";
+
+            nudGioiHanTKFrom.Enabled = true;
+            nudGioiHanTKFrom.Location = new Point(800, 171);
+            nudGioiHanTKFrom.Minimum = 1;
+            nudGioiHanTKFrom.Maximum = 9999;
+            nudGioiHanTKFrom.Value = 20;
+            nudGioiHanTKFrom.Name = "nudGioiHanTKFrom";
+            nudGioiHanTKFrom.Size = new Size(46, 23);
+            nudGioiHanTKFrom.TabIndex = 25;
+
+            lblDenGioiHanTK.AutoSize = true;
+            lblDenGioiHanTK.Location = new Point(850, 174);
+            lblDenGioiHanTK.Name = "lblDenGioiHanTK";
+            lblDenGioiHanTK.Text = "đến";
+
+            nudGioiHanTKTo.Enabled = true;
+            nudGioiHanTKTo.Location = new Point(878, 171);
+            nudGioiHanTKTo.Minimum = 1;
+            nudGioiHanTKTo.Maximum = 9999;
+            nudGioiHanTKTo.Value = 80;
+            nudGioiHanTKTo.Name = "nudGioiHanTKTo";
+            nudGioiHanTKTo.Size = new Size(46, 23);
+            nudGioiHanTKTo.TabIndex = 26;
+
+            lblPhutGioiHanTK.AutoSize = true;
+            lblPhutGioiHanTK.Location = new Point(928, 174);
+            lblPhutGioiHanTK.Name = "lblPhutGioiHanTK";
+            lblPhutGioiHanTK.Text = "phút";
+
             // ── Info row ──
             llbHuongDan.AutoSize = true;
-            llbHuongDan.Location = new Point(20, 158);
+            llbHuongDan.Location = new Point(20, 208);
             llbHuongDan.Name = "llbHuongDan";
             llbHuongDan.TabIndex = 20;
             llbHuongDan.TabStop = true;
@@ -398,14 +480,14 @@
 
             lblCanhBao1.AutoSize = true;
             lblCanhBao1.ForeColor = Color.Red;
-            lblCanhBao1.Location = new Point(200, 158);
+            lblCanhBao1.Location = new Point(200, 208);
             lblCanhBao1.Name = "lblCanhBao1";
             lblCanhBao1.TabIndex = 21;
             lblCanhBao1.Text = "Lưu ý: Kiểm tra kịch bản của tài khoản trước khi chạy";
 
             lblCanhBao2.AutoSize = true;
             lblCanhBao2.ForeColor = Color.Red;
-            lblCanhBao2.Location = new Point(570, 158);
+            lblCanhBao2.Location = new Point(570, 208);
             lblCanhBao2.Name = "lblCanhBao2";
             lblCanhBao2.TabIndex = 22;
             lblCanhBao2.Text = "Lưu ý: Nếu không chọn kịch bản cho tài khoản thì auto sẽ chạy kịch bản đầu tiên";
@@ -439,6 +521,16 @@
             panel4.Controls.Add(timepickerFrom);
             panel4.Controls.Add(lblDenNgay);
             panel4.Controls.Add(timepickerTo);
+            panel4.Controls.Add(lblDelayHanhDong);
+            panel4.Controls.Add(numericUpDown2);
+            panel4.Controls.Add(lblDenDelay);
+            panel4.Controls.Add(numericUpDown1);
+            panel4.Controls.Add(lblGiayDelay);
+            panel4.Controls.Add(lblGioiHanTK);
+            panel4.Controls.Add(nudGioiHanTKFrom);
+            panel4.Controls.Add(lblDenGioiHanTK);
+            panel4.Controls.Add(nudGioiHanTKTo);
+            panel4.Controls.Add(lblPhutGioiHanTK);
             panel4.Controls.Add(llbHuongDan);
             panel4.Controls.Add(lblCanhBao1);
             panel4.Controls.Add(lblCanhBao2);
@@ -490,6 +582,10 @@
             ((System.ComponentModel.ISupportInitialize)nudTaiKhoanTo).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudKichBanFrom).EndInit();
             ((System.ComponentModel.ISupportInitialize)nudKichBanTo).EndInit();
+            ((System.ComponentModel.ISupportInitialize)numericUpDown1).EndInit();
+            ((System.ComponentModel.ISupportInitialize)numericUpDown2).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudGioiHanTKFrom).EndInit();
+            ((System.ComponentModel.ISupportInitialize)nudGioiHanTKTo).EndInit();
             ResumeLayout(false);
         }
 
@@ -536,5 +632,15 @@
         private AntdUI.VirtualPanel virtualPanel;
         private AntdUI.Input input6;
         private AntdUI.Button button16;
+        private NumericUpDown numericUpDown1;
+        private NumericUpDown numericUpDown2;
+        private Label lblDelayHanhDong;
+        private Label lblDenDelay;
+        private Label lblGiayDelay;
+        private NumericUpDown nudGioiHanTKFrom;
+        private NumericUpDown nudGioiHanTKTo;
+        private Label lblGioiHanTK;
+        private Label lblDenGioiHanTK;
+        private Label lblPhutGioiHanTK;
     }
 }

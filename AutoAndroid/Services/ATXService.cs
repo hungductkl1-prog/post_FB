@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Sunny.Subdy.Data.Models;
+using AutoAndroid.Monitoring;
 
 namespace AutoAndroid
 {
@@ -60,7 +61,9 @@ namespace AutoAndroid
             try
             {
                 i++;
-                _initer.Reinstall();
+                // Idempotent: only Install (has built-in outdated checks).
+                // Do NOT Uninstall a healthy ATX install on every connect.
+                _initer.Install();
             }
             catch (Exception ex)
             {
@@ -68,6 +71,22 @@ namespace AutoAndroid
             }
             _client.RunTime($"Connect: UIAUTOMATOR", () => Connect());
             _client.RunTime($"Connect: UIAUTOMATOR ", () => RunUiautomator());
+            if (RunUiautomator())
+            {
+                return true;
+            }
+
+            // Fallback: only when Install + Connect still cannot bring up
+            // UIAutomator do a full Reinstall (Uninstall + Install) + retry.
+            try
+            {
+                _initer.Reinstall();
+            }
+            catch (Exception ex2)
+            {
+                _client.LogHelper.Log(ex2.Message);
+            }
+            _client.RunTime($"Connect: UIAUTOMATOR (retry)", () => Connect());
             return RunUiautomator();
         }
         public bool Connect()
@@ -278,6 +297,9 @@ namespace AutoAndroid
                 { "params", array }
             };
 
+            var devMetrics = DeviceMetricsRegistry.GetOrCreate(_serial);
+            MetricsCollector.Increment("atx.jsonrpc.total");
+            using var _ = MetricsCollector.Measure("atx.jsonrpc.execution.ms");
             try
             {
                 using (var socket = SocketHelper.Create(_url))
@@ -286,10 +308,14 @@ namespace AutoAndroid
 
                     if (result == null || result.Code != 200)
                     {
+                        MetricsCollector.Increment("atx.jsonrpc.failed");
+                        devMetrics.JsonRpcFailCount++;
                         return null;
                     }
                     if (string.IsNullOrWhiteSpace(result.Content))
                     {
+                        MetricsCollector.Increment("atx.jsonrpc.failed");
+                        devMetrics.JsonRpcFailCount++;
                         return null;
                     }
 
@@ -307,8 +333,12 @@ namespace AutoAndroid
             }
             catch (Exception ex)
             {
+                MetricsCollector.Increment("atx.jsonrpc.failed");
+                devMetrics.JsonRpcFailCount++;
                 if (ex.Message.Contains("Failed to connect to "))
                 {
+                    devMetrics.AtxReconnectCount++;
+                    MetricsCollector.Increment("atx.reconnect.count");
                     Connect();
                     return JsonRpc(method, argv);
                 }

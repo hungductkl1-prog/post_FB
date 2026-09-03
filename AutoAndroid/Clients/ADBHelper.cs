@@ -41,15 +41,15 @@ namespace AutoAndroid
 
         /// <summary>
         /// Khởi động lại adb an toàn: kill toàn bộ process trước rồi start-server.
-        /// Dùng khi khởi động phần mềm hoặc khi adb bị ngẽn.
+        /// Dùng khi phát hiện connection leak hoặc khi adb bị ngẽn.
         /// </summary>
         public static void Restart()
         {
-            // KillAllAdbProcesses();
-            //   _serverStarted = false;
-            //  Thread.Sleep(500);
-            // ProcessHelper.RunAdbWithTimeout($"start-server", 10);
-            //_serverStarted = true;
+            KillAllAdbProcesses();
+            _serverStarted = false;
+            Thread.Sleep(500);
+            ProcessHelper.RunAdbWithTimeout("start-server", 10);
+            _serverStarted = true;
         }
 
         private static int _lastLeakCount = 0;
@@ -101,7 +101,7 @@ namespace AutoAndroid
             // đang enumerate thiết bị USB (1-2s). Thử tối đa 3 lần × 5s.
             for (int attempt = 0; attempt < 3; attempt++)
             {
-                var devicesOutput = ProcessHelper.RunAdbNoRetry("devices", 5);
+                var devicesOutput = ProcessHelper.RunAdbMonitorCommand("devices", 5);
                 var lines = devicesOutput.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
 
                 var result = lines

@@ -5,5 +5,6 @@ namespace Sunny.Subdy.Common.Models
         public const string Facebook = "Facebook";
         public const string Instagram = "Instagram";
         public const string Threads = "Threads";
+        public const string Pandora = "Pandora";
     }
 }

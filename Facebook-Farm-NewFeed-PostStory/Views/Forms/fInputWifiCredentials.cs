@@ -7,7 +7,7 @@ using Facebook_Farm_NewFeed_PostStory.Utils.Design;
 
 namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
 {
-    public partial class fInputWifiCredentials : AntdUI.Window
+    public partial class fInputWifiCredentials : Facebook_Farm_NewFeed_PostStory.Utils.BaseForm
     {
         private const string ConfigFileName = "wifi-credentials-input.txt";
         private static readonly string ConfigPath =
@@ -24,7 +24,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
         public fInputWifiCredentials()
         {
             BuildUi();
-            FontUtil.ApplyFontToAllControls(this);
+            FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
             txtLines.Text = SafeReadConfig();
         }
 

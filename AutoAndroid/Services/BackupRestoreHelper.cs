@@ -1,6 +1,7 @@
 ﻿using AutoAndroid;
 using Sunny.Subdy.Data.Models;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace Sunny.Subdy.Common
 {
@@ -45,25 +46,22 @@ namespace Sunny.Subdy.Common
             string fileName = Path.GetFileName(file);
             string escapedFile = file.Replace("\\", "/");
 
-            _Android.Shell($"am force-stop {Package_Facebook}");
-            _Android.Shell($"su -c 'killall -9 {Package_Facebook}'");
-
             for (int i = 0; i < 2; i++)
             {
+                string output = _Android.ADB.Shell($"cmd package list packages -U {Package_Facebook}", 30).Trim();
+
+                string appUid = Regex.Match(output, @"uid:(\d+)").Groups[1].Value;
+                if (string.IsNullOrWhiteSpace(appUid)) continue;
                 _Android.Device.Status = "Đang đẩy file vào thiết bị...";
-                string s = _Android.ADB.CMD($"push \"{escapedFile}\" /sdcard/{fileName}", 100);
+                _Android.ADB.CMD($"push \"{escapedFile}\" /data/local/tmp/{fileName}", 100);
 
                 _Android.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/*'");
-                _Android.Shell($"su -c 'cp /sdcard/{fileName} /data/data/{Package_Facebook}/profile.tar.gz'");
-                _Android.Shell(" su -c 'tar -xpf /data/data/" + Package_Facebook + "/profile.tar.gz'");
-                _Android.ADB.Shell($"su -c \"sh -c 'tar -xzf /data/data/{Package_Facebook}/profile.tar.gz -C /data/data/{Package_Facebook}/'\"");
-                string owner = _Android.Shell($"su -c 'stat -c \"%U:%G\" /data/data/{Package_Facebook}'");
-                if (string.IsNullOrWhiteSpace(owner)) continue;
+                _Android.Shell($"su -c 'tar -zxvf /data/local/tmp/{fileName} -C /data/data/{Package_Facebook}/ --exclude=\"*cache*\"'");
+                _Android.Shell($"su -c 'cp -af /data/data/{Package_Facebook}/data/data/{Package_Facebook}/. /data/data/{Package_Facebook}/'");
+                _Android.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/data'");
 
-                _Android.Shell($"su -c 'chown -R {owner} /data/data/{Package_Facebook}'");
-                _Android.Shell($"su -c 'chmod -R 771 /data/data/{Package_Facebook}'");
-                _Android.Shell($"su -c 'restorecon -R /data/data/{Package_Facebook}'");
-                _Android.AppStart(Package_Facebook);
+                _Android.Shell($"su -c 'chown -R {appUid}:{appUid} /data/data/{Package_Facebook}'");
+                _Android.Shell($"su -c 'rm -f /data/local/tmp/{fileName}'");
                 _Android.LogHelper.SUCCESS("Restore Facebook thành công");
                 return true;
             }
