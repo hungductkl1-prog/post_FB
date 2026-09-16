@@ -82,6 +82,8 @@ namespace Sunny.Subd.Core.Facebook
                 if (_stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(setting["timeoutTaiKhoan"])))
                 {
                     _mainService.SetStatus($"Đã quá {setting["timeoutTaiKhoan"]} phút cho tài khoản này!", 2);
+                    AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
+                        $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi tài khoản ({setting["timeoutTaiKhoan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                     return true;
                 }
             }
@@ -90,6 +92,8 @@ namespace Sunny.Subd.Core.Facebook
                 if (_stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(setting["timeoutKichBan"])))
                 {
                     _mainService.SetStatus($"Đã quá {setting["timeoutKichBan"]} phút cho kịch bản này!", 2);
+                    AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
+                        $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi kịch bản ({setting["timeoutKichBan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                     return true;
                 }
             }
@@ -161,25 +165,26 @@ namespace Sunny.Subd.Core.Facebook
             {
                 actions = actions.OrderBy(x => Guid.NewGuid()).ToList();
             }
+            // ── GIỚI HẠN THỜI GIAN CHẠY (fix 2026-09-16: mapping lệch sau khi UI đổi tên control) ──
+            // UI "Quản lý kịch bản" HIỆN dùng: checkBox2 = "Giới hạn thời gian chạy mỗi tài khoản"
+            // (nudTaiKhoanFrom/To), checkBox3 = "Giới hạn thời gian chạy mỗi kịch bản" (nudKichBanFrom/To).
+            // Backend CŨ đọc sai tên (checkBox3/4 + numericUpDown6..9, là control của bản UI trước)
+            // nên KHÔNG BAO GIỜ áp time limit; tệ hơn, nhánh checkBox2 cũ cắt cụt actions còn
+            // RandomValue(1,5) hành động -> tích "Giới hạn thời gian" lại LÀM HỎNG kịch bản.
+            // Cơ chế ép limit đã có sẵn: Stop() so _stopwatch.Elapsed với 2 key này ở ĐẦU mỗi vòng
+            // action; quá hạn -> return -> MainService đổi sang tài khoản kế. Giữ fallback numericUpDown*
+            // cho config cũ; RandomValue cận trên LOẠI TRỪ nên +1 để [from..to] BAO GỒM cả 'to'.
             if (_configKichBan.GetBooleanValue("checkBox2"))
             {
-                int index = SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown5", 1), _configKichBan.GetIntType("numericUpDown4", 5));
-                if (actions.Count > index)
-                {
-                    actions = actions.Take(index).ToList();
-                }
+                int tkFrom = _configKichBan.GetIntType("nudTaiKhoanFrom", _configKichBan.GetIntType("numericUpDown7", 40));
+                int tkTo = _configKichBan.GetIntType("nudTaiKhoanTo", _configKichBan.GetIntType("numericUpDown6", 60));
+                setting["timeoutTaiKhoan"] = SubdyHelper.RandomValue(tkFrom, tkTo + 1);
             }
             if (_configKichBan.GetBooleanValue("checkBox3"))
             {
-                setting["timeoutTaiKhoan"] = SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown7", 60), _configKichBan.GetIntType("numericUpDown6", 120));
-            }
-            if (_configKichBan.GetBooleanValue("checkBox4"))
-            {
-                setting["timeoutKichBan"] = SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown9", 60), _configKichBan.GetIntType("numericUpDown8", 120));
-            }
-            if (_configKichBan.GetBooleanValue("checkBox5"))
-            {
-                setting["timeoutHanhDong"] = SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown11", 5), _configKichBan.GetIntType("numericUpDown10", 20));
+                int kbFrom = _configKichBan.GetIntType("nudKichBanFrom", _configKichBan.GetIntType("numericUpDown9", 5));
+                int kbTo = _configKichBan.GetIntType("nudKichBanTo", _configKichBan.GetIntType("numericUpDown8", 10));
+                setting["timeoutKichBan"] = SubdyHelper.RandomValue(kbFrom, kbTo + 1);
             }
             _stopwatch.Restart();
             _mainService._sate = "Tải kịch bản";

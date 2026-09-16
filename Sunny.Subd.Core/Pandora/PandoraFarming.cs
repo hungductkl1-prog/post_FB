@@ -315,12 +315,16 @@ namespace Sunny.Subd.Core.Pandora
                 && _stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(_setting["timeoutTaiKhoan"])))
             {
                 _mainService.SetStatus($"Đã quá {_setting["timeoutTaiKhoan"]} phút cho tài khoản này!", 2);
+                AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
+                    $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi tài khoản ({_setting["timeoutTaiKhoan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                 return true;
             }
             if (_setting.ContainsKey("timeoutKichBan")
                 && _stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(_setting["timeoutKichBan"])))
             {
                 _mainService.SetStatus($"Đã quá {_setting["timeoutKichBan"]} phút cho kịch bản này!", 2);
+                AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
+                    $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi kịch bản ({_setting["timeoutKichBan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                 return true;
             }
             return false;
@@ -359,24 +363,23 @@ namespace Sunny.Subd.Core.Pandora
             {
                 actions = actions.OrderBy(_ => Guid.NewGuid()).ToList();
             }
+            // ── GIỚI HẠN THỜI GIAN CHẠY (fix 2026-09-16: mapping lệch sau khi UI đổi tên control) ──
+            // checkBox2 = "Giới hạn thời gian chạy mỗi tài khoản" (nudTaiKhoanFrom/To),
+            // checkBox3 = "Giới hạn thời gian chạy mỗi kịch bản" (nudKichBanFrom/To). Backend CŨ đọc
+            // sai tên (checkBox3/4 + numericUpDown6..9) nên time limit KHÔNG BAO GIỜ áp, và nhánh
+            // checkBox2 cũ cắt cụt actions còn RandomValue(1,5). Stop() ép limit ở đầu mỗi vòng action.
+            // RandomValue cận trên LOẠI TRỪ nên +1 để [from..to] BAO GỒM cả 'to'.
             if (_configKichBan.GetBooleanValue("checkBox2"))
             {
-                int take = SubdyHelper.RandomValue(
-                    _configKichBan.GetIntType("numericUpDown5", 1),
-                    _configKichBan.GetIntType("numericUpDown4", 5));
-                if (actions.Count > take) actions = actions.Take(take).ToList();
+                int tkFrom = _configKichBan.GetIntType("nudTaiKhoanFrom", _configKichBan.GetIntType("numericUpDown7", 40));
+                int tkTo = _configKichBan.GetIntType("nudTaiKhoanTo", _configKichBan.GetIntType("numericUpDown6", 60));
+                _setting["timeoutTaiKhoan"] = SubdyHelper.RandomValue(tkFrom, tkTo + 1);
             }
             if (_configKichBan.GetBooleanValue("checkBox3"))
             {
-                _setting["timeoutTaiKhoan"] = SubdyHelper.RandomValue(
-                    _configKichBan.GetIntType("numericUpDown7", 60),
-                    _configKichBan.GetIntType("numericUpDown6", 120));
-            }
-            if (_configKichBan.GetBooleanValue("checkBox4"))
-            {
-                _setting["timeoutKichBan"] = SubdyHelper.RandomValue(
-                    _configKichBan.GetIntType("numericUpDown9", 60),
-                    _configKichBan.GetIntType("numericUpDown8", 120));
+                int kbFrom = _configKichBan.GetIntType("nudKichBanFrom", _configKichBan.GetIntType("numericUpDown9", 5));
+                int kbTo = _configKichBan.GetIntType("nudKichBanTo", _configKichBan.GetIntType("numericUpDown8", 10));
+                _setting["timeoutKichBan"] = SubdyHelper.RandomValue(kbFrom, kbTo + 1);
             }
 
             _stopwatch.Restart();
