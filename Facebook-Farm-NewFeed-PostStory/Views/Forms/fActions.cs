@@ -46,6 +46,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                     FacebookFarmingType.HDDangStory => new fHDDangStory(this.scriptId),
                     FacebookFarmingType.HDUpAvatar => new fHDUpAvatar(this.scriptId),
                     FacebookFarmingType.HDUpCover => new fHDUpCover(this.scriptId),
+                    FacebookFarmingType.HDKhangSpam => new fHDKhangSpam(this.scriptId),
                     _ => null
                 };
                 if(form == null)
@@ -165,6 +166,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
                     FacebookFarmingType.DictionariesAction[FacebookFarmingType.HDUpCover],
                     Properties.Resources.IconDocThongBao,
                     FacebookFarmingType.DescriptionAction[FacebookFarmingType.HDUpCover]),
+                new IList(FacebookFarmingType.HDKhangSpam,
+                    FacebookFarmingType.DictionariesAction[FacebookFarmingType.HDKhangSpam],
+                    Properties.Resources.IconDocThongBao,
+                    FacebookFarmingType.DescriptionAction[FacebookFarmingType.HDKhangSpam]),
             };
             var dir = new Dictionary<string, IList[]>
             {

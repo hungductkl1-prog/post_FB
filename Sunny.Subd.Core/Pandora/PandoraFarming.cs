@@ -213,10 +213,12 @@ namespace Sunny.Subd.Core.Pandora
 
         // Một số SDK quảng cáo không expose clickable trên nút Skip. Chỉ xét nhóm raw này
         // SAU khi chính luồng hiện tại đã bấm Watch Ad, không dùng ở gate hoặc overlay chung.
+        // Loại mọi node thuộc Pandora player: nút tua lùi của player có content-desc chứa
+        // "Skip" nhưng resource-id mang prefix com.pandora.android:id/.
         private static readonly List<string> X_AD_SKIP_FALLBACK = new()
         {
-            "//*[@text=\"Skip\"]",
-            "//*[contains(@content-desc,\"Skip\")]",
+            "//*[@text=\"Skip\" and not(contains(@resource-id,\"com.pandora.android:id/\"))]",
+            "//*[contains(@content-desc,\"Skip\") and not(contains(@resource-id,\"com.pandora.android:id/\"))]",
         };
 
         // Dấu hiệu đang ở màn quảng cáo (chờ, KHÔNG tap bừa).
@@ -866,40 +868,119 @@ namespace Sunny.Subd.Core.Pandora
 
         private async Task HDNgheNhac(JsonHelper json, ScriptAction action)
         {
-            // txtPandoraUrl: URL của playlist hoặc bài hát trên Pandora
-            string url = json.GetValue("txtPandoraUrl", "").Trim();
-            if (string.IsNullOrEmpty(url))
+            // txtPandoraUrl: DANH SÁCH URL, mỗi dòng một URL playlist/bài hát.
+            // Tương thích ngược: cấu hình cũ chỉ 1 URL -> parse ra đúng 1 phần tử.
+            var urls = ParsePandoraUrls(json.GetValue("txtPandoraUrl", ""));
+            if (urls.Count == 0)
             {
                 throw new SubdyExtension(SubdyEnum.JobFail, "Chưa cấu hình URL bài hát/playlist.");
             }
 
-            // Khoảng phút là NGÂN SÁCH tổng cho tài khoản.
+            // Khoảng phút là NGÂN SÁCH CHO TỪNG URL: mỗi URL tự bốc thăm một số phút
+            // trong khoảng này, nghe hết rồi mới sang URL kế. Tài khoản chỉ đổi khi
+            // đã đi hết danh sách.
             int minMinutes = Math.Clamp(json.GetIntType("nudListenMinutesFrom", 30), 1, 1440);
             int maxMinutes = Math.Clamp(json.GetIntType("nudListenMinutesTo", 180), 1, 1440);
             if (minMinutes > maxMinutes) (minMinutes, maxMinutes) = (maxMinutes, minMinutes);
-            int selectedMinutes = Random.Shared.Next(minMinutes, maxMinutes + 1);
-            int totalSeconds = selectedMinutes * 60;
-
-            var sw = Stopwatch.StartNew();
-            int played = 0, listenedTotal = 0;
 
             _mainService.SetStatus(
-                $"Mở URL: {url}, chọn {selectedMinutes} phút trong khoảng " +
-                $"{minMinutes}-{maxMinutes} phút ({totalSeconds} giây).",
+                $"Danh sách {urls.Count} URL, mỗi URL nghe ngẫu nhiên {minMinutes}-{maxMinutes} phút.",
                 2);
 
+            var swAll = Stopwatch.StartNew();
+            int done = 0, failed = 0;
+            bool stoppedEarly = false;
+
+            for (int i = 0; i < urls.Count; i++)
+            {
+                _client.ThrowIfStopped();
+                if (Stop()) { stoppedEarly = true; break; }
+                await _mainService.Stop();
+
+                string url = urls[i];
+                int selectedMinutes = Random.Shared.Next(minMinutes, maxMinutes + 1);
+                int totalSeconds = selectedMinutes * 60;
+
+                _mainService.SetStatus(
+                    $"[{i + 1}/{urls.Count}] Mở URL: {url}, chọn {selectedMinutes} phút trong khoảng " +
+                    $"{minMinutes}-{maxMinutes} phút ({totalSeconds} giây).",
+                    2);
+
+                if (await ListenOneUrlAsync(url, i + 1, urls.Count, selectedMinutes,
+                                           minMinutes, maxMinutes, totalSeconds))
+                    done++;
+                else
+                    failed++;
+
+                // Nghỉ ngắn giữa hai URL cho tự nhiên (không nghỉ sau URL cuối).
+                if (i < urls.Count - 1) _client.Delay(5, 12);
+            }
+
+            // Cả danh sách đều không mở được => coi như hành động thất bại.
+            // Nếu thoát sớm vì timeout tài khoản/kịch bản (stoppedEarly) thì KHÔNG phải
+            // lỗi mở URL — không ném, chỉ báo cáo số đã nghe được.
+            if (done == 0 && !stoppedEarly)
+            {
+                throw new SubdyExtension(SubdyEnum.JobFail,
+                    $"Không thể mở URL bài hát/playlist trên Pandora ({failed}/{urls.Count} URL lỗi).");
+            }
+
+            _mainService.SetStatus(
+                $"Hoàn tất nghe nhạc: {done}/{urls.Count} URL, tổng {(int)swAll.Elapsed.TotalSeconds} giây " +
+                $"({failed} URL lỗi).",
+                2);
+        }
+
+        /// <summary>
+        /// Tách ô "URL Playlist/Bài hát" thành danh sách URL. Mỗi dòng một URL;
+        /// cho phép cả phân cách '|' và tự loại dòng trùng/rỗng. Dòng không có
+        /// "://" bị bỏ (dán cả đoạn văn bản vào cũng không sinh ra URL vô nghĩa).
+        /// </summary>
+        private static List<string> ParsePandoraUrls(string raw)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrWhiteSpace(raw)) return result;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var piece in raw.Split(new[] { '\r', '\n', '|' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string url = piece.Trim();
+                if (url.Length == 0) continue;
+                if (!url.Contains("://"))
+                {
+                    Log($"Bỏ dòng không phải URL trong danh sách: {url}");
+                    continue;
+                }
+                if (seen.Add(url)) result.Add(url);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Mở 1 URL và nghe hết ngân sách thời gian của nó.
+        /// Trả về false nếu không mở được URL (lỗi đã được log + báo trạng thái,
+        /// để luồng trên quyết định bỏ qua và đi tiếp URL sau).
+        /// </summary>
+        private async Task<bool> ListenOneUrlAsync(string url, int index, int count,
+                                                  int selectedMinutes, int minMinutes, int maxMinutes,
+                                                  int totalSeconds)
+        {
             // Mở URL và phát nhạc
             if (!OpenUrlAndPlay(url))
             {
                 // Nếu mở URL không được, thử lại 1 lần
-                _mainService.SetStatus("Mở URL thất bại, thử lại...", 1);
+                _mainService.SetStatus($"[{index}/{count}] Mở URL thất bại, thử lại...", 1);
                 await RecoverAsync(1);
                 if (!OpenUrlAndPlay(url))
                 {
-                    throw new SubdyExtension(SubdyEnum.JobFail, "Không thể mở URL bài hát/playlist trên Pandora.");
+                    _mainService.SetStatus($"[{index}/{count}] Không mở được URL, bỏ sang URL tiếp theo.", 1);
+                    Log($"[{index}/{count}] Không mở được URL: {url}");
+                    return false;
                 }
             }
-            played = 1;
+
+            int played = 1, listenedTotal = 0;
+            var sw = Stopwatch.StartNew();
 
             // Nghe nhạc trong ngân sách thời gian đã chọn
             while (sw.Elapsed.TotalSeconds < totalSeconds)
@@ -914,7 +995,7 @@ namespace Sunny.Subd.Core.Pandora
                 var (listened, stalled) = await ListenAsync(Math.Min(remain, MaxListenSeconds));
                 listenedTotal += listened;
                 _mainService.SetStatus(
-                    $"Đã nghe {listened}s - tổng {played} bài / {listenedTotal}s nhạc, " +
+                    $"[{index}/{count}] Đã nghe {listened}s - tổng {played} bài / {listenedTotal}s nhạc, " +
                     $"phát \"{_lastPlayedTrack}\", {(int)sw.Elapsed.TotalSeconds}/{totalSeconds}s " +
                     $"(đã chọn {selectedMinutes} phút từ {minMinutes}-{maxMinutes} phút).",
                     2);
@@ -934,10 +1015,12 @@ namespace Sunny.Subd.Core.Pandora
             }
 
             _mainService.SetStatus(
-                $"Hoàn tất nghe nhạc từ URL: {played} bài, {listenedTotal}s nhạc trong " +
+                $"[{index}/{count}] Xong URL: {played} bài, {listenedTotal}s nhạc trong " +
                 $"{(int)sw.Elapsed.TotalSeconds}/{totalSeconds} giây " +
                 $"(đã chọn {selectedMinutes} phút, cấu hình {minMinutes}-{maxMinutes} phút).",
                 2);
+
+            return true;
         }
 
         /// <summary>
@@ -1622,18 +1705,18 @@ namespace Sunny.Subd.Core.Pandora
 
             // Đã bấm Watch Ad: quảng cáo che player nên X_AD_PLAYING phải đứng trước
             // các case "đang phát", tránh nhận nhầm mini player nằm dưới lớp quảng cáo.
-            // X_AD_SKIP_FALLBACK xếp SAU X_AD_PLAYING để không tap Skip khi quảng cáo
-            // còn chạy (nút Skip hiện nhưng chưa clickable).
+            // Khi quảng cáo không còn, player phải được ưu tiên trước fallback Skip: nút tua lùi
+            // của player cũng có content-desc chứa "Skip", không được tap như nút quảng cáo.
             var casesDuringAd = new List<string>();
             casesDuringAd.AddRange(X_AD_CLOSE);
             casesDuringAd.AddRange(X_AD_PLAYING);
+            casesDuringAd.Add(X_NOW_PLAYING_BAR);
+            casesDuringAd.Add(X_MINI_HANDLE);
             casesDuringAd.AddRange(X_AD_SKIP_FALLBACK);
             casesDuringAd.AddRange(X_WATCH_AD);
             casesDuringAd.Add(X_OFFER_HEADER);
             casesDuringAd.Add(X_START_STATION);
-            casesDuringAd.Add(X_NOW_PLAYING_BAR);
             casesDuringAd.Add(X_COACHMARK);
-            casesDuringAd.Add(X_MINI_HANDLE);
             casesDuringAd.AddRange(X_PROMO);
 
             var sw = Stopwatch.StartNew();

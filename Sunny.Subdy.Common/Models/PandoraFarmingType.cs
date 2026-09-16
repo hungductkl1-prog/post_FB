@@ -11,7 +11,7 @@ namespace Sunny.Subdy.Common.Models
 
         public readonly static Dictionary<string, string> DescriptionAction = new Dictionary<string, string>
         {
-            { HDNgheNhac, "Mở URL playlist/bài hát trên Pandora, phát và nghe nhạc trong khoảng thời gian cấu hình." },
+            { HDNgheNhac, "Mở lần lượt danh sách URL playlist/bài hát trên Pandora, phát và nghe mỗi URL một khoảng thời gian ngẫu nhiên riêng." },
         };
     }
 }

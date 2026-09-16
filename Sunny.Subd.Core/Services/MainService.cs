@@ -156,7 +156,14 @@ namespace Sunny.Subd.Core.Services
             //}
             if (!_client.IsRoot()) return;
             _sate = "Lấy thông tin xác thực";
-            if (string.IsNullOrEmpty(_account.Cookie) || string.IsNullOrEmpty(_account.Token))
+            // "Lưu cookie, token" (checkBox10 của fSettingDefault): khi bỏ tích thì KHÔNG
+            // ghi Cookie/Token vào account/DB. Vẫn gọi GetAuthenticationInfo nếu thiếu Uid
+            // (uid dùng cho tên file backup / hiển thị), nhưng chỉ gán Uid.
+            bool saveCookieToken = _settingGeneral.GetBooleanValue("checkBox10", true);
+            bool needAuth = saveCookieToken
+                ? (string.IsNullOrEmpty(_account.Cookie) || string.IsNullOrEmpty(_account.Token))
+                : string.IsNullOrEmpty(_account.Uid);
+            if (needAuth)
             {
                 try
                 {
@@ -170,8 +177,11 @@ namespace Sunny.Subd.Core.Services
                     if (!string.IsNullOrEmpty(parts[0]))
                     {
                         _account.Uid = parts[0];
-                        _account.Cookie = parts[2];
-                        _account.Token = parts[1];
+                        if (saveCookieToken)
+                        {
+                            _account.Cookie = parts[2];
+                            _account.Token = parts[1];
+                        }
                     }
                     else
                     {
@@ -235,6 +245,8 @@ namespace Sunny.Subd.Core.Services
                 string profileDir = _settingGeneral.GetValuesFromInputString("textBox3", Path.Combine(AppContext.BaseDirectory, "Backup", "Profile", _platform));
                 Directory.CreateDirectory(profileDir);
                 string fileProfile = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
+                AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                    $"[BACKUP] uid={_account?.Uid} | BackupProfile {_platform} -> {fileProfile} (chỉ tar/cp/pull qua su, KHÔNG reboot)");
                 switch (_platform)
                 {
                     case PlatformModel.Facebook:
@@ -249,6 +261,8 @@ namespace Sunny.Subd.Core.Services
                             break;
                         }
                 }
+                AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                    $"[BACKUP] uid={_account?.Uid} | BackupProfile XONG (không có lệnh reboot nào trong backup)");
 
             }
             SetStatus("Đang sao lưu thiết bị...", 2);
@@ -257,7 +271,11 @@ namespace Sunny.Subd.Core.Services
                 string profileDir = _settingGeneral.GetValuesFromInputString("textBox2", Path.Combine(AppContext.BaseDirectory, "Backup", "Device", _platform));
                 Directory.CreateDirectory(profileDir);
                 string fileProfile = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
+                AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                    $"[BACKUP] uid={_account?.Uid} | BackupDevice -> {fileProfile} (chỉ tar/cp/pull qua su, KHÔNG reboot)");
                 await _client.BackupDevice(fileProfile);
+                AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                    $"[BACKUP] uid={_account?.Uid} | BackupDevice XONG (không có lệnh reboot nào trong backup)");
             }
             SetStatus("Cập nhật trạng thái tài khoản", 2);
             _account.State = "LIVE";
@@ -265,10 +283,22 @@ namespace Sunny.Subd.Core.Services
         }
 
         // Thay đổi thông tin thiết bị
+        // Luôn chạy trong luồng job: thứ tự đã chốt là change device TRƯỚC change
+        // proxy. Không gate theo checkBox1 nữa vì toggle đó bị ẩn trong UI và giá
+        // trị lưu có thể false khiến bước này bị bỏ qua im lặng.
+        // Kết quả bước đổi thiết bị của account hiện tại. Ô trạng thái trên UI chỉ giữ
+        // dòng CUỐI CÙNG (bước đổi proxy ghi đè mất dòng đổi thiết bị), nên lưu lại để
+        // nhúng vào dòng trạng thái của bước đổi proxy — đảm bảo người dùng luôn thấy
+        // bước đổi thiết bị đã chạy (và chạy trước đổi proxy).
+        private string _lastDeviceChange = string.Empty;
+
         private async Task ChangeInfoAsync()
         {
-            if (!_settingGeneral.GetBooleanValue("checkBox1", true)) return;
             _sate = "Thay đổi thông tin thiết bị";
+            AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                $"[{AutoAndroid.DeviceChangeLog.BuildTag}] ChangeInfoAsync: BẮT ĐẦU (uid={_account?.Uid}).");
+            _client.LogHelper.SUCCESS(">>> BƯỚC ĐỔI THIẾT BỊ (chạy trước đổi proxy)");
+            _client.LogHelper.State = _sate;
             try
             {
                 SetStatus("Đang thay đổi thông tin thiết bị...", 2);
@@ -284,16 +314,19 @@ namespace Sunny.Subd.Core.Services
                 }
                 if (await _client.ChangInfo(filezip, backup, "", "VN"))
                 {
+                    _lastDeviceChange = $"Thiết bị OK [{_client.GetDeviceName()}]";
                     SetStatus($"Thành công. [{_client.GetDeviceName()}]", 2);
                 }
                 else
                 {
+                    _lastDeviceChange = $"Thiết bị LỖI [{_client.GetDeviceName()}]";
                     SetStatus($"Thất bại. [{_client.GetDeviceName()}]", 1);
                 }
             }
             catch (Exception ex)
             {
                 LogManager.Error(ex);
+                _lastDeviceChange = $"Thiết bị LỖI NGOẠI LỆ: {ex.Message}";
                 SetStatus(ex.Message, 1);
             }
         }
@@ -332,7 +365,7 @@ namespace Sunny.Subd.Core.Services
                     break;
             }
 
-            SetStatus($"Loại: [{proxyType}] - proxy đã nhận", 2);
+            SetStatus($"Loại: [{proxyType}] - {_lastDeviceChange} - proxy đã nhận", 2);
             if (proxyType == ProxyService.Mobile4G)
             {
                 _client.DisablePlane();
@@ -343,22 +376,33 @@ namespace Sunny.Subd.Core.Services
 
             if (string.IsNullOrWhiteSpace(proxy))
             {
+                // Nguồn proxy được cấu hình không trả về gì (hết key, API lỗi...). Trước khi
+                // bỏ qua tài khoản, thử proxy ĐÃ GÁN cho chính tài khoản đó trong DB — đúng
+                // cách bản cũ (loại "Proxy đã gán") vẫn chạy — để job không chết im mà vẫn
+                // đi đủ quy trình: đổi thiết bị -> đổi proxy -> restore -> đăng nhập.
+                string assigned = _account?.Proxy;
+                if (!string.IsNullOrWhiteSpace(assigned))
+                {
+                    proxy = assigned;
+                    SetStatus($"Nguồn [{proxyType}] trống, dùng proxy đã gán cho tài khoản: {ProxyService.Mask(proxy)}.", 2);
+                    AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                        $"ChangeProxyAsync: nguồn [{proxyType}] KHÔNG trả proxy -> fallback proxy đã gán ({ProxyService.Mask(proxy)}).");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(proxy))
+            {
                 SetStatus("Không lấy được proxy, bỏ qua tài khoản.", 1);
                 return false;
             }
 
-            // Normal job chỉ dùng VAT Proxy đã cài sẵn; tuyệt đối không tải/cài trong vòng account.
-            if (!_client.AppList().Contains(VATProxyService.Package_Proxy))
-            {
-                SetStatus("Thiết bị không có APK VAT Proxy đã cài sẵn. Dừng thiết bị.", 1);
-                _client.Device.IsLive = false;
-                _client.Running = false;
-                return false;
-            }
-
+            // Không kiểm tra danh sách package ở đây (_client.AppList() đi qua Shell
+            // với vòng retry + Connect lại đầy đủ, là điểm treo im nhiều phút khi
+            // adb/device chập chờn). Kết nối proxy chỉ dựa vào xác nhận "successful"
+            // từ chính broadcast VAT; thất bại thì bỏ qua tài khoản.
             if (!_client.ConnectProxyPreinstalled(proxy))
             {
-                SetStatus("Kết nối proxy thất bại, bỏ qua tài khoản.", 1);
+                SetStatus($"Kết nối proxy thất bại ({_lastDeviceChange}), bỏ qua tài khoản.", 1);
                 return false;
             }
 
@@ -395,6 +439,9 @@ namespace Sunny.Subd.Core.Services
         private async Task<string> GetProxyFromServiceAsync(Func<string, Task<string>> newProxyFunc, Func<string, Task<string>> getProxyFunc)
         {
             string key = ProxyService.GetProxy();
+            // Không có key (txtLines trống) thì trả về ngay: gọi API với key rỗng chỉ
+            // đốt thời gian chờ rồi vẫn nhận chuỗi rỗng, và lỗi bị nuốt im trong provider.
+            if (string.IsNullOrWhiteSpace(key)) return string.Empty;
             return await newProxyFunc(key) ?? await getProxyFunc(key);
         }
 
@@ -564,38 +611,15 @@ namespace Sunny.Subd.Core.Services
             return true;
         }
 
-        // Chuẩn bị APK/dependency một lần cho vòng đời worker.
-        // Normal job chỉ dùng APK đã cài sẵn; không tự download/cài Facebook hoặc VAT Proxy.
-        private async Task<bool> PrepareDeviceOnceAsync()
+        // Theo yêu cầu: bỏ qua hoàn toàn bước kiểm tra package (Facebook/VAT Proxy)
+        // khi khởi động worker. Mọi truy vấn danh sách package qua adb đều là điểm
+        // treo im khi adb/device chập chờn, nên không đọc gì ở đây. Thiếu package
+        // sẽ tự lộ ra ở bước thao tác thực tế (xóa dữ liệu / broadcast proxy thất
+        // bại) và dừng device ở đó.
+        private Task<bool> PrepareDeviceOnceAsync()
         {
-            if (_devicePrepared) return true;
-
-            _sate = "Kiểm tra ứng dụng trên thiết bị";
-            SetStatus("Đang kiểm tra Facebook và VAT Proxy đã cài sẵn...", 2);
-            {
-                var installedPackages = new HashSet<string>(_client.AppList(), StringComparer.OrdinalIgnoreCase);
-                if (!installedPackages.Contains(FacebookHander.Package(_platform)))
-                {
-                    SetStatus("Thiết bị không có APK Facebook đã cài sẵn. Dừng thiết bị.", 1);
-                    _client.Device.IsLive = false;
-                    _client.Running = false;
-                    return false;
-                }
-
-                if (!installedPackages.Contains(VATProxyService.Package_Proxy))
-                {
-                    SetStatus("Thiết bị không có APK VAT Proxy đã cài sẵn. Dừng thiết bị.", 1);
-                    _client.Device.IsLive = false;
-                    _client.Running = false;
-                    return false;
-                }
-
-                // Quyền Facebook do người dùng cấp thủ công trước khi chạy job.
-                // Normal flow không kiểm tra hoặc cấp quyền lặp lại.
-            }
-
             _devicePrepared = true;
-            return true;
+            return Task.FromResult(true);
         }
 
         // Chuẩn bị thiết bị. Hàm này chỉ giữ tương thích cho các luồng cũ;
@@ -938,48 +962,112 @@ namespace Sunny.Subd.Core.Services
                 _account.Running = true;
                 try
                 {
+                    AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] RunAsync: vào vòng account uid={_account?.Uid} (thứ tự: xóa dữ liệu -> đổi thiết bị -> đổi proxy).");
+
+                    // ── CHẶN MÀN HÌNH ĐEN SUỐT VÒNG ACCOUNT (v12) ──────────────────────────
+                    // Trước đây mirror-guard + recovery chỉ sống bên trong Change() (vài giây
+                    // đổi thiết bị) rồi Stop, NHƯNG đen màn hình lại xảy ra SAU đó — đúng lúc
+                    // MỞ Facebook (createSurface) khi VirtualDisplay mồ côi còn sót / TaskRecord
+                    // rò rỉ tích lũy. v12 giữ mirror-guard chạy NỀN SUỐT account (đổi thiết bị
+                    // -> proxy -> mở FB) để không còn khoảng hở. Guard KHÔNG kill system_server
+                    // nên KHÔNG rớt tun0/VPN — an toàn tuyệt đối cho quy trình FB.
+                    _client.MirrorGuardStart();
+
+                    // Recovery leak (DẠNG 2) ở ĐẦU account = điểm VPN-safe: proxy account này
+                    // CHƯA nối, proxy account trước sắp bị thay ở bước 3, nên nếu phải kill
+                    // system_server cũng không mất VPN đang cần. Bắt sớm leak tích lũy từ
+                    // farming của account trước (đo live: leak TỰ TĂNG cả khi tool tắt).
+                    // Gated: framework khỏe thì trả về ngay (~1s), không can thiệp.
+                    try { _client.maxChange?.RecoverFrameworkIfBlackScreenPublic(); }
+                    catch (Exception exR)
+                    {
+                        AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                            $"[{AutoAndroid.DeviceChangeLog.BuildTag}] RunAsync: recovery đầu account lỗi (bỏ qua): {exR.Message}");
+                    }
+
                     // 1. Dọn sạch cache/session/account Facebook cũ.
+                    AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                        $"[FARM] uid={_account?.Uid} | bước 1/6: ClearPreviousAccountDataAsync (xóa cache/session/account FB cũ)");
                     if (!await ClearPreviousAccountDataAsync()) break;
 
                     // 2. Thay đổi thông tin thiết bị sau khi đã dọn sạch phiên cũ.
+                    AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                        $"[FARM] uid={_account?.Uid} | bước 2/6: ChangeInfoAsync (đổi thông tin thiết bị)");
                     await ChangeInfoAsync();
 
                     // 3. Kết nối proxy qua VAT Proxy bằng broadcast, không mở giao diện.
+                    AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                        $"[FARM] uid={_account?.Uid} | bước 3/6: ChangeProxyAsync (đổi IP/proxy VAT)");
                     if (!await ChangeProxyAsync())
                     {
                         if (!_client.Running) break;
                         continue;
                     }
 
-                    // 4. Restore và mở Facebook.
-                    if (!await RestoreFacebookAsync()) continue;
-
-                    int index = _settingGeneral.GetIntType("comboBox1", 0);
-                    _account.Uid_Email = index == 1 ? _account.Email : _account.Uid;
-                    _account.Uid_Email ??= _account.Email ?? _account.Uid;
-
-                    await _facebookService.Login(_client, _account, _ct, 400, this);
-
-                    _sate = "Đợi sau đăng nhập";
-                    if (_settingGeneral.GetBooleanValue("checkBox11", true))
-                    {
-                        int second = SubdyHelper.RandomValue(_settingGeneral.GetIntType("numericUpDown25", 10), _settingGeneral.GetIntType("numericUpDown24", 20));
-                        await DelayMessageAsync(second, "Đợi {time} giây sau khi đăng nhập trước khi thực hiện thao tác.", 2);
-                    }
-
-                    _sate = "Lấy thông tin xác thực";
-                    await ExtractAndUpdateAuthenticationInfoAsync();
                     _sate = "Thực hiện kịch bản";
                     _config.JobService = "https://app.golike.net/";
                     FacebookFarming farming = new FacebookFarming(this);
+
+                    // ── BỎ QUA ĐĂNG NHẬP QUA APP CHO KỊCH BẢN "KHÁNG SPAM" (gỡ checkpoint 282) ──
+                    // Tài khoản trong kịch bản này ĐANG bị 282. Nếu mở app Facebook rồi Login(),
+                    // Login() khớp nhóm xpath CP282 và NÉM SubdyExtension(CP_282)
+                    // (FacebookService.cs:111-114) -> ngoại lệ thoát ra try của vòng account ->
+                    // HanderCase gán State="CP_282" rồi `continue` sang TÀI KHOẢN KHÁC ->
+                    // farming.ExecuteAsync() KHÔNG BAO GIỜ chạy -> HDKhangSpam không bao giờ
+                    // inject cookie / mở Chrome. (Live 2026-09-15: "tool không chuyển sang chrome
+                    // để login cookie fb, mà chỉ login bằng facebook app rồi dừng".)
+                    // HDKhangSpam tự đăng nhập bằng cookie của _account TRONG Chrome, nên bước
+                    // restore+login qua app là vừa thừa vừa chặn đường chạy.
+                    if (farming.ScriptHasKhangSpam())
+                    {
+                        _sate = "Kháng spam 282 (bỏ qua đăng nhập app)";
+                        SetStatus("Kịch bản kháng spam: bỏ qua đăng nhập app Facebook, sẽ login bằng cookie trong Chrome.", 2);
+                        AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                            $"[{AutoAndroid.DeviceChangeLog.BuildTag}] RunAsync: script có HDKhangSpam -> SKIP RestoreFacebook+Login (uid={_account?.Uid}), vào thẳng farming.");
+                    }
+                    else
+                    {
+                        // 4. Restore và mở Facebook.
+                        AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                            $"[FARM] uid={_account?.Uid} | bước 4/6: RestoreFacebookAsync (load file backup profile acc)");
+                        if (!await RestoreFacebookAsync()) continue;
+
+                        int index = _settingGeneral.GetIntType("comboBox1", 0);
+                        _account.Uid_Email = index == 1 ? _account.Email : _account.Uid;
+                        _account.Uid_Email ??= _account.Email ?? _account.Uid;
+
+                        AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                            $"[FARM] uid={_account?.Uid} | bước 5/6: Login (đăng nhập app Facebook)");
+                        await _facebookService.Login(_client, _account, _ct, 400, this);
+
+                        _sate = "Đợi sau đăng nhập";
+                        if (_settingGeneral.GetBooleanValue("checkBox11", true))
+                        {
+                            int second = SubdyHelper.RandomValue(_settingGeneral.GetIntType("numericUpDown25", 10), _settingGeneral.GetIntType("numericUpDown24", 20));
+                            await DelayMessageAsync(second, "Đợi {time} giây sau khi đăng nhập trước khi thực hiện thao tác.", 2);
+                        }
+
+                        _sate = "Lấy thông tin xác thực";
+                        await ExtractAndUpdateAuthenticationInfoAsync();
+                    }
+
+                    AutoAndroid.RunHistoryLog.Step(_client.Device?.Serial ?? "?",
+                        $"[FARM] uid={_account?.Uid} | bước 6/6: farming.ExecuteAsync (thực hiện kịch bản)");
                     await farming.ExecuteAsync();
                 }
                 catch (Exception ex)
                 {
+                    AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] RunAsync: NGOẠI LỆ ở bước [{_sate}] uid={_account?.Uid}: {ex.Message}");
                     HanderCase(ex);
                 }
                 finally
                 {
+                    // Tắt mirror-guard của vòng account (ref-count: guard lồng của Change()
+                    // đã tự giảm khi nó kết thúc, đây là lần giảm CUỐI -> watchdog nền tắt).
+                    // Best-effort, không ném; đặt trước để luôn chạy kể cả khi Update lỗi.
+                    _client.MirrorGuardStop();
                     if (_account != null)
                     {
                         _account.Running = false;

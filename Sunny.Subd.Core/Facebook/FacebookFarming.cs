@@ -62,6 +62,9 @@ namespace Sunny.Subd.Core.Facebook
         private JsonHelper _configKichBan;
         private Dictionary<string, object> setting = new Dictionary<string, object>();
         private Stopwatch _stopwatch = new Stopwatch();
+        // Thư mục đích upload (/sdcard/pictures) chỉ cần bảo đảm TỒN TẠI một lần cho mỗi
+        // thiết bị/lần chạy. Các story sau bỏ qua 3 lệnh mkdir qua ADB (~0.3-1s/story).
+        private bool _remoteUploadFolderEnsured = false;
         public FacebookFarming(MainService mainService)
         {
             _client = mainService._client;
@@ -92,6 +95,41 @@ namespace Sunny.Subd.Core.Facebook
             }
             return false;
         }
+        /// <summary>
+        /// Kịch bản ĐƯỢC CHỌN có chứa hành động "Kháng spam" (HDKhangSpam) không.
+        /// MainService gọi trước khi mở app Facebook + Login(): tài khoản kháng 282 ĐANG bị
+        /// checkpoint nên Login() sẽ ném SubdyExtension(CP_282) và huỷ cả vòng account TRƯỚC khi
+        /// tới StartAction -> HDKhangSpam không bao giờ chạy (không inject cookie, không mở Chrome).
+        /// HDKhangSpam tự login bằng cookie trong Chrome nên bước login qua app là thừa.
+        /// Resolve script BẰNG ĐÚNG logic của ExecuteAsync để kết quả luôn khớp kịch bản sẽ chạy.
+        /// </summary>
+        public bool ScriptHasKhangSpam()
+        {
+            try
+            {
+                string scriptName = _account?.NameScript?.Trim() ?? "";
+                Script script;
+                if (string.IsNullOrEmpty(scriptName))
+                {
+                    var all = _scriptContext.GetByPlatform(_mainService._platform) ?? new List<Script>();
+                    script = all.FirstOrDefault(s => !string.Equals(s.Name, "FarmXu", StringComparison.OrdinalIgnoreCase));
+                }
+                else
+                {
+                    script = _scriptContext.GetByName(scriptName, _mainService._platform);
+                }
+                if (script == null) return false;
+
+                List<ScriptAction> actions = _scriptActionContext.GetByScriptId(script.Id);
+                return actions != null && actions.Any(a => a.Type == FacebookFarmingType.HDKhangSpam);
+            }
+            catch
+            {
+                // Không đọc được script thì giữ hành vi cũ (login qua app bình thường).
+                return false;
+            }
+        }
+
         public async Task ExecuteAsync()
         {
             string scriptName = _account?.NameScript?.Trim() ?? "";
@@ -154,7 +192,14 @@ namespace Sunny.Subd.Core.Facebook
                 _mainService._sate = $"Thực hiện {i}/{actions.Count}: {action.Name}";
                 _mainService.SetStatus($"Đang thực hiện...", 0);
                 _mainService.SetStatus("Đang kiểm tra tài khoản...", 2);
-                await _mainService._facebookService.HanderAccount(_client, _account, 5, _mainService._ct, _mainService);
+                // Hành động "Kháng spam" (gỡ checkpoint 282) chủ đích chạy TRÊN tài khoản ĐANG bị
+                // checkpoint 282. HanderAccount ném SubdyExtension(CP_282) ngay ngoài try/catch -> sẽ
+                // huỷ cả vòng lặp account trước khi tới StartAction. Nên bỏ qua precheck này; HDKhangSpam
+                // tự đăng nhập qua Chrome bằng cookie của _account và tự xử lý màn 282.
+                if (action.Type != FacebookFarmingType.HDKhangSpam)
+                {
+                    await _mainService._facebookService.HanderAccount(_client, _account, 5, _mainService._ct, _mainService);
+                }
                 try
                 {
                     await StartAction(action);
@@ -170,7 +215,10 @@ namespace Sunny.Subd.Core.Facebook
 
         public async Task StartAction(ScriptAction action)
         {
-            string error = "Thành công";
+            // KHÔNG default "Thành công" nữa (bug user 2026-09-15: action bail sớm return 0 — vd thư
+            // mục ảnh 282 hết ảnh, chưa mở Chrome — vẫn bị finally báo "Thành công" vì error chỉ đổi
+            // khi có exception). Mặc định RỖNG; mỗi case tự báo kết quả THẬT của nó ở finally dưới.
+            string error = string.Empty;
             try
             {
                 JsonHelper jsonHelper = new JsonHelper(action.Json, true);
@@ -392,6 +440,14 @@ namespace Sunny.Subd.Core.Facebook
                     case FacebookFarmingType.HDCauHinhTaiKhoan:
                         HDCauHinhTaiKhoan(0, "", action.Name);
                         break;
+                    case FacebookFarmingType.HDKhangSpam:
+                        {
+                            // Bắt kết quả THẬT (1 = kháng thành công) để finally KHÔNG báo nhầm
+                            // "Thành công" khi action bail sớm (hết ảnh / thiếu key / cookie die...).
+                            int khangResult = await HDKhangSpam(jsonHelper, action);
+                            error = khangResult == 1 ? "Thành công" : "Không hoàn tất (xem log)";
+                        }
+                        break;
                 }
             }
             catch (Exception ex)
@@ -424,8 +480,11 @@ namespace Sunny.Subd.Core.Facebook
             }
             finally
             {
-                await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown2", 5), _configKichBan.GetIntType("numericUpDown1", 15)), $"Đã chạy hành động {action.Name}.{error}." + " Đợi {time} giây để qua hành động tiếp theo...", 2);
-                _mainService.SetStatus($"Đã chạy xong hành động {action.Name} - {error} ", 0);
+                // Case KHÔNG trả kết quả (hành động thường) giữ nguyên hành vi cũ "Thành công";
+                // HDKhangSpam luôn ghi error THẬT ở trên nên không bị mask nữa.
+                string errShown = string.IsNullOrEmpty(error) ? "Thành công" : error;
+                await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(_configKichBan.GetIntType("numericUpDown2", 5), _configKichBan.GetIntType("numericUpDown1", 15)), $"Đã chạy hành động {action.Name}.{errShown}." + " Đợi {time} giây để qua hành động tiếp theo...", 2);
+                _mainService.SetStatus($"Đã chạy xong hành động {action.Name} - {errShown} ", 0);
             }
 
 
@@ -4291,6 +4350,190 @@ namespace Sunny.Subd.Core.Facebook
             }
             return isSuccess ? 1 : 0;
         }
+
+        /// <summary>
+        /// Hành động "Kháng spam" — gỡ checkpoint 282 qua trình duyệt Chrome.
+        /// Luồng: đọc cấu hình -> yêu cầu key cap.guru -> consume-and-delete 1 ảnh kháng nghị
+        /// -> inject cookie Chrome -> mở m.facebook.com trong Chrome -> giải captcha (nếu có)
+        /// -> drive picker upload ảnh -> đợi nút "Gửi" enabled -> tap Gửi -> xác nhận
+        /// "đã gửi đơn kháng nghị". Cơ chế thiết bị nặng nằm trong <see cref="KhangSpam282"/>
+        /// (file riêng, using System.Drawing/Microsoft.Data.Sqlite gọn, tránh đụng file 14k dòng này).
+        /// Trả về 1 khi thành công, 0 khi lỗi mềm (không throw -> không phá vòng lặp account).
+        /// </summary>
+        public async Task<int> HDKhangSpam(JsonHelper settings, ScriptAction action)
+        {
+            string status = $"Đang {action.Name}: ";
+            Action<string, int, string> report = (msg, color, log) => _mainService.SetStatus(msg, color, log);
+
+            // (1) Đọc cấu hình folder ảnh (default H:\anhgo282) + delay.
+            string folderPath = settings.GetValue("txtPathFolder", @"H:\anhgo282");
+            if (string.IsNullOrWhiteSpace(folderPath)) folderPath = @"H:\anhgo282";
+
+            // (2) BẮT BUỘC key cap.guru (user chốt "Yêu cầu cấu hình cap.guru"). Rỗng -> báo lỗi mềm, return.
+            string captchaKey = _mainService._settingGeneral.GetValuesFromInputString("textBoxCaptchaKey");
+            if (string.IsNullOrWhiteSpace(captchaKey))
+            {
+                SetStatusAccount(0, status + "Chưa cấu hình key captcha (cap.guru) trong Cài đặt chung!");
+                _mainService.SetStatus(status + "Chưa cấu hình key captcha (cap.guru).", 3);
+                return 0;
+            }
+
+            if (!Directory.Exists(folderPath))
+            {
+                SetStatusAccount(0, status + $"Không tìm thấy thư mục ảnh: {folderPath}");
+                return 0;
+            }
+
+            try
+            {
+                // (3) Consume-and-delete 1 ảnh ngẫu nhiên (user chốt: lấy bất kỳ, dùng xong xoá ngay tránh nhầm ảnh).
+                string photoPath = "";
+                string deviceFileName = "";
+                string deviceRemotePath = "";
+                lock (object_2)
+                {
+                    photoPath = Directory.GetFiles(folderPath)
+                        .Where(f => !f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(_ => Guid.NewGuid())
+                        .FirstOrDefault();
+                    if (string.IsNullOrEmpty(photoPath))
+                    {
+                        SetStatusAccount(0, status + "Thư mục ảnh kháng nghị rỗng.");
+                        return 0;
+                    }
+                    // Đẩy ảnh lên /sdcard/pictures + broadcast MediaStore (dùng row broadcast).
+                    // Giữ tên file TRÊN DEVICE để luồng picker tap đúng tile trong DocumentsUI.
+                    var pushed = UploadMediaFiles(new List<string> { photoPath });
+                    deviceFileName = pushed != null && pushed.Count > 0 ? Path.GetFileName(pushed[0]) : "";
+                    deviceRemotePath = pushed != null && pushed.Count > 0 ? pushed[0] : "";
+                    // Xoá file nguồn NGAY sau khi dùng (consume-and-delete).
+                    SubdyHelper.DeleteFile(photoPath);
+                }
+
+                // (4) Inject cookie Chrome (login bằng cookie đã lưu của TÀI KHOẢN ĐANG CHẠY).
+                // Cookie lấy từ _account.Cookie = cột cookie CỦA ĐÚNG nick này trong DB (KHÔNG phải
+                // cookie test hard-code). Truyền _account.Uid để InjectChromeCookies đối chiếu c_user
+                // và CẢNH BÁO nếu cookie trong DB là cookie cũ/test của nick khác (user 2026-09-15 #2).
+                SetStatusAccount(0, status + "Đang đăng nhập Chrome bằng cookie...");
+                if (!KhangSpam282.InjectChromeCookies(_client, _account.Cookie, report, _account.Uid))
+                {
+                    SetStatusAccount(0, status + "Đăng nhập Chrome thất bại (inject cookie).");
+                    return 0;
+                }
+
+                // (5) Mở Facebook trong Chrome. Tài khoản đang bị 282 sẽ tự redirect sang màn checkpoint.
+                SetStatusAccount(0, status + "Đang mở checkpoint trong Chrome...");
+                KhangSpam282.OpenFacebookInChrome(_client, "https://m.facebook.com/");
+                _client.Delay(6);
+
+                // (6) Chạy luồng kháng nghị: captcha -> picker upload -> Gửi -> xác nhận.
+                // Truyền deviceFileName để picker tap ĐÚNG tile (text = tên file đã push).
+                // RunAppealFlow trả AppealOutcome (KHÔNG bool) để caller phân biệt 3 nhánh ghi chú:
+                //   Success   -> up ảnh + gửi đơn THÀNH CÔNG
+                //   CookieDie -> cookie chết, hiện màn đăng nhập, KHÔNG vào được bước up ảnh
+                //   Failed    -> timeout 360s / captcha sai nhiều / picker lỗi...
+                SetStatusAccount(0, status + "Đang xử lý màn kháng nghị 282...");
+                AppealOutcome outcome = AppealOutcome.Failed;
+                try
+                {
+                    outcome = await KhangSpam282.RunAppealFlow(_client, captchaKey, report, deviceFileName);
+                }
+                finally
+                {
+                    // (7) Dọn ảnh KHÁNG NGHỊ TRÊN ĐIỆN THOẠI sau khi kháng xong (thành công hay thất bại).
+                    // Nếu không xoá, mỗi lần kháng đẩy thêm 1 ảnh vào /sdcard/pictures -> đầy bộ nhớ device.
+                    CleanupAppealImageOnDevice(deviceRemotePath, deviceFileName, report);
+                }
+
+                if (outcome == AppealOutcome.Success)
+                {
+                    SetStatusAccount(0, status + "Đã gửi đơn kháng nghị 282, chờ FB review.");
+                    _mainService.SetStatus(status + "Đã gửi đơn kháng nghị 282.", 0);
+
+                    // (REQ 2 — user 2026-09-15 #2) Acc up ảnh kháng THÀNH CÔNG -> ghi chú
+                    // "đã up ảnh thành công" để user lọc/dò lại kết quả từng nick.
+                    SetAccountNoteSafe("đã up ảnh thành công");
+
+                    // (REQ 1 — user 2026-09-15 #1) CHUYỂN bước xoá toàn bộ Chrome (như mới)
+                    // XUỐNG CUỐI: SAU khi up ảnh kháng thành công -> delay 10s -> pm clear Chrome.
+                    // Trước đây pm clear chạy ở ĐẦU InjectChromeCookies (gây First-Run mỗi lần +
+                    // rủi ro kẹt); giờ để cuối: vừa sạch Chrome sẵn cho nick kế, vừa không phá luồng
+                    // đang chạy. Delay 10s theo đúng yêu cầu để FB kịp ghi nhận đơn trước khi wipe.
+                    SetStatusAccount(0, status + "Up ảnh thành công, chờ 10s rồi xoá sạch Chrome...");
+                    _client.Delay(10);
+                    KhangSpam282.FullResetChrome(_client);
+
+                    return 1;
+                }
+
+                if (outcome == AppealOutcome.CookieDie)
+                {
+                    // (REQ 3 — user 2026-09-15 #3) Cookie CHẾT, không login được -> KHÔNG vào
+                    // được bước up ảnh. Ghi chú "cookie die" để user lọc acc. Bỏ qua acc này:
+                    // vòng account tự advance sang nick khác (GetAccount đã lấy acc khỏi pool).
+                    SetAccountNoteSafe("cookie die");
+                    SetStatusAccount(0, status + "Cookie die, không vào được màn up ảnh — bỏ qua acc này.");
+                    _mainService.SetStatus(status + "Cookie die, bỏ qua acc.", 3);
+                    return 0;
+                }
+
+                SetStatusAccount(0, status + "Không hoàn tất được đơn kháng nghị 282.");
+                _mainService.SetStatus(status + "Không hoàn tất được đơn kháng nghị 282.", 3);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _mainService.SetStatus(status + $"Lỗi: {ex.Message}", 3, $"[HDKhangSpam] {ex}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Ghi chú tài khoản đang chạy (user 2026-09-15 #2/#3): "đã up ảnh thành công" / "cookie die".
+        /// Theo đúng pattern UpdateStoryStats: set _account.Note rồi persist AccountContext.Update,
+        /// bọc try/catch để lỗi DB KHÔNG phá vòng account. _account là CÙNG object MainService giữ
+        /// nên `finally` của MainService (_accountContext.Update(_account)) cũng mang theo Note này.
+        /// </summary>
+        private void SetAccountNoteSafe(string note)
+        {
+            try
+            {
+                if (_account == null) return;
+                _account.Note = note;
+                new AccountContext().Update(_account);
+            }
+            catch
+            {
+            }
+        }
+
+        /// <summary>
+        /// Xoá ảnh kháng nghị ĐÃ push lên điện thoại (/sdcard/pictures/…) sau khi luồng kháng
+        /// kết thúc — cả thành công lẫn thất bại/lỗi. Nếu không xoá, mỗi lần kháng cộng thêm 1 ảnh
+        /// vào device và dần đầy bộ nhớ (user yêu cầu 2026-09-15).
+        /// Ngoài `rm` + broadcast MediaStore (DeleteMediaFiles), xoá luôn ROW trong MediaStore bằng
+        /// `content delete` vì UploadMediaFiles đã `content insert` — nếu chỉ rm, row cũ còn sót sẽ
+        /// hiện tile "0 B / Jan 1, 1970" trong picker các lần sau (bẫy MediaStore đã ghi nhận).
+        /// </summary>
+        private void CleanupAppealImageOnDevice(string remotePath, string deviceFileName, Action<string, int, string> report)
+        {
+            if (string.IsNullOrWhiteSpace(remotePath)) return;
+            try
+            {
+                DeleteMediaFiles(new List<string> { remotePath });
+                // Xoá row MediaStore trỏ tới file vừa rm để tile biến mất khỏi DocumentsUI.
+                _client.Shell($"content delete --uri content://media/external/images/media " +
+                              $"--where \"_data='{remotePath.Trim()}'\"");
+                report($"Đã xoá ảnh kháng nghị trên điện thoại: {deviceFileName}", 2, null);
+            }
+            catch (Exception ex)
+            {
+                // Dọn dẹp thất bại KHÔNG được phá kết quả kháng nghị — chỉ log.
+                report($"Không xoá được ảnh trên điện thoại ({deviceFileName}): {ex.Message}", 3,
+                       $"[HDKhangSpam.Cleanup] {ex}");
+            }
+        }
+
         public int HDDangBaiPage(int accountId, string statusPrefix, JsonHelper settings, string actionName, string pageKey)
         {
             int postCountFrom = settings.GetIntType("nudSoLuongFrom", 1);
@@ -9144,12 +9387,32 @@ namespace Sunny.Subd.Core.Facebook
             int successCount = 0;
             int refail = 0;
             int failCount = 0;
+            Stopwatch shareStopwatch = new Stopwatch();
+            int shareIntervalMilliseconds = 0;
+            bool hasSharedStory = false;
             UpdateStoryStats(successCount, failCount);
 
             while (!_mainService._ct.IsCancellationRequested)
             {
                 if (successCount >= targetCount) break;
                 if (refail > 5) break;
+
+                // Khoảng cách cấu hình là: BẮT ĐẦU bấm Share story trước → BẮT ĐẦU
+                // dựng story kế tiếp. Không chờ Facebook tải/hoàn tất story trước và không
+                // cộng dồn thời gian upload, chọn nhạc hay dựng UI story hiện tại.
+                if (hasSharedStory && shareIntervalMilliseconds > 0)
+                {
+                    int elapsedMilliseconds = shareStopwatch.IsRunning
+                        ? (int)Math.Min(int.MaxValue, shareStopwatch.ElapsedMilliseconds)
+                        : 0;
+                    int remainingMilliseconds = shareIntervalMilliseconds - elapsedMilliseconds;
+                    if (remainingMilliseconds > 0)
+                    {
+                        int remainingSeconds = (remainingMilliseconds + 999) / 1000;
+                        _mainService.SetStatus($"({successCount + 1}/{targetCount}), Đợi {remainingSeconds}s để bắt đầu dựng story...", 2);
+                        await Task.Delay(remainingMilliseconds, _mainService._ct);
+                    }
+                }
 
                 string content = string.Empty;
                 if (isText && _data.ContainsKey($"{action.Id}_txtLinks") && _data[$"{action.Id}_txtLinks"].Any())
@@ -9224,7 +9487,17 @@ namespace Sunny.Subd.Core.Facebook
                         _mainService.SetStatus($"({successCount + 1}/{targetCount}), Upload ảnh nhạc...", 2);
                         fileMedia.AddRange(UploadMediaFiles(new List<string> { musicImagePath }));
                     }
-                    OpenFacebookTimeline();
+                    // Chỉ mở Timeline khi CHƯA ở đó. Sau khi Share story trước, app đã
+                    // được đưa về Timeline; upload media không đổi app foreground nên lần
+                    // mở này thường thừa → bỏ deeplink + reload (~3-5s/story).
+                    if (IsOnFacebookTimeline())
+                    {
+                        _mainService.SetStatus($"({successCount + 1}/{targetCount}), Đã ở Timeline...", 2);
+                    }
+                    else
+                    {
+                        OpenFacebookTimeline();
+                    }
 
                     int tickCount = Environment.TickCount;
                     int timeoutSeconds = 300;
@@ -9236,11 +9509,19 @@ namespace Sunny.Subd.Core.Facebook
                     List<string> xpaths;
                     if (postType == 0)
                     {
+                        // THỨ TỰ LIST = THỨ TỰ ƯU TIÊN: ADBClient.FindElement trả về XPATH KHỚP
+                        // ĐẦU TIÊN theo thứ tự list. 'Add to story' là THẺ "+" bấm được thật, phải
+                        // đứng TRƯỚC 'Stories' trần — vì 'Stories' còn là TIÊU ĐỀ MỤC trên feed và
+                        // khớp cả node KHUNG chứa khay story (ElementWithAttributes chọn node diện
+                        // tích lớn nhất) -> đứng trước thì nó THẮNG và tool tap vào tiêu đề/khung
+                        // thay vì thẻ tạo story = "tab nhầm chỗ".
+                        // CHỈ DỜI XUỐNG, KHÔNG XOÁ: màn nào không có 'Add to story' thì FindElement
+                        // rơi xuống 'Stories' y như hành vi cũ, không mất lưới an toàn.
                         xpaths = new List<string>
                         {
+                            "//*[@content-desc='Add to story']",
                             "//*[@text='Stories']",
                             "//*[@content-desc='Stories']",
-                            "//*[@content-desc='Add to story']",
                             "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
                             "//*[@class='androidx.recyclerview.widget.RecyclerView']/descendant::android.widget.Button[@clickable='true' and string-length(@content-desc)>0]",
                             "//*[@content-desc='Start a Text story']",
@@ -9258,12 +9539,16 @@ namespace Sunny.Subd.Core.Facebook
                     }
                     else if (postType == 1)
                     {
+                        // THỨ TỰ LIST = THỨ TỰ ƯU TIÊN (FindElement trả xpath khớp ĐẦU TIÊN).
+                        // 'Create story' / 'Add to story' là nút bấm được thật -> đứng TRƯỚC
+                        // 'Stories' trần (tiêu đề mục / khung chứa khay story) để không tap nhầm.
+                        // CHỈ DỜI XUỐNG, KHÔNG XOÁ: giữ nguyên lưới an toàn như cũ.
                         xpaths = new List<string>
                         {
-                            "//*[@text='Stories']",
-                            "//*[@content-desc='Stories']",
                             "//*[@text='Create story' or @content-desc='Create story']",
                             "//*[@content-desc='Add to story']",
+                            "//*[@text='Stories']",
+                            "//*[@content-desc='Stories']",
                             "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
                             "//*[@class='androidx.recyclerview.widget.RecyclerView']/descendant::android.widget.Button[@clickable='true' and string-length(@content-desc)>0]",
                             "//*[@content-desc='Start a Music story']",
@@ -9281,18 +9566,28 @@ namespace Sunny.Subd.Core.Facebook
                         };
                         if (musicCoAnh)
                         {
-                            xpaths.Insert(3, "(//*[contains(@content-desc, 'Photo taken on') or contains(@text, 'Photo taken on')])[1]");
-                            xpaths.Insert(3, "(//*[@content-desc='Photo'])[last()]");
+                            // Chỉ số 3 -> 1 vì nhóm "mở khay story" đã được sắp lại. QUAN HỆ ƯU TIÊN
+                            // GIỮ NGUYÊN Y HỆT bản cũ: CreateStory > Photo[last] > PhotoTakenOn >
+                            // AddTo (bộ chọn ảnh vẫn đứng TRÊN 'Add to story' — nếu để AddTo lên
+                            // trước, dump màn gallery còn sót node nền 'Add to story' sẽ thắng và
+                            // tool tap lại khay story thay vì chọn ảnh). Thay đổi DUY NHẤT so với
+                            // trước: 'Stories' trần rơi XUỐNG DƯỚI tất cả (đó chính là fix).
+                            xpaths.Insert(1, "(//*[contains(@content-desc, 'Photo taken on') or contains(@text, 'Photo taken on')])[1]");
+                            xpaths.Insert(1, "(//*[@content-desc='Photo'])[last()]");
                         }
                     }
                     else
                     {
+                        // THỨ TỰ LIST = THỨ TỰ ƯU TIÊN (FindElement trả xpath khớp ĐẦU TIÊN).
+                        // 'Create story' / 'Add to story' là nút bấm được thật -> đứng TRƯỚC
+                        // 'Stories' trần (tiêu đề mục / khung chứa khay story) để không tap nhầm.
+                        // CHỈ DỜI XUỐNG, KHÔNG XOÁ: giữ nguyên lưới an toàn như cũ.
                         xpaths = new List<string>
                         {
+                            "//*[@text='Create story' or @content-desc='Create story']",
+                            "//*[@content-desc='Add to story']",
                             "//*[@text='Stories']",
                             "//*[@content-desc='Stories']",
-                           "//*[@text='Create story' or @content-desc='Create story']",
-                            "//*[@content-desc='Add to story']",
                             "//*[@content-desc='Stories']//androidx.recyclerview.widget.RecyclerView/child::*/child::*",
                             "//*[@content-desc='Photo' or @content-desc='Video']/*[@content-desc='Photo' or @content-desc='Video']",
                             "//*[@text='Privacy' or @content-desc='Privacy']",
@@ -9302,12 +9597,27 @@ namespace Sunny.Subd.Core.Facebook
                         };
                     }
                     bool isFirstLoop = true;
+                    // Đứng TRƯỚC NavigationButton: trên màn "pay or consent" phần tử
+                    // khớp đầu của NavigationButton là nút Continue mờ (vô tác dụng).
+                    xpaths.AddRange(XpathManagerFacebook.Get(XpathType.MetaAdsConsent));
                     xpaths.AddRange(XpathManagerFacebook.Get(XpathType.NavigationButton));
                     while (!_mainService._ct.IsCancellationRequested)
                     {
                         if (Environment.TickCount - tickCount >= timeoutSeconds * 1000) break;
 
                         string xmlSource = _client.GetXMLSource();
+
+                        // Quét & bấm nút Dismiss TRƯỚC khi khớp list story. List cục bộ bên trên
+                        // (Stories / Create story / Privacy / Public / //android.widget.ProgressBar …)
+                        // đứng TRƯỚC MetaAdsConsent và NavigationButton, và dialog Facebook là cửa sổ
+                        // chồng lên màn nền nên dump bắt được node của CẢ màn nền -> một node nền khớp
+                        // trước sẽ thắng, tool bấm vào nền, dialog nuốt cú chạm, lặp vô hạn và KHÔNG
+                        // BAO GIỜ tới lượt xpath Dismiss. Truyền lại xmlSource nên KHÔNG tốn thêm dump.
+                        if (FacebookHander.TryClickAnyDismiss(_client, xmlSource))
+                        {
+                            _client.Delay(1);
+                            continue;
+                        }
 
                         string foundElement = _client.FindElement(xmlSource, xpaths, 1);
 
@@ -9321,6 +9631,9 @@ namespace Sunny.Subd.Core.Facebook
                                 hasClickedAddToStory = true;
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Add to story...", 2);
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                break;
+                            case var c when XpathManagerFacebook.Get(XpathType.MetaAdsConsent).Contains(c):
+                                await FacebookHander.TryHandleMetaAdsConsentAsync(_client);
                                 break;
                             case var c when XpathManagerFacebook.Get(XpathType.NavigationButton).Contains(c):
                                 _client.ElementWithAttributes(c, 5);
@@ -9419,15 +9732,18 @@ namespace Sunny.Subd.Core.Facebook
                                         _client.ElementWithAttributes(foundElement, 1, xmlSource);
                                         _client.SendTextSlow(foundElement, musicText + " ");
                                         _client.ATX.Press(PressKey.Enter);
-                                        _client.Delay(3);
+                                        // Bỏ Delay(3) cứng: ElementWithAttributes bên dưới tự poll node
+                                        // 'Music Track' tối đa 10s (chờ theo UI-state + fallback).
                                         if (_client.ElementWithAttributes("(//*[contains(@content-desc, 'Music Track') or contains(@text, 'Music Track')])[1]", 10, ""))
                                         {
-                                            _client.Delay(3);
+                                            // Bỏ Delay(3) cứng: lệnh ngay sau tự poll node 'Music' tối đa 10s.
                                             _client.ElementWithAttributes("//*[@text='Music' or @content-desc='Music']", 10, "");
                                             _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chon kieu Album Art...", 2);
                                             ClickRandomAlbumArtStyle();
                                             _client.ElementWithAttributes("//*[@class='android.widget.Button' and (starts-with(@text,'Done') or starts-with(@content-desc,'Done'))]", 10, "");
-                                            _client.Delay(3);
+                                            // Bỏ Delay(3) cứng: MoveMusicStickerRandom tự poll node
+                                            // 'Music sticker' tối đa 10s — node này chỉ có ở màn dựng
+                                            // story nên chính là tín hiệu đã chuyển cảnh xong.
                                             MoveMusicStickerRandom();
                                             break;
                                         }
@@ -9458,7 +9774,8 @@ namespace Sunny.Subd.Core.Facebook
                                     _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chon kieu Album Art...", 2);
                                     ClickRandomAlbumArtStyle();
                                     _client.ElementWithAttributes("//*[@class='android.widget.Button' and (starts-with(@text,'Done') or starts-with(@content-desc,'Done'))]", 10, "");
-                                    _client.Delay(3);
+                                    // Bỏ Delay(3) cứng: MoveMusicStickerRandom tự poll node 'Music
+                                    // sticker' tối đa 10s (chờ theo UI-state + fallback).
                                     MoveMusicStickerRandom();
                                     break;
                                 }
@@ -9467,7 +9784,8 @@ namespace Sunny.Subd.Core.Facebook
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
                                 if (isMusic)
                                 {
-                                    _client.Delay(3);
+                                    // Bỏ Delay(3) cứng: MoveMusicStickerRandom tự poll node 'Music
+                                    // sticker' tối đa 10s (chờ theo UI-state + fallback).
                                     MoveMusicStickerRandom();
                                 }
                                 break;
@@ -9524,9 +9842,18 @@ namespace Sunny.Subd.Core.Facebook
                                 break;
                             case "//*[@content-desc=\"Share\"]":
                             case "//*[@class='android.widget.Button' and (starts-with(@text,'Share') or starts-with(@content-desc,'Share'))]":
+                                // Không chờ K ở đây. Khoảng cách "Share story này → bắt đầu dựng
+                                // story kế tiếp" được canh duy nhất ở ĐẦU vòng lặp (shareStopwatch),
+                                // nên mốc K luôn là khoảnh khắc gửi tap Share, không phải lúc sắp bấm.
                                 successCount++;
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Share...", 2);
+                                // Mốc của khoảng cách là KHOẢNH KHẮC bắt đầu gửi tap Share story này.
+                                shareIntervalMilliseconds = SubdyHelper.RandomValue(
+                                    Math.Max(0, Math.Min(delayFrom, delayTo)),
+                                    Math.Min(999999, Math.Max(delayFrom, delayTo)) + 1) * 1000;
+                                shareStopwatch.Restart();
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                hasSharedStory = true;
                                 _client.Delay(2);
                                 if (_client.ElementWithAttributes("//*[@class='android.widget.Button' and (starts-with(@text,'NOT NOW') or starts-with(@content-desc,'NOT NOW'))]", 10, ""))
                                 {
@@ -9536,7 +9863,9 @@ namespace Sunny.Subd.Core.Facebook
                                 if (hasClickedAddToStory)
                                 {
                                     OpenFacebookTimeline();
-                                    _client.Delay(3);
+                                    // Bỏ Delay(3) cứng: chờ Timeline ổn định theo UI-state,
+                                    // trả về ngay khi màn hình ngừng tải (fallback 3s).
+                                    WaitForUiStable(3);
                                 }
                                 //WaitForPostComplete(isMedia ? 300 : 60);
                                 break;
@@ -9561,7 +9890,9 @@ namespace Sunny.Subd.Core.Facebook
                         {
                             xpaths.Remove(foundElement);
                         }
-                        _client.Delay(3);
+                        // Bỏ Delay(3) cứng: nhịp chờ giữa các lần poll UI giờ trả về NGAY
+                        // khi màn hình ngừng thay đổi (fallback tối đa 3s).
+                        WaitForUiStable(3);
                     }
 
                     if (postSuccess)
@@ -9576,7 +9907,8 @@ namespace Sunny.Subd.Core.Facebook
                             try { File.Delete(musicImagePath); } catch { }
                         }
                         UpdateStoryStats(successCount, failCount);
-                        await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayFrom, delayTo), $"({successCount}/{targetCount}), Đợi {{time}}s...", 2);
+                        // KHÔNG chờ K thêm ở đây: khoảng cách "Share → dựng story kế" đã được
+                        // canh ở ĐẦU vòng lặp dựa trên mốc shareStopwatch (khoảnh khắc bấm Share).
                         DeleteMediaFiles(fileMedia);
                     }
                     else
@@ -13692,6 +14024,60 @@ namespace Sunny.Subd.Core.Facebook
             //method_69
             return _client.Shell("am start -n " + FacebookHander.Package(PlatformModel.Facebook) + "/.IntentUriHandler \"" + url + "\"");
         }
+        // Phát hiện ĐANG ở Timeline/Home của Facebook. Tab "Home" luôn hiện trên
+        // Timeline; các màn dựng story / soạn bài là immersive fullscreen nên KHÔNG
+        // có tab bar này. Dùng để bỏ qua OpenFacebookTimeline (deeplink + reload) khi
+        // không cần thiết. Trả về false nếu không chắc chắn (an toàn → sẽ mở lại).
+        private bool IsOnFacebookTimeline()
+        {
+            try
+            {
+                if (!(_client?.IsRunningApp(PlatformModel.Facebook) ?? false))
+                {
+                    return false;
+                }
+                string homeTab = _client.FindElement("", new List<string>
+                {
+                    "//*[@content-desc='Home, tab']",
+                    "//*[@content-desc='Home, Tab']",
+                }, 1);
+                return !string.IsNullOrEmpty(homeTab);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Chờ UI "ổn định" thay vì ngủ cứng: poll XML nguồn, TRẢ VỀ NGAY khi hai lần
+        // dump liên tiếp giống nhau (màn hình đã ngừng tải). maxSeconds là fallback an
+        // toàn nếu UI cứ thay đổi. Tôn trọng nút DỪNG qua _client.Delay (ThrowIfStopped).
+        private void WaitForUiStable(int maxSeconds = 3, int settleSeconds = 1)
+        {
+            try
+            {
+                int tickCount = Environment.TickCount;
+                string previous = _client.GetXMLSource();
+                while (Environment.TickCount - tickCount < maxSeconds * 1000)
+                {
+                    _client.Delay(settleSeconds);
+                    string current = _client.GetXMLSource();
+                    if (!string.IsNullOrEmpty(current) && current == previous)
+                    {
+                        return;
+                    }
+                    previous = current;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+            }
+        }
+
         public void OpenFacebookTimeline()
         {
             //D7950A0F
@@ -13975,9 +14361,13 @@ namespace Sunny.Subd.Core.Facebook
             List<string> remoteFiles = new List<string>();
             _mainService.SetStatus("Uploading media files...", 2);
 
-            EnsureRemoteFolder("sdcard/dcim/camera");
-            EnsureRemoteFolder("sdcard/pictures");
-            EnsureRemoteFolder("sdcard/movies");
+            // Chỉ bảo đảm thư mục ĐÍCH (/sdcard/pictures) một lần cho mỗi lần chạy.
+            // Upload luôn đẩy vào /sdcard/pictures nên dcim/camera và movies là mkdir thừa.
+            if (!_remoteUploadFolderEnsured)
+            {
+                EnsureRemoteFolder("sdcard/pictures");
+                _remoteUploadFolderEnsured = true;
+            }
 
             foreach (string localFile in files)
             {

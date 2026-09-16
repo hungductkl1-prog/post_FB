@@ -23,6 +23,11 @@
            ProxyFile,
         };
 
+        // HttpClient dùng chung cho mọi lời gọi API nhà cung cấp proxy, timeout ngắn (15s):
+        // trước đây mỗi lời gọi dùng new HttpClient() với timeout mặc định ~100s, nên một
+        // nhà cung cấp chết/không reachable đốt ~200s im lặng mỗi account trước khi bỏ qua.
+        public static readonly HttpClient Http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+
         public static string GetProxy()
         {
             lock (Proxies)
@@ -33,6 +38,15 @@
                 Proxies.Add(proxy);
                 return proxy;
             }
+        }
+
+        // Chỉ hiện host:port khi cần log/status; tuyệt đối không lộ
+        // username/password của proxy ra log.
+        public static string Mask(string? proxy)
+        {
+            if (string.IsNullOrWhiteSpace(proxy)) return "(trống)";
+            var parts = proxy.Split(':');
+            return parts.Length >= 2 ? $"{parts[0]}:{parts[1]}" : proxy;
         }
     }
 }

@@ -19,12 +19,35 @@ namespace AutoAndroid
             _service = service;
         }
 
-        private Task<bool> EnsureReadyAsync()
+        private async Task<bool> EnsureReadyAsync()
         {
+            Task<bool> task;
             lock (_initializationLock)
             {
-                return _initializationTask ??= TurnOnADBKeyboardCore();
+                task = _initializationTask ??= TurnOnADBKeyboardCore();
             }
+
+            bool ready;
+            try
+            {
+                ready = await task.ConfigureAwait(false);
+            }
+            catch
+            {
+                ready = false;
+            }
+
+            if (!ready)
+            {
+                // Init thất bại (transient): xóa cache để lần Input sau được retry,
+                // tránh kẹt vĩnh viễn ở trạng thái false.
+                lock (_initializationLock)
+                {
+                    if (ReferenceEquals(_initializationTask, task))
+                        _initializationTask = null;
+                }
+            }
+            return ready;
         }
         public Task<bool> TurnOnADBKeyboard()
         {
@@ -99,6 +122,8 @@ namespace AutoAndroid
         {
             try
             {
+                // EnsureReadyAsync không capture sync context (ConfigureAwait(false) toàn bộ)
+                // nên sync-wait ở đây an toàn trên cả UI thread lẫn thread pool.
                 if (!EnsureReadyAsync().GetAwaiter().GetResult())
                     return false;
 

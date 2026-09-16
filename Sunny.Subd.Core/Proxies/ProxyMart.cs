@@ -13,7 +13,7 @@ namespace Sunny.Subd.Core.Proxies
         {
             try
             {
-                var client = new HttpClient();
+                var client = ProxyService.Http;
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://proxymart.pro/key/get-current-ip?key={token}");
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
@@ -48,7 +48,7 @@ namespace Sunny.Subd.Core.Proxies
             string error = string.Empty;
             try
             {
-                var client = new HttpClient();
+                var client = ProxyService.Http;
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://proxymart.pro/key/get-new-ip?key={token}");
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();

@@ -573,6 +573,9 @@ namespace LamToolAutoPhonePrime.Views.Forms
                 case FacebookFarmingType.HDBuffLikePage:
                     form = new fHDBuffLikePage(action.ScriptId.ToString(), action.Id.ToString());
                     break;
+                case FacebookFarmingType.HDKhangSpam:
+                    form = new fHDKhangSpam(action.ScriptId.ToString(), action.Id.ToString());
+                    break;
 
                 // Instagram
                 case InstagramFarmingType.IGXemReel:

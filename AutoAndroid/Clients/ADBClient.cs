@@ -501,8 +501,13 @@ namespace AutoAndroid
             }
             return false;
         }
-        public bool RebootAndWaitForDeviceReady()
+        public bool RebootAndWaitForDeviceReady(string? reason = null)
         {
+            // LỊCH SỬ CHẠY: mọi lệnh reboot của tool đều đi qua đây -> ghi 1 dòng REBOOT
+            // nêu serial + lý do tường minh + stack trace best-effort. Dòng này là bằng
+            // chứng "máy reboot do tool, ở bước nào". KHÔNG đổi hành vi reboot.
+            RunHistoryLog.Reboot(Device?.Serial ?? "?",
+                reason ?? "(không nêu lý do — gọi RebootAndWaitForDeviceReady trực tiếp)");
             LogHelper.SUCCESS("Đang khởi động lại máy!");
             ADB.Shell("reboot");
             LogHelper.SUCCESS("Đang chờ khởi động máy!");
@@ -568,16 +573,74 @@ namespace AutoAndroid
         }
         public async Task<bool> ChangInfo(string filePath, bool backup, string brand, string country)
         {
-            var result = Shell("su -c \"whoami\"");
-            if (result.Trim() != "root")
+            string serial = Device?.Serial ?? "?";
+            DeviceChangeLog.Write(serial, "ChangInfo: VÀO bước đổi thiết bị.");
+
+            // Kiểm tra root bằng lệnh adb timeout cứng (tránh Shell() retry+Connect treo),
+            // và so khớp lỏng (chứa "root") vì output su có thể kèm khoảng trắng/dòng thừa.
+            string who = ProcessHelper.RunAdbCommand(
+                $"-s {serial} shell su -c whoami", 8) ?? string.Empty;
+            bool isRoot = who.IndexOf("root", StringComparison.OrdinalIgnoreCase) >= 0;
+            DeviceChangeLog.Write(serial, $"ChangInfo: whoami=[{who.Trim()}] isRoot={isRoot}");
+
+            if (!isRoot)
             {
-                LogHelper.ERROR("Không phải root");
+                LogHelper.ERROR("Không phải root - bỏ qua đổi thiết bị");
                 return false;
             }
             LogHelper.SUCCESS($"Đang thay đổi thiết bị!");
             MaxChangeService maxChangeService = new MaxChangeService(this);
             return await maxChangeService.Change(filePath, backup, brand, country);
         }
+
+        // ── FACADE PUBLIC CHO MIRROR-GUARD (v12) ────────────────────────────────────────
+        // MirrorSuppressor là `internal` của AutoAndroid; Sunny.Subd.Core (assembly khác) KHÔNG
+        // instantiate được. Hai facade dưới đây để luồng job (MainService/FacebookRegsiner) giữ
+        // mirror-guard SUỐT cả cửa sổ nguy hiểm (đổi thiết bị -> proxy -> mở Facebook) thay vì
+        // chỉ trong vài giây Change() như trước — vá khoảng hở gây đen màn hình lúc mở FB.
+        //
+        // _mirrorGuard là MỘT instance duy nhất cho cặp Start/Stop của luồng job (vì _started là
+        // per-instance). Ref-count THEO SERIAL nằm trong MirrorSuppressor (static) nên guard LỒNG
+        // của Change() (Start/Stop riêng, instance riêng) KHÔNG kill watchdog nền của guard ngoài.
+        private MirrorSuppressor? _mirrorGuard;
+
+        /// <summary>
+        /// Bật mirror-guard cho SUỐT vòng account (idempotent theo instance). Best-effort, không ném.
+        /// Gọi ở ĐẦU vòng lặp account; tắt bằng <see cref="MirrorGuardStop"/> trong finally.
+        /// </summary>
+        public void MirrorGuardStart()
+        {
+            try
+            {
+                string serial = Device?.Serial ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(serial)) return;
+                _mirrorGuard ??= new MirrorSuppressor(serial);
+                _mirrorGuard.Start();
+            }
+            catch (Exception ex)
+            {
+                DeviceChangeLog.Write(Device?.Serial ?? "?",
+                    $"MIRROR-GUARD(facade): Start lỗi (bỏ qua, không chặn job): {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Tắt mirror-guard của luồng job (chỉ thật sự kill watchdog khi ref-count về 0).
+        /// Best-effort, không ném. Gọi trong finally của vòng lặp account.
+        /// </summary>
+        public void MirrorGuardStop()
+        {
+            try
+            {
+                _mirrorGuard?.Stop();
+            }
+            catch (Exception ex)
+            {
+                DeviceChangeLog.Write(Device?.Serial ?? "?",
+                    $"MIRROR-GUARD(facade): Stop lỗi (watchdog tự hết): {ex.Message}");
+            }
+        }
+
         public async Task<bool> BackupDevice(string filePath)
         {
             return await maxChange.BackupDeviceInfoChange(filePath);
@@ -814,30 +877,36 @@ namespace AutoAndroid
             {
                 LogHelper.SUCCESS("Xóa dữ liệu phiên Facebook cũ");
 
+                // Gộp nhiều lệnh vào MỘT phiên shell thay vì ~48 lời gọi adb tuần tự
+                // (8 package x 6 lệnh): mỗi lời gọi tốn ~120-150ms round-trip, nên bước
+                // này trước đây mất vài giây đến vài chục giây; đo trên thiết bị thật
+                // dạng gộp chỉ còn <1s.
                 // Dừng và vô hiệu hóa tạm thời toàn bộ thành phần Facebook để
                 // không đăng ký lại Account Manager trong lúc đang dọn dữ liệu.
-                foreach (string package in facebookPackages)
-                {
-                    try { Shell("am", "force-stop", package); } catch { }
-                    try { Shell("pm", "disable-user", "--user", "0", package); } catch { }
-                }
+                string stopBatch = string.Join("; ", facebookPackages.Select(p => $"am force-stop {p}"));
+                string disableBatch = string.Join("; ", facebookPackages.Select(p => $"pm disable-user --user 0 {p}"));
+                try { Shell(stopBatch + "; " + disableBatch); } catch { }
                 InterruptibleSleep(500);
 
-                foreach (string package in facebookPackages)
+                // rm -rf dưới root: gộp mọi đường dẫn vào MỘT lệnh (đã kiểm chứng trên
+                // device: cả dạng `su -c rm -rf <dir>` lẫn dạng quote đều xóa đúng).
+                string rmPaths = string.Join(" ", facebookPackages.SelectMany(p => new[]
                 {
-                    try { Shell("su", "-c", $"rm -rf /data/media/0/Android/data/{package}"); } catch { }
-                    try { Shell("su", "-c", $"rm -rf /sdcard/Android/data/{package}"); } catch { }
-                    try { Shell("pm", "clear", package); } catch { }
-                }
+                    $"/data/media/0/Android/data/{p}",
+                    $"/sdcard/Android/data/{p}",
+                }));
+                try { Shell("su", "-c", $"\"rm -rf {rmPaths}\""); } catch { }
+
+                // pm clear từng package nhưng trong cùng một phiên shell.
+                string clearBatch = string.Join("; ", facebookPackages.Select(p => $"pm clear {p}"));
+                try { Shell(clearBatch); } catch { }
 
                 // Xóa một lần duy nhất cho mỗi account, thay vì lặp lại khi
                 // AppClear được gọi cho từng package Facebook phụ.
                 bool accountsCleared = DeleteAccounts();
 
-                foreach (string package in facebookPackages)
-                {
-                    try { Shell("pm", "enable", "--user", "0", package); } catch { }
-                }
+                string enableBatch = string.Join("; ", facebookPackages.Select(p => $"pm enable --user 0 {p}"));
+                try { Shell(enableBatch); } catch { }
 
                 if (!accountsCleared)
                     throw new InvalidOperationException("Không thể xác nhận đã xóa dữ liệu tài khoản Facebook.");
@@ -853,13 +922,8 @@ namespace AutoAndroid
         {
             try
             {
-                // Force-stop tất cả Facebook apps trước để authenticator không giữ lock trên accounts DB
-                string[] allFbPkgs = { "com.facebook.katana", "com.facebook.lite", "com.facebook.orca", "com.facebook.messenger" };
-                foreach (var pkg in allFbPkgs)
-                {
-                    try { Shell($"am force-stop {pkg}"); } catch { }
-                }
-                InterruptibleSleep(1000);
+                // Caller (ClearFacebookData) đã force-stop toàn bộ package Facebook ngay
+                // trước đó, không lặp lại ở đây để khỏi tốn thêm ~1s ngủ + 4 lời gọi shell.
 
                 string sqlite = ResolveSqlite3();
                 if (string.IsNullOrEmpty(sqlite))
@@ -926,9 +990,17 @@ namespace AutoAndroid
                 }
                 catch { }
 
-                // Stop framework để đóng toàn bộ connection tới accounts_*.db
+                // Stop framework để đóng toàn bộ connection tới accounts_*.db.
+                // ── FIX #3 ── stop/start framework LÀM MẤT VIEW PHONE TẠM THỜI (~5s): mirror
+                // ngoài (xiaowei) chết theo framework rồi TỰ RESPAWN khi framework lên lại.
+                // Đây là bước BẮT BUỘC (AccountManagerService phải nhả cache account DB; ROM
+                // không có `cmd account remove`) nên KHÔNG thể bỏ, chỉ giảm thiểu. mirror-guard
+                // (MirrorSuppressor, bật ở MirrorGuardStart TRƯỚC ClearPreviousAccountDataAsync)
+                // đang chạy sẽ dọn mồ côi VirtualDisplay sinh lúc framework chết -> chống đen
+                // vĩnh viễn (DẠNG 1). ĐÃ BỎ InterruptibleSleep(1000) thừa: StopFramework() tự
+                // Thread.Sleep(2000) rồi (giảm ~1s cửa sổ mất view).
+                LogHelper.Log("[DeleteAccounts] stop/start framework sẽ làm mất view TẠM THỜI ~5s; mirror-guard đang chạy sẽ dọn mồ côi VirtualDisplay, mirror tự nối lại.");
                 bool stopped = StopFramework();
-                InterruptibleSleep(1000);
 
                 int deletedCount = 0;
                 foreach (int id in ids)
@@ -2056,6 +2128,96 @@ namespace AutoAndroid
             LogHelper.Log($"{message}: ({ms}ms)");
             return;
         }
+        // ─── Hook TOÀN CỤC chặn popup "trôi nổi" (thẻ Meta consent) ──────────────────────
+        // VẤN ĐỀ (xác minh LIVE 2026-09-10 trên 520058f34d7c947b): thẻ "Use free of charge
+        // with ads" hiện BẤT CHỢT ở MỌI thời điểm của job, nhưng 65/66 vòng lặp FindElement
+        // của FacebookFarming KHÔNG chứa XpathType.MetaAdsConsent trong danh sách xpath. Vòng
+        // lặp đó không bao giờ khớp -> FindElement poll tight-loop (không delay giữa 2 lần
+        // dump) đến hết timeout -> trả "" -> lặp lại vô hạn. Bằng chứng logcat: 159 lần
+        // "dumpWindowHierarchy" trong 30 giây mà KHÔNG có một lệnh click/tap/am start nào,
+        // mResumedActivity vẫn là ConsentFlowHostActivity sau 20 giây. KẸT IM LẶNG.
+        //
+        // Vá từng vòng lặp là bất khả thi (65 chỗ, và job mới sẽ lại quên). GetXMLSource là
+        // ĐIỂM THẮT DUY NHẤT mà mọi vòng lặp đều đi qua -> đặt hook ở đây vá được tất cả.
+        //
+        // AutoAndroid KHÔNG reference Sunny.Subd.Core (chiều phụ thuộc ngược lại), nên hook
+        // khai báo ở đây và Sunny.Subd.Core đăng ký lúc khởi động (Program.Main):
+        //   ADBClient.GlobalPopupDetector    = FacebookHander.IsMetaConsentPopup;
+        //   ADBClient.GlobalPopupInterceptor = FacebookHander.TryHandleMetaConsentPopup;
+        //
+        // HỢP ĐỒNG (cả hai đều ĐỒNG BỘ, vì GetXMLSource là hàm sync):
+        //   Detector    (client, xml) -> true nếu màn hình CÓ popup. PHẢI RẺ và KHÔNG tác động
+        //                               (chỉ đọc chuỗi) — nó chạy trên MỌI lần dump.
+        //   Interceptor (client, xml) -> true nếu ĐÃ nhận diện và XỬ LÝ popup (tap/swipe).
+        //                                Khi true, GetXMLSource dump lại để caller thấy màn mới.
+        public static Func<ADBClient, string, bool>? GlobalPopupDetector;
+        public static Func<ADBClient, string, bool>? GlobalPopupInterceptor;
+
+        // Chống ĐỆ QUY: chính Interceptor cũng gọi GetXMLSource/FindElement.
+        [ThreadStatic] private static bool _popupInterceptorBusy;
+        // Van an toàn: Interceptor dọn không nổi (biến thể lạ) thì nghỉ, đừng chiếm trọn job.
+        private DateTime _popupLastAttemptUtc = DateTime.MinValue;
+        private int _popupFailStreak;
+        private const int PopupMaxFailStreak = 3;
+        private const int PopupCooldownSeconds = 90;
+
+        /// <summary>
+        /// Chạy hook popup toàn cục trên XML vừa dump, trả về XML caller nên dùng
+        /// (XML MỚI nếu popup vừa được dọn, ngược lại giữ nguyên XML cũ).
+        /// KHÔNG BAO GIỜ ném (trừ OperationCanceledException khi user bấm DỪNG).
+        /// </summary>
+        private string RunGlobalPopupInterceptor(string xml)
+        {
+            var detector = GlobalPopupDetector;
+            var interceptor = GlobalPopupInterceptor;
+            if (detector == null || interceptor == null) return xml;
+            if (_popupInterceptorBusy) return xml;
+            if (_popupFailStreak >= PopupMaxFailStreak
+                && (DateTime.UtcNow - _popupLastAttemptUtc).TotalSeconds < PopupCooldownSeconds)
+                return xml;
+
+            try
+            {
+                // Detector rẻ (string search) nên KHÔNG trả về ngay ở đây là một sai lầm —
+                // phải kiểm tra TRƯỚC để 99.9% lần dump không phải vào Interceptor.
+                if (!detector(this, xml))
+                {
+                    _popupFailStreak = 0;
+                    return xml;
+                }
+
+                _popupInterceptorBusy = true;
+                _popupLastAttemptUtc = DateTime.UtcNow;
+                LogHelper.Log("[PopupInterceptor] phát hiện popup ngoài luồng job -> dọn toàn cục");
+
+                if (!interceptor(this, xml)) return xml;
+
+                // Popup đã được xử lý -> dump LẠI (guard ở trên chặn đệ quy) lấy màn hình mới.
+                ThrowIfStopped();
+                string fresh = _currentAutomationType == AutomationType.Appium
+                    ? GetXmlSourceByAppium()
+                    : GetXmlSourceByATX();
+                if (!IsValidHierarchyXml(fresh)) return xml;
+
+                // Vẫn còn popup? -> một lần thất bại, để van an toàn đếm và hạ nhiệt.
+                _popupFailStreak = detector(this, fresh) ? _popupFailStreak + 1 : 0;
+                return fresh;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[PopupInterceptor] lỗi: {ex.Message}");
+                return xml;
+            }
+            finally
+            {
+                _popupInterceptorBusy = false;
+            }
+        }
+
         public string GetXMLSource(string? type = null)
         {
             if (!string.IsNullOrWhiteSpace(type))
@@ -2077,7 +2239,7 @@ namespace AutoAndroid
 
                     if (IsValidHierarchyXml(xml))
                     {
-                        return xml;
+                        return RunGlobalPopupInterceptor(xml);
                     }
                     ThrowIfStopped();
                     Connect(CurrentAutomationType);
@@ -3630,6 +3792,7 @@ namespace AutoAndroid
 
         public void GrantAppPermissions(string package)
         {
+            // Quyền danh bạ + lưu trữ legacy (Android 9-12).
             this.Shell(" pm grant " + package + " android.permission.READ_CONTACTS");
             this.Shell(" pm grant " + package + " android.permission.READ_EXTERNAL_STORAGE");
             this.Shell(" pm grant " + package + " android.permission.WRITE_EXTERNAL_STORAGE");
@@ -3637,8 +3800,13 @@ namespace AutoAndroid
             this.Shell(" pm grant " + package + " android.permission.RECORD_AUDIO");
             this.Shell(" pm grant " + package + " android.permission.CALL_PHONE");
             this.Shell("pm grant " + package + " android.permission.MANAGE_EXTERNAL_STORAGE");
-            this.Shell("pm grant " + package + " android.permission.MANAGE_EXTERNAL_STORAGE");
 
+            // Android 13+ (SDK 33): quyền "Storage" trên UI ánh xạ sang READ_MEDIA_*.
+            // Lệnh grant cho permission không tồn tại sẽ báo lỗi nhưng KHÔNG gây hại -> bỏ qua.
+            this.Shell("pm grant " + package + " android.permission.READ_MEDIA_IMAGES");
+            this.Shell("pm grant " + package + " android.permission.READ_MEDIA_VIDEO");
+            this.Shell("pm grant " + package + " android.permission.READ_MEDIA_AUDIO");
+            this.Shell("pm grant " + package + " android.permission.READ_MEDIA_VISUAL_USER_SELECTED");
         }
         public async Task<string> GetIp(string state = "")
         {

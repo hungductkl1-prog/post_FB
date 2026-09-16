@@ -11,7 +11,7 @@ namespace Sunny.Subd.Core.Proxies
             string error = string.Empty;
             try
             {
-                var client = new HttpClient();
+                var client = ProxyService.Http;
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.kiotproxy.com/api/v1/proxies/current?key={token}");
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
@@ -41,7 +41,7 @@ namespace Sunny.Subd.Core.Proxies
             string error = string.Empty;
             try
             {
-                var client = new HttpClient();
+                var client = ProxyService.Http;
                 var request = new HttpRequestMessage(HttpMethod.Get, $"https://api.kiotproxy.com/api/v1/proxies/new?key={token}");
                 var response = await client.SendAsync(request);
                 response.EnsureSuccessStatusCode();

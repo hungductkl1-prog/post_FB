@@ -68,11 +68,31 @@ namespace Sunny.Subd.Core.Facebook
                 _main = main;
                 Stopwatch.Restart();
                 string _case = string.Empty;
+                // Cấp quyền Storage TRƯỚC khi mở app để Facebook không bật hộp thoại
+                // "Cho phép truy cập bộ nhớ?" chen ngang lúc đăng nhập. AppClear ở luồng
+                // chuẩn bị đã xóa quyền nên phải cấp lại MỖI lần đăng nhập.
+                try
+                {
+                    client.GrantAppPermissions(FacebookHander.Package(PlatformModel.Facebook));
+                }
+                catch { /* không chặn luồng login nếu grant lỗi */ }
+                List<string> xpaths = new List<string>();
+                xpaths.Add("//*[@content-desc=\"Use free of charge with ads\"]");
+                xpaths.AddRange(FacebookHander.GetActiAccountFacebook());
                 while (true)
                 {
                     CheckStop(timeout);
                     SetStatus("Đang tìm cửa sổ đăng nhập...", 2);
-                    _case = client.FindElement("", FacebookHander.GetActiAccountFacebook(), 60);
+                    // Quét & bấm nút Dismiss TRƯỚC khi khớp nhóm. Dialog Facebook chồng lên màn nền
+                    // và dump bắt được node của cả màn nền; GetActiAccountFacebook có 127 xpath đứng
+                    // TRƯỚC NavigationButton (CP282/Loading/Captcha/.../MetaAdsConsent) nên một node
+                    // nền khớp trước sẽ nuốt mất lượt của Dismiss -> kẹt. Xem FacebookHander.
+                    if (FacebookHander.TryClickAnyDismiss(client))
+                    {
+                        client.Delay(1);
+                        continue;
+                    }
+                    _case = client.FindElement("", xpaths, 60);
                     if (string.IsNullOrEmpty(_case))
                     {
                         client.AppStart(FacebookHander.Package(PlatformModel.Facebook), true, true, true);
@@ -81,6 +101,12 @@ namespace Sunny.Subd.Core.Facebook
                     SetStatus("Đang xử lý...", 2, logDetail: $"[FacebookService.Login] case={_case}");
                     switch (_case)
                     {
+                        case "//*[@content-desc=\"Use free of charge with ads\"]":
+                            client.ElementWithAttributes(_case, 5);
+                            client.Delay(2);
+                            client.ElementWithAttributes("//*[@content-desc=\"Continue\"]", 5);
+                            client.Delay(2);
+                            break;
                         case var c when XpathManagerFacebook.Get(XpathType.Loading).Contains(c): continue;
                         case var c when XpathManagerFacebook.Get(XpathType.CP282).Contains(c):
                             subyEnum = SubdyEnum.CP_282;
@@ -112,11 +138,10 @@ namespace Sunny.Subd.Core.Facebook
                             }
 
                         case var c when XpathManagerFacebook.Get(XpathType.Block).Contains(c):
-                            if (c == $"//*[contains(@text, \"Dismiss\")]")
-                            {
-                                client.ElementWithAttributes(c, 1);
-                                continue;
-                            }
+                            // "Dismiss" đã được GỠ khỏi nhóm Block (xem XpathManagerFacebook) nên
+                            // nhánh special-case cũ (click Dismiss) ở đây thành code chết. Hộp thoại
+                            // dismiss-được giờ rơi xuống case NavigationButton bên dưới để click;
+                            // Block thật (3 marker cụ thể) vẫn ném như cũ.
                             subyEnum = SubdyEnum.Block;
                             message = $"Tài khoản bị chặn [{ExtractReadable(c)}]";
                             throw new SubdyExtension(subyEnum, message);
@@ -136,6 +161,14 @@ namespace Sunny.Subd.Core.Facebook
                                 client.AppStart("com.facebook.katana");
                                 continue;
                             }
+                            // Cấp lại quyền Storage sau khi đăng nhập thành công để Facebook
+                            // chạy ẩn/nền được. AppClear ở luồng chuẩn bị đã xóa các quyền này
+                            // nên PHẢI cấp lại MỖI lần đăng nhập (READ/WRITE_EXTERNAL + READ_MEDIA_* trên Android 13+).
+                            try
+                            {
+                                client.GrantAppPermissions(FacebookHander.Package(PlatformModel.Facebook));
+                            }
+                            catch { /* không chặn luồng login nếu grant lỗi */ }
                             subyEnum = SubdyEnum.Success;
                             message = $"Đăng nhập thành công [{ExtractReadable(c)}]";
                             return new SubdyExtension(subyEnum, message);
@@ -147,6 +180,9 @@ namespace Sunny.Subd.Core.Facebook
                             break;
                         case var c when XpathManagerFacebook.Get(XpathType.TowFA).Contains(c):
                             await Import2FA();
+                            break;
+                        case var c when XpathManagerFacebook.Get(XpathType.MetaAdsConsent).Contains(c):
+                            await FacebookHander.TryHandleMetaAdsConsentAsync(client);
                             break;
                         case var c when XpathManagerFacebook.Get(XpathType.NavigationButton).Contains(c):
                             client.ElementWithAttributes(c, 1);
@@ -332,12 +368,25 @@ namespace Sunny.Subd.Core.Facebook
             string message = "Lỗi trong quá trình kiểm tra tài khoản!";
             const int MAX_RELOGIN_ATTEMPTS = 2;
             int reloginAttempts = 0;
+            // Cấp quyền Storage trước khi mở/khởi động lại app để tránh hộp thoại
+            // "Cho phép truy cập bộ nhớ?" chen ngang lúc kiểm tra tài khoản.
+            try
+            {
+                client.GrantAppPermissions(FacebookHander.Package(PlatformModel.Facebook));
+            }
+            catch { /* không chặn luồng nếu grant lỗi */ }
             while (true)
             {
                 if (client.IsRunningApp(FacebookHander.Package(PlatformModel.Facebook)) == false && !client.ElementWithAttributes("//*[@text=\"Close app\"]"))
                 {
                     client.AppStart(FacebookHander.Package(PlatformModel.Facebook), true, true, true);
                     client.Delay(5);
+                    continue;
+                }
+                // Quét & bấm nút Dismiss TRƯỚC khi khớp nhóm — xem ghi chú ở FacebookService.Login.
+                if (FacebookHander.TryClickAnyDismiss(client))
+                {
+                    client.Delay(1);
                     continue;
                 }
                 _case = client.FindElement("", FacebookHander.GetActiAccountFacebook(), timeout);
@@ -637,6 +686,42 @@ namespace Sunny.Subd.Core.Facebook
         {
             _sate = "Xử lý mất kết nối internet";
             SetStatus("Phát hiện mất kết nối internet, đang xử lý...", 2);
+
+            // ── FIX B2 (proxy-aware) ──
+            // Kiểm tra internet có đi qua proxy VAT (tun0) TRƯỚC khi đụng WiFi. Khi tool nối
+            // proxy bằng VAT VPN (com.vat.vpn), route mạng nằm trên interface tun0, KHÔNG phải
+            // WiFi vật lý. Lúc đó bật/tắt WiFi (svc wifi disable/enable) là VÔ DỤNG — thậm chí
+            // `svc wifi disable` có thể làm RỚT route mà tunnel đang phụ thuộc. Nên nếu tun0
+            // đang up: KHÔNG toggle WiFi, chỉ re-check IP; hết IP thật sự -> throw No_Internet
+            // (bỏ qua tài khoản, vòng lặp ngoài sẽ đổi proxy MỚI cho tài khoản kế).
+            //
+            // ── FIX B3 (bỏ reboot cứng) ──
+            // TRƯỚC ĐÂY handler này kết thúc bằng RebootAndWaitForDeviceReady() = kernel reboot.
+            // Đó là nguồn MẤT VIEW PHONE HOÀN TOÀN (bootreason=shutdown,shell) + treo sau reboot
+            // do mồ côi VirtualDisplay. Giờ thay reboot bằng `throw No_Internet` -> HanderCase
+            // (MainService) chỉ đánh dấu State="No_Internet" rồi `continue` sang tài khoản khác,
+            // KHÔNG reboot, GIỮ nguyên view phone. Mục tiêu: tool không bao giờ tự làm mất view.
+            bool tunUp = (_client.Shell("ip", "link", "show") ?? string.Empty).Contains("tun0");
+            if (tunUp)
+            {
+                SetStatus("Internet đang qua proxy (tun0) — không bật/tắt WiFi, kiểm tra lại IP...", 2);
+                for (int i = 1; i <= 3; i++)
+                {
+                    _client.Delay(5);
+                    string ipProxy = await _client.GetIp();
+                    if (!string.IsNullOrEmpty(ipProxy))
+                    {
+                        SetStatus($"Đã có internet qua proxy, IP: {ipProxy}", 2);
+                        return;
+                    }
+                    SetStatus($"Chưa có IP qua proxy, kiểm tra lần {i}/3...", 2);
+                }
+                SetStatus("Không có internet qua proxy — bỏ qua tài khoản (KHÔNG reboot, giữ view phone).", 3);
+                throw new SubdyExtension(SubdyEnum.No_Internet, "[FacebookService.HandleNoInternet] Internet qua proxy (tun0) không có IP sau 3 lần kiểm tra — bỏ qua tài khoản thay vì reboot (giữ view phone).");
+            }
+
+            // Không có tun0 -> internet đi qua WiFi vật lý / Mobile data. Bật/tắt WiFi để khôi
+            // phục route (như luồng cũ). KHÔNG reboot kể cả khi 5 lần thất bại.
             int maxRetry = 5;
             for (int i = 1; i <= maxRetry; i++)
             {
@@ -657,19 +742,9 @@ namespace Sunny.Subd.Core.Facebook
                 }
             }
 
-            SetStatus("Thử wifi 5 lần thất bại, đang khởi động lại thiết bị...", 2);
-            _client.RebootAndWaitForDeviceReady();
-            _client.Delay(30);
-
-            string ipAfterReboot = await _client.GetIp();
-            if (!string.IsNullOrEmpty(ipAfterReboot))
-            {
-                SetStatus($"Sau khởi động lại đã có internet, IP: {ipAfterReboot}", 2);
-                return;
-            }
-
-            SetStatus("Không có internet sau khởi động lại, dừng luồng thiết bị.", 3);
-            throw new SubdyExtension(SubdyEnum.No_Internet, "[FacebookService.HandleNoInternet] Thiết bị không có internet sau khi thử wifi 5 lần và khởi động lại.");
+            // FIX B3: 5 lần WiFi thất bại -> bỏ qua tài khoản, KHÔNG reboot (giữ view phone).
+            SetStatus("Thử wifi 5 lần thất bại — bỏ qua tài khoản (KHÔNG reboot, giữ view phone).", 3);
+            throw new SubdyExtension(SubdyEnum.No_Internet, "[FacebookService.HandleNoInternet] Thiết bị không có internet sau khi thử wifi 5 lần — bỏ qua tài khoản thay vì reboot (giữ view phone).");
         }
     }
 }

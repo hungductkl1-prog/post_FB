@@ -62,6 +62,24 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
                 return;
             }
 
+            // Ô URL là danh sách nhiều dòng; mỗi dòng một URL. Kiểm tra có ít nhất
+            // một dòng hợp lệ (chứa "://") để không lưu hành động rỗng.
+            var urls = txtPandoraUrl.Text
+                .Split(new[] { '\r', '\n', '|' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(x => x.Trim())
+                .Where(x => x.Length > 0 && x.Contains("://"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (urls.Count == 0)
+            {
+                AntdHelper.NotifyWarn(this, "Cảnh báo", "Vui lòng nhập ít nhất một URL playlist/bài hát (mỗi dòng một URL)!");
+                return;
+            }
+
+            // Ghi lại danh sách đã làm sạch (bỏ dòng rỗng/trùng/dòng không phải URL).
+            txtPandoraUrl.Text = string.Join(Environment.NewLine, urls);
+
             string configJson = jsonConfig.GetJsonString();
 
             if (string.IsNullOrEmpty(actionId))

@@ -120,6 +120,10 @@ namespace Sunny.Subd.Core.Facebook
         private async Task ExtractAndUpdateAuthenticationInfoAsync()
         {
             if (!_client.IsRoot()) return;
+            // "Lưu cookie, token (root)" (checkBox10 của fSettingRegsiner): khi bỏ tích thì
+            // KHÔNG ghi Cookie/Token vào account/DB. Uid luôn phải lấy (account đăng ký mới),
+            // nên vẫn gọi GetAuthenticationInfo nhưng chỉ gán Uid.
+            bool saveCookieToken = _settingGeneral.GetBooleanValue("checkBox10", true);
             switch (_platform)
             {
                 case PlatformModel.Facebook:
@@ -133,8 +137,11 @@ namespace Sunny.Subd.Core.Facebook
                             throw new Exception("Chuỗi xác thực không hợp lệ.");
 
                         _account.Uid = parts[0];
-                        _account.Cookie = parts[2];
-                        _account.Token = parts[1];
+                        if (saveCookieToken)
+                        {
+                            _account.Cookie = parts[2];
+                            _account.Token = parts[1];
+                        }
 
                         break;
                     }
@@ -170,10 +177,20 @@ namespace Sunny.Subd.Core.Facebook
         }
 
         // Thay đổi thông tin thiết bị
+        // Kết quả bước đổi thiết bị của account hiện tại (ô trạng thái UI chỉ giữ dòng
+        // cuối cùng nên lưu lại để nhúng vào dòng trạng thái của bước đổi proxy).
+        private string _lastDeviceChange = string.Empty;
+
+        // Thay đổi thông tin thiết bị
+        // Luôn chạy và LUÔN chạy trước đổi proxy (ConnectAndPrepareDeviceAsync gọi
+        // ChangeInfoAsync rồi mới ChangeProxyAsync). Không gate theo checkBox1 nữa:
+        // toggle đó bị ẩn trong UI, giá trị lưu có thể false khiến bước đổi thiết bị
+        // bị bỏ qua im lặng (không in ra dòng log nào) rồi nhảy thẳng sang proxy.
         private async Task ChangeInfoAsync()
         {
-            if (!_settingGeneral.GetBooleanValue("checkBox1", true)) return;
             _sate = "Thay đổi thông tin thiết bị";
+            _client.LogHelper.SUCCESS(">>> BƯỚC ĐỔI THIẾT BỊ (chạy trước đổi proxy)");
+            _client.LogHelper.State = _sate;
             try
             {
                 SetStatus("Đang thay đổi thông tin thiết bị...", 2);
@@ -189,16 +206,19 @@ namespace Sunny.Subd.Core.Facebook
                 }
                 if (await _client.ChangInfo(filezip, backup, "", "VN"))
                 {
+                    _lastDeviceChange = $"Thiết bị OK [{_client.GetDeviceName()}]";
                     SetStatus($"Thành công. [{_client.GetDeviceName()}]", 2);
                 }
                 else
                 {
+                    _lastDeviceChange = $"Thiết bị LỖI [{_client.GetDeviceName()}]";
                     SetStatus($"Thất bại. [{_client.GetDeviceName()}]", 1);
                 }
             }
             catch (Exception ex)
             {
                 LogManager.Error(ex);
+                _lastDeviceChange = $"Thiết bị LỖI NGOẠI LỆ: {ex.Message}";
                 SetStatus(ex.Message, 1);
             }
         }
@@ -236,7 +256,18 @@ namespace Sunny.Subd.Core.Facebook
                     proxy = _account.Proxy;
                     break;
             }
-            SetStatus($"Loại: [{proxyType}] - [{proxy}]", 2);
+            // Nguồn proxy được cấu hình không trả về gì -> thử proxy đã gán cho tài khoản
+            // (cách bản cũ vẫn chạy) để luồng đăng ký không bỏ trống bước đổi proxy.
+            if (string.IsNullOrWhiteSpace(proxy))
+            {
+                string assigned = _account?.Proxy;
+                if (!string.IsNullOrWhiteSpace(assigned))
+                {
+                    proxy = assigned;
+                    SetStatus($"Nguồn [{proxyType}] trống, dùng proxy đã gán: {ProxyService.Mask(proxy)}.", 2);
+                }
+            }
+            SetStatus($"Loại: [{proxyType}] - {_lastDeviceChange} - [{ProxyService.Mask(proxy)}]", 2);
             if (!string.IsNullOrEmpty(proxy))
             {
                 _client.ConnectProxy(proxy);
@@ -277,6 +308,8 @@ namespace Sunny.Subd.Core.Facebook
         private async Task<string> GetProxyFromServiceAsync(Func<string, Task<string>> newProxyFunc, Func<string, Task<string>> getProxyFunc)
         {
             string key = ProxyService.GetProxy();
+            // Không có key (txtLines trống) thì trả về ngay thay vì gọi API với key rỗng.
+            if (string.IsNullOrWhiteSpace(key)) return string.Empty;
             return await newProxyFunc(key) ?? await getProxyFunc(key);
         }
 
@@ -385,7 +418,8 @@ namespace Sunny.Subd.Core.Facebook
                 }
 
                 SetStatus($"Reboot khi mất mạng quá {retryCount} lần", 2);
-                _client.RebootAndWaitForDeviceReady();
+                _client.RebootAndWaitForDeviceReady(
+                    $"checkBox4 'Reboot khi mất mạng' = BẬT, đã thử {retryCount} lần không có internet (job ĐĂNG KÝ FacebookRegsiner).");
                 return false;
             }
 
@@ -591,7 +625,9 @@ namespace Sunny.Subd.Core.Facebook
             if (timeout != 0 && _swTotal.IsRunning && _swTotal.ElapsedMilliseconds > timeout)
             {
                 SetStatus($"Tự reboot sau {_settingGeneral.GetIntType("numericUpDown2", 30)} phút.", 2);
-                _client.RebootAndWaitForDeviceReady();
+                int mins = _settingGeneral.GetIntType("numericUpDown2", 30);
+                _client.RebootAndWaitForDeviceReady(
+                    $"checkBox5 'Tự reboot sau N phút' = BẬT, đã chạy {mins} phút (job ĐĂNG KÝ FacebookRegsiner).");
                 _stopwatch.Restart();
                 return isReboot;
             }
@@ -618,6 +654,23 @@ namespace Sunny.Subd.Core.Facebook
                 _account.Running = true;
                 try
                 {
+                    // ── CHẶN MÀN HÌNH ĐEN SUỐT VÒNG ACCOUNT (v12) ──────────────────────────
+                    // Mirror-guard chạy NỀN suốt cửa sổ nguy hiểm (đổi thiết bị -> proxy ->
+                    // mở Facebook đăng ký). Trước đây guard chỉ sống trong Change() rồi Stop,
+                    // để hở đúng lúc mở FB (createSurface) khi mồ côi VirtualDisplay còn sót.
+                    // Guard KHÔNG kill system_server nên KHÔNG rớt tun0/VPN — an toàn cho FB.
+                    _client.MirrorGuardStart();
+
+                    // Recovery leak (DẠNG 2) ở ĐẦU account = điểm VPN-safe: proxy account MỚI
+                    // chưa nối (ConnectAndPrepareDeviceAsync(true) bên dưới mới đổi proxy),
+                    // proxy account trước không còn cần -> nếu phải kill system_server cũng
+                    // không mất VPN đang dùng. Bắt sớm TaskRecord rò rỉ tích lũy từ vòng trước.
+                    try { _client.maxChange?.RecoverFrameworkIfBlackScreenPublic(); }
+                    catch (Exception exR)
+                    {
+                        AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                            $"[{AutoAndroid.DeviceChangeLog.BuildTag}] FacebookRegsiner: recovery đầu account lỗi (bỏ qua): {exR.Message}");
+                    }
 
                     _sate = "Chuẩn bị thiết bị và proxy";
                     if (!await ConnectAndPrepareDeviceAsync(true)) continue;
@@ -627,6 +680,7 @@ namespace Sunny.Subd.Core.Facebook
 
                     _sate = "Đăng ký tài khoản Facebook mới";
                     var message = await ImportInfo();
+
                     if (message.SubdyEnum == SubdyEnum.Success)
                     {
                         if (_settingGeneral.GetBooleanValue("checkBox11", true))
@@ -647,6 +701,9 @@ namespace Sunny.Subd.Core.Facebook
                 }
                 finally
                 {
+                    // Tắt mirror-guard của vòng account (ref-count về 0 -> watchdog nền tắt).
+                    // Best-effort, không ném; đặt trước để luôn chạy kể cả khi phần dưới lỗi.
+                    _client.MirrorGuardStop();
                     if (_account != null)
                     {
                         _accountContext.Update(_account);
@@ -994,6 +1051,12 @@ namespace Sunny.Subd.Core.Facebook
 
             while (_stopwatch.ElapsedMilliseconds < _timeOut && !_ct.IsCancellationRequested)
             {
+                // Quét & bấm nút Dismiss TRƯỚC khi khớp nhóm — xem ghi chú ở FacebookHander.
+                if (FacebookHander.TryClickAnyDismiss(_client))
+                {
+                    _client.Delay(1);
+                    continue;
+                }
                 string currentCase = _client.FindElement("", listLogin, 120);
                 if (string.IsNullOrEmpty(currentCase))
                 {
@@ -1040,6 +1103,9 @@ namespace Sunny.Subd.Core.Facebook
                 switch (currentCase)
                 {
                     case "//*[@text=\"I agree\"]":
+                    case var x when XpathManagerFacebook.Get(XpathType.MetaAdsConsent).Contains(x):
+                        await FacebookHander.TryHandleMetaAdsConsentAsync(_client);
+                        break;
                     case var x when XpathManagerFacebook.Get(XpathType.NavigationButton).Contains(x):
                         _client.ElementWithAttributes(currentCase, 5);
                         await DelayMessageAsync(1, _account.Status, 2);
@@ -1138,6 +1204,9 @@ namespace Sunny.Subd.Core.Facebook
             var listLogin = new List<string>();
             listLogin.AddRange(XpathManagerFacebook.Combine(XpathType.CP282, XpathType.CP956, XpathType.ExistEmail, XpathType.Success));
             listLogin.AddRange(xpaths);
+            // Đứng TRƯỚC NavigationButton: trên màn "pay or consent" phần tử khớp đầu
+            // của NavigationButton là nút Continue mờ (click vô tác dụng) -> kẹt.
+            listLogin.AddRange(XpathManagerFacebook.Get(XpathType.MetaAdsConsent));
             listLogin.AddRange(XpathManagerFacebook.Get(XpathType.NavigationButton));
             listLogin.Add("//*[@text=\"I agree\"]");
             return listLogin;
@@ -1216,6 +1285,9 @@ namespace Sunny.Subd.Core.Facebook
                         _sate = "Chờ xác nhận từ Facebook";
                         _client.ElementWithAttributes(currentCase, 5);
                         return await Agreement();
+                    case var c when XpathManagerFacebook.Get(XpathType.MetaAdsConsent).Contains(c):
+                        await FacebookHander.TryHandleMetaAdsConsentAsync(_client);
+                        break;
                     case var c when XpathManagerFacebook.Get(XpathType.NavigationButton).Contains(c):
                     case var x when XpathManagerFacebook.Get(XpathType.Confim_Register).Contains(x):
                         _client.ElementWithAttributes(currentCase, 5);

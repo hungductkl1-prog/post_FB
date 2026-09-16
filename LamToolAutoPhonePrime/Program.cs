@@ -4,6 +4,7 @@ using DeviceId;
 using LamToolAutoPhonePrime.Utils;
 using LamToolAutoPhonePrime.Views.Forms;
 using Microsoft.Win32;
+using Sunny.Subd.Core.Facebook;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Models;
@@ -29,6 +30,19 @@ namespace LamToolAutoPhonePrime
             ComWrappers.RegisterForMarshalling(WinFormsComInterop.WinFormsComWrappers.Instance);
             ApplicationConfiguration.Initialize();
             Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+
+            // ── Nối dây hook popup TOÀN CỤC (thẻ Meta consent "pay or consent") ────────
+            // AutoAndroid KHÔNG reference Sunny.Subd.Core (chiều phụ thuộc ngược lại), nên
+            // hai delegate NÀY PHẢI được gán ở đây lúc khởi động — nếu thiếu,
+            // RunGlobalPopupInterceptor thấy detector=null và trả XML nguyên trạng, thẻ
+            // consent hiện ngoài luồng login sẽ làm 65 vòng lặp FindElement poll vô hạn mà
+            // KHÔNG bấm gì, KHÔNG log gì (xác minh LIVE 2026-09-10 trên 520058f34d7c947b).
+            // App này cũng chạy job FacebookRegsiner (ucdgvAccount.cs) nên cần y hệt
+            // Facebook-Farm-NewFeed-PostStory/Program.cs. Hook đặt trong ADBClient.GetXMLSource
+            // — ĐIỂM THẮT mọi vòng lặp đều đi qua. Detector chỉ đọc chuỗi (rẻ); Interceptor mới
+            // tap/swipe và tự chống đệ quy bằng [ThreadStatic] _popupInterceptorBusy.
+            ADBClient.GlobalPopupDetector = FacebookHander.IsGlobalPopup;
+            ADBClient.GlobalPopupInterceptor = FacebookHander.TryHandleGlobalPopup;
 
             // Splash hiển thị xuyên suốt giai đoạn kiểm tra môi trường + init.
             // Chạy trong UI thread riêng (STA) để spinner mượt khi main thread block I/O.

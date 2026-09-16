@@ -12,6 +12,7 @@ using Sunny.Subd.Core.Telegram;
 using Sunny.Subdy.Common.API;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Json;
+using Sunny.Subdy.Common.Logs;
 using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Common.Services;
 using Sunny.Subdy.Data.Context;
@@ -3919,6 +3920,19 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
                     await service.RunPandoraAsync();
                 else
                     await service.RunAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                device.Status = "Đã dừng theo yêu cầu.";
+                device.TypeColor = 1;
+            }
+            catch (Exception ex)
+            {
+                // Không để worker chết im: status phải phản ánh lỗi thay vì kẹt
+                // ở dòng trạng thái cũ, khiến người dùng tưởng tool đang chạy.
+                device.Status = $"Lỗi worker: {ex.Message}";
+                device.TypeColor = 1;
+                LogManager.Error(ex);
             }
             finally
             {

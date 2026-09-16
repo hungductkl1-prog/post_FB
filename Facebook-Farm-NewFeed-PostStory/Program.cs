@@ -3,6 +3,7 @@ using DeviceId;
 using Facebook_Farm_NewFeed_PostStory.Utils;
 using Facebook_Farm_NewFeed_PostStory.Views.Forms;
 using Microsoft.Win32;
+using Sunny.Subd.Core.Facebook;
 using Sunny.Subdy.Common.Helper;
 using Sunny.Subdy.Common.Models;
 using Sunny.Subdy.Data.Models;
@@ -50,6 +51,19 @@ namespace Facebook_Farm_NewFeed_PostStory
                 AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
             }
             catch { }
+
+            // ── Nối dây hook popup TOÀN CỤC (thẻ Meta consent "pay or consent") ────────
+            // AutoAndroid KHÔNG reference Sunny.Subd.Core (chiều phụ thuộc ngược lại), nên
+            // hai delegate NÀY PHẢI được gán ở đây lúc khởi động — nếu thiếu,
+            // RunGlobalPopupInterceptor thấy detector=null và trả XML nguyên trạng, thẻ
+            // consent hiện ngoài luồng login sẽ làm 65 vòng lặp FindElement poll vô hạn mà
+            // KHÔNG bấm gì, KHÔNG log gì (xác minh LIVE 2026-09-10 trên 520058f34d7c947b:
+            // 159 dump/30s, 0 click, activity không đổi). Hook đặt trong
+            // ADBClient.GetXMLSource — ĐIỂM THẮT mọi vòng lặp đều đi qua — nên vá được tất
+            // cả mà không phải sửa từng chỗ. Detector chỉ đọc chuỗi (rẻ); Interceptor mới
+            // tap/swipe và tự chống đệ quy bằng [ThreadStatic] _popupInterceptorBusy.
+            ADBClient.GlobalPopupDetector = FacebookHander.IsGlobalPopup;
+            ADBClient.GlobalPopupInterceptor = FacebookHander.TryHandleGlobalPopup;
 
             // Phase 5 grid diagnostics: set ACCOUNT_GRID_DIAG=1 before launch,
             // OR drop an empty marker file named "diag.on" next to the .exe (reliable for

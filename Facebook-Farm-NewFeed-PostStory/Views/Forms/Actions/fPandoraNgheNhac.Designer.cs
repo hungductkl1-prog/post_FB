@@ -29,6 +29,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             label5 = new Label();
             nudListenMinutesTo = new NumericUpDown();
             label6 = new Label();
+            label7 = new Label();
             groupBox1 = new GroupBox();
             groupBox2 = new GroupBox();
             ((System.ComponentModel.ISupportInitialize)nudListenMinutesFrom).BeginInit();
@@ -40,7 +41,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             //
             // btnSave
             //
-            btnSave.Location = new Point(497, 320);
+            btnSave.Location = new Point(497, 432);
             btnSave.Name = "btnSave";
             btnSave.Size = new Size(100, 36);
             btnSave.TabIndex = 3;
@@ -49,7 +50,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             //
             // btnCancel
             //
-            btnCancel.Location = new Point(607, 320);
+            btnCancel.Location = new Point(607, 432);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(100, 36);
             btnCancel.TabIndex = 4;
@@ -78,24 +79,36 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             label2.Name = "label2";
             label2.Size = new Size(150, 20);
             label2.TabIndex = 0;
-            label2.Text = "URL Playlist/Bài hát:";
+            label2.Text = "Danh sách URL Playlist/Bài hát:";
             //
             // txtPandoraUrl
             //
             txtPandoraUrl.Location = new Point(20, 96);
+            txtPandoraUrl.Multiline = true;
             txtPandoraUrl.Name = "txtPandoraUrl";
-            txtPandoraUrl.Size = new Size(672, 36);
+            txtPandoraUrl.ScrollBars = ScrollBars.Vertical;
+            txtPandoraUrl.Size = new Size(670, 150);
             txtPandoraUrl.TabIndex = 1;
             //
             // label3
             //
             label3.AutoSize = true;
             label3.ForeColor = Color.Gray;
-            label3.Location = new Point(20, 140);
+            label3.Location = new Point(20, 252);
             label3.Name = "label3";
             label3.Size = new Size(350, 16);
             label3.TabIndex = 0;
-            label3.Text = "Nhập URL playlist hoặc bài hát trên Pandora (vd: https://www.pandora.com/playlist/...)";
+            label3.Text = "Mỗi dòng một URL playlist hoặc bài hát trên Pandora (vd: https://www.pandora.com/playlist/...)";
+            //
+            // label7
+            //
+            label7.AutoSize = true;
+            label7.ForeColor = Color.Gray;
+            label7.Location = new Point(20, 274);
+            label7.Name = "label7";
+            label7.Size = new Size(350, 16);
+            label7.TabIndex = 0;
+            label7.Text = "Nghe lần lượt hết danh sách rồi mới chuyển tài khoản; mỗi URL có thời gian ngẫu nhiên riêng.";
             //
             // label4
             //
@@ -104,11 +117,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             label4.Name = "label4";
             label4.Size = new Size(105, 20);
             label4.TabIndex = 0;
-            label4.Text = "Ngẫu nhiên từ";
+            label4.Text = "Mỗi URL ngẫu nhiên từ";
             //
             // nudListenMinutesFrom
             //
-            nudListenMinutesFrom.Location = new Point(131, 24);
+            nudListenMinutesFrom.Location = new Point(180, 24);
             nudListenMinutesFrom.Maximum = new decimal(new int[] { 1440, 0, 0, 0 });
             nudListenMinutesFrom.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             nudListenMinutesFrom.Name = "nudListenMinutesFrom";
@@ -119,7 +132,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             // label5
             //
             label5.AutoSize = true;
-            label5.Location = new Point(237, 28);
+            label5.Location = new Point(286, 28);
             label5.Name = "label5";
             label5.Size = new Size(32, 20);
             label5.TabIndex = 0;
@@ -127,7 +140,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             //
             // nudListenMinutesTo
             //
-            nudListenMinutesTo.Location = new Point(275, 24);
+            nudListenMinutesTo.Location = new Point(324, 24);
             nudListenMinutesTo.Maximum = new decimal(new int[] { 1440, 0, 0, 0 });
             nudListenMinutesTo.Minimum = new decimal(new int[] { 1, 0, 0, 0 });
             nudListenMinutesTo.Name = "nudListenMinutesTo";
@@ -138,7 +151,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             // label6
             //
             label6.AutoSize = true;
-            label6.Location = new Point(381, 28);
+            label6.Location = new Point(430, 28);
             label6.Name = "label6";
             label6.Size = new Size(39, 20);
             label6.TabIndex = 0;
@@ -151,9 +164,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             groupBox1.Controls.Add(label2);
             groupBox1.Controls.Add(txtPandoraUrl);
             groupBox1.Controls.Add(label3);
+            groupBox1.Controls.Add(label7);
             groupBox1.Location = new Point(12, 12);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(710, 180);
+            groupBox1.Size = new Size(710, 302);
             groupBox1.TabIndex = 0;
             groupBox1.Text = "Cài đặt hành động";
             //
@@ -164,7 +178,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             groupBox2.Controls.Add(label5);
             groupBox2.Controls.Add(nudListenMinutesTo);
             groupBox2.Controls.Add(label6);
-            groupBox2.Location = new Point(12, 200);
+            groupBox2.Location = new Point(12, 322);
             groupBox2.Name = "groupBox2";
             groupBox2.Size = new Size(710, 100);
             groupBox2.TabIndex = 1;
@@ -174,7 +188,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
             //
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            ClientSize = new Size(734, 380);
+            ClientSize = new Size(734, 492);
             Controls.Add(groupBox1);
             Controls.Add(groupBox2);
             Controls.Add(btnSave);
@@ -208,6 +222,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms.Actions
         private Label label5;
         private NumericUpDown nudListenMinutesTo;
         private Label label6;
+        private Label label7;
         private GroupBox groupBox1;
         private GroupBox groupBox2;
     }

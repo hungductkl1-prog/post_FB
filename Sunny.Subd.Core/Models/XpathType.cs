@@ -32,5 +32,10 @@
         PandoraLikeButton,
         PandoraBackButton,
         PandoraPopupDismiss,
+
+        // Hộp thoại Meta "pay or consent" (EU) — xem XpathManagerFacebook +
+        // FacebookHander.TryHandleMetaAdsConsentAsync. Để CUỐI enum để không dịch
+        // giá trị các member đã có.
+        MetaAdsConsent,
     }
 }

@@ -414,7 +414,7 @@ namespace Sunny.Subd.Core.Instagram
                     proxy = _account.Proxy;
                     break;
             }
-            SetStatus($"Loại: [{proxyType}] - [{proxy}]", 2);
+            SetStatus($"Loại: [{proxyType}] - [{ProxyService.Mask(proxy)}]", 2);
             if (!string.IsNullOrEmpty(proxy))
             {
                 string ip = await CheckProxyAsync(proxy);
