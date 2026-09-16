@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>AntdUI.EmojiFluentFlat</name>
+    </assembly>
+    <members>
+        <member name="M:AntdUI.FluentFlat.CompressString(System.String)">
+            <summary>
+            压缩字符串
+            </summary>
+            <param name="text">待压缩的字符串</param>
+            <returns>压缩后的 Base64 编码字符串</returns>
+        </member>
+        <member name="M:AntdUI.FluentFlat.DecompressString(System.String)">
+            <summary>
+            解压缩字符串
+            </summary>
+            <param name="compressedText">压缩后的 Base64 编码字符串</param>
+            <returns>解压缩后的字符串</returns>
+        </member>
+        <member name="T:AntdUI.EmojiFluentFlat.Properties.Resources">
+            <summary>
+              A strongly-typed resource class, for looking up localized strings, etc.
+            </summary>
+        </member>
+        <member name="P:AntdUI.EmojiFluentFlat.Properties.Resources.ResourceManager">
+            <summary>
+              Returns the cached ResourceManager instance used by this class.
+            </summary>
+        </member>
+        <member name="P:AntdUI.EmojiFluentFlat.Properties.Resources.Culture">
+            <summary>
+              Overrides the current thread's CurrentUICulture property for all
+              resource lookups using this strongly typed resource class.
+            </summary>
+        </member>
+        <member name="P:AntdUI.EmojiFluentFlat.Properties.Resources.D">
+            <summary>
+              Looks up a localized string similar to H4sIAAAAAAAACuy9y64tS3ae9yoTpY7dUDLuF4MkUGeeOliNdQC3VmN3BEOkKAKEJehCueGGOrbphkVTakiiBNA2IMi2DEMtwzZg6134AuYjGN//R2TOOWvXOtsQIIiWahfOypgZGRm3jBgxxj/+8Wd/8s/+q//o1//m7//O7fd/97f/znd/7T/7jZ+FW7jldMvpZ7ff/PW//p/8rb96+63f+NmPcRy99XGL8ajxPeajlj5u6Zg5hHiP+UhB6VxDiLeYjjpJk38mrt7qkXMf93yMoTvpmL2PWz5q45F8NH4vx0iUWI9Agf2IKrAdg7fPIxaS84iRyoSj3ecxKCfGI05+GXFXk//2sVNvqwlffnb7K7/7e7/3Gz/7CyH08t3Pf/ZrD81M7WhV1U3hCK2Pe5xHXk0ZLu1s5DjKQyfQKSmdb0vhSLGPe4pHPOtwS2nVXLVNyZ2hdqR6xPzQxtSOyYv7EdVBaRw5PvRQmkeIDx2YxhE1BrezEY9N/Xn7xfdP [rest of string was truncated]&quot;;.
+            </summary>
+        </member>
+    </members>
+</doc>

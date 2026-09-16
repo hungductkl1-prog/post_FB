@@ -482,51 +482,75 @@ namespace Sunny.Subd.Core.Facebook
                 loginStreak = 0; // trang không phải login -> reset streak
 
                 // (a3) Chrome First-Run sau khi `pm clear` đưa Chrome về như mới (XẢY RA MỖI LẦN KHÁNG).
-                // First-Run có 2 TRANG liên tiếp (verify LIVE 2026-09-16 — 13 device kẹt đúng màn này):
+                // First-Run là CHUỖI TRANG liên tiếp (verify LIVE 2026-09-16 trên 20 device):
                 //   TRANG 1: "Welcome to Chrome" + nút "Accept & continue" (rid terms_accept)
-                //   TRANG 2: sign-in — "Add account to device" (signin_fre_continue_button) +
+                //   TRANG 2a (sign-in): "Add account to device" (signin_fre_continue_button) +
                 //            "Use without an account" (signin_fre_dismiss_button)
-                // GỐC RỄ KẸT: gate CŨ chỉ tap terms_accept (nút trang 1) nhưng marker "welcome to
-                // chrome" KHỚP CẢ TRANG 2 (title giữ nguyên) -> sang trang 2 gate fire mà tap TRƯỢT
-                // (terms_accept không tồn tại) -> vòng lặp tap hụt -> KẸT First-Run mãi mãi.
-                // FIX: gate chung marker của CẢ 2 trang, tap tuần tự terms_accept RỒI
-                // signin_fre_dismiss_button (bỏ qua sign-in để KHÔNG gắn Google account vào Chrome farm).
-                // BẪY raw dump giữ nguyên: "&" bị escape thành "&amp;" nên literal phải viết escape.
+                //   TRANG 2b (SYNC — verify LIVE 2026-09-16, 11 device KẸT đúng màn này):
+                //            "Turn on sync?" + "No thanks" (negative_button) + "Add account"
+                //            (positive_button) — biến thể này KHÔNG có 2 nút signin_fre_*.
+                // GỐC RỄ KẸT: gate CŨ khớp marker chung ("fre_pager"/"welcome to chrome" — có ở MỌI
+                // trang) nhưng CHỈ tap nút trang 1 -> sang trang 2a/2b gate fire mà tap TRƯỢT ->
+                // vòng lặp tap hụt -> KẸT First-Run mãi mãi. Gate sync cũ nằm DƯỚI gate (a3) nên
+                // là DEAD CODE: (a3) khớp trước qua fre_pager và NUỐT màn sync trước khi tới nó.
+                // FIX: gate CHUNG mọi trang, tap TUẦN TỰ 1 -> 2a -> 2b, re-dump sau mỗi bước để
+                // biết trang kế tiếp là biến thể nào (bỏ sign-in/sync để KHÔNG gắn Google account
+                // vào Chrome farm). BẪY raw dump giữ nguyên: "&" escape thành "&amp;".
                 if (Contains(xml, "terms_accept", "fre_pager", "signin_fre_dismiss_button",
                                   "signin_fre_continue_button", "welcome to chrome", "accept &amp; continue",
                                   "chào mừng bạn đến với chrome", "chấp nhận và tiếp tục",
                                   "use without an account", "dùng mà không cần tài khoản",
-                                  "add account to device", "thêm tài khoản vào thiết bị"))
+                                  "add account to device", "thêm tài khoản vào thiết bị",
+                                  "turn on sync", "bật đồng bộ", "no thanks", "không, cảm ơn"))
                 {
-                    report("Chrome First-Run: bấm Accept & continue...", 2, null);
-                    if (!TapByResourceId(client, xml, "com.android.chrome:id/terms_accept"))
-                        TapByMarkers(client, xml, "Accept & continue", "Chấp nhận và tiếp tục");
-                    client.Delay(3);
-                    // TRANG 2 (sign-in): dump lại vì trang 2 có thể chưa render ở dump trên.
-                    string xmlFre2 = client.GetXMLSource();
-                    if (!string.IsNullOrEmpty(xmlFre2) &&
-                        Contains(xmlFre2, "signin_fre_dismiss_button", "signin_fre_continue_button",
-                                 "fre_pager", "use without an account", "add account to device",
+                    // TRANG 1: Accept & continue (đang ở trang 2 thì terms_accept không có -> bỏ qua).
+                    if (Contains(xml, "terms_accept", "accept &amp; continue", "chấp nhận và tiếp tục"))
+                    {
+                        report("Chrome First-Run: bấm Accept & continue...", 2, null);
+                        if (!TapByResourceId(client, xml, "com.android.chrome:id/terms_accept"))
+                            TapByMarkers(client, xml, "Accept & continue", "Chấp nhận và tiếp tục");
+                        client.Delay(3);
+                        xml = client.GetXMLSource();
+                    }
+                    bool hitSignIn = false, hitSync = false;
+                    // TRANG 2a (sign-in): dump lại vì trang 2 có thể chưa render ở dump trên.
+                    if (!string.IsNullOrEmpty(xml) &&
+                        Contains(xml, "signin_fre_dismiss_button", "signin_fre_continue_button",
+                                 "use without an account", "add account to device",
                                  "dùng mà không cần tài khoản", "thêm tài khoản vào thiết bị"))
                     {
+                        hitSignIn = true;
                         report("Chrome First-Run: bấm Use without an account (bỏ qua sign-in)...", 2, null);
-                        if (!TapByResourceId(client, xmlFre2, "com.android.chrome:id/signin_fre_dismiss_button"))
-                            TapByMarkers(client, xmlFre2, "Use without an account",
+                        if (!TapByResourceId(client, xml, "com.android.chrome:id/signin_fre_dismiss_button"))
+                            TapByMarkers(client, xml, "Use without an account",
                                          "Dùng mà không cần tài khoản", "Sử dụng mà không có tài khoản");
                         client.Delay(3);
+                        xml = client.GetXMLSource();
+                    }
+                    // TRANG 2b (sync): No thanks — biến thể này CHỈ có negative_button/positive_button.
+                    if (!string.IsNullOrEmpty(xml) &&
+                        Contains(xml, "turn on sync", "bật đồng bộ", "no thanks", "không, cảm ơn"))
+                    {
+                        hitSync = true;
+                        report("Chrome First-Run (sync): bấm No thanks (không bật sync)...", 2, null);
+                        if (!TapByResourceId(client, xml, "com.android.chrome:id/negative_button"))
+                            TapByMarkers(client, xml, "No thanks", "Không, cảm ơn");
+                        client.Delay(3);
+                    }
+                    // LƯỚI CUỐI cho prompt cùng họ nút "No thanks" (vd default-browser) mà 2 sub-gate
+                    // trên không nhận ra. CHỈ chạy khi cả 2 sub-gate KHÔNG fire — nếu không sẽ tap
+                    // THÊM một lần theo toạ độ dump CŨ lên màn đã chuyển (dễ tap nhầm trang FB).
+                    if (!hitSignIn && !hitSync && !string.IsNullOrEmpty(xml) &&
+                        Contains(xml, "no thanks", "không, cảm ơn"))
+                    {
+                        report("Chrome prompt: bấm No thanks...", 2, null);
+                        TapByMarkers(client, xml, "No thanks", "Không, cảm ơn");
+                        client.Delay(2);
                     }
                     // Chrome có thể ĐÁNH RƠI intent URL khi hiện First-Run trước -> mở lại FB để chắc
                     // chắn trang checkpoint/login được tải sau khi accept.
                     OpenFacebookInChrome(client, AppealUrl);
                     client.Delay(4);
-                    continue;
-                }
-                if (Contains(xml, "turn on sync", "bật đồng bộ"))
-                {
-                    TapByMarkers(client, xml, "No thanks", "Không, cảm ơn");
-                    client.Delay(3);
-                    OpenFacebookInChrome(client, AppealUrl);
-                    client.Delay(3);
                     continue;
                 }
 

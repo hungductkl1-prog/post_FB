@@ -1,0 +1,4 @@
+﻿Sunny.Subd.Core/Services/MainService.cs | HEAD ffd=0 | INDEX ffd=0 | WORK ffd=220
+Sunny.Subd.Core/Facebook/FacebookHander.cs | HEAD ffd=1 | INDEX ffd=1 | WORK ffd=1
+Sunny.Subd.Core/Facebook/FacebookFarming.cs | HEAD ffd=0 | INDEX ffd=0 | WORK ffd=0
+Sunny.Subd.Core/Utils/XpathManagerFacebook.cs | HEAD ffd=0 | INDEX ffd=0 | WORK ffd=0

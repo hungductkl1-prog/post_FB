@@ -1,0 +1,1238 @@
+diff --git a/Facebook-Farm-NewFeed-PostStory/Views/Controls/ucdgvAccount.cs b/LamToolAutoPhonePrime/Views/Controls/ucdgvAccount.cs
+index 1a76739..355f7f5 100644
+--- a/Facebook-Farm-NewFeed-PostStory/Views/Controls/ucdgvAccount.cs
++++ b/LamToolAutoPhonePrime/Views/Controls/ucdgvAccount.cs
+@@ -1,8 +1,8 @@
+ ﻿using AntdUI;
+ using AutoAndroid;
+-using Facebook_Farm_NewFeed_PostStory.Utils;
+-using Facebook_Farm_NewFeed_PostStory.Utils.Design;
+-using Facebook_Farm_NewFeed_PostStory.Views.Forms;
++using LamToolAutoPhonePrime.Utils;
++using LamToolAutoPhonePrime.Utils.Design;
++using LamToolAutoPhonePrime.Views.Forms;
+ using Sunny.Subd.Core.Facebook;
+ using Sunny.Subd.Core.Utils;
+ using Sunny.Subd.Core.Models;
+@@ -22,7 +22,7 @@ using System.Threading.Tasks;
+ using CommonMethod = Sunny.Subdy.Common.ControlMethod.CommonMethod;
+ using File = System.IO.File;
+ 
+-namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
++namespace LamToolAutoPhonePrime.Views.Controls
+ {
+     public partial class ucdgvAccount : UserControl
+     {
+@@ -34,11 +34,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         private readonly ConfigHelper _configHelper;
+         private readonly JobHistoryContext _jobHistoryContext;
+         public List<Account> _accounts;
+-        // VirtualMode: danh sách đang hiển thị (sau filter). Grid không còn DataSource;
+-        // CellValueNeeded đọc trực tiếp từ _view[rowIndex]. Tránh tạo 5000 DataGridViewRow.
+-        private List<Account> _view = new List<Account>();
+-        private int _sortColumnIndex = -1;
+-        private SortOrder _sortOrder = SortOrder.None;
++        private SortableBindingList<Account> bindingList;
+         private List<string> _folderNames = new List<string>();
+         private readonly ScriptContext _scriptContext;
+         private System.Windows.Forms.Timer _countsTimer;
+@@ -56,20 +52,29 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+ 
+             _accounts = new List<Account>();
+             _scriptContext = new ScriptContext();
+-            _view = new List<Account>();
++            bindingList = new SortableBindingList<Account>(_accounts);
+             _jobHistoryContext = new JobHistoryContext();
+ 
+             // Visual setup (style chung do GridStyleHelper + SsaTheme quản lý)
+             dataGridView1.AutoGenerateColumns = false;
+-            // VirtualMode: grid chỉ render rows đang hiển thị, lấy data từ _view qua
+-            // CellValueNeeded → không tạo vật lý 5000+ DataGridViewRow nữa (root cause đơ UI).
+-            dataGridView1.VirtualMode = true;
++            dataGridView1.AlternatingRowsDefaultCellStyle.BackColor = Color.White;
++
++            // Double buffering để giảm flicker với 20k rows
++            typeof(DataGridView).InvokeMember("DoubleBuffered",
++                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty,
++                null, dataGridView1, new object[] { true });
++
++            var defaultFont = new Font(FontUtil._fontSemiBold, 9F, FontStyle.Bold);
++            dataGridView1.DefaultCellStyle = new DataGridViewCellStyle
++            {
++                BackColor = Color.White,
++                ForeColor = ColorTranslator.FromHtml("#1A1A1A"),
++                SelectionBackColor = Color.FromArgb(0, 120, 215),
++                SelectionForeColor = Color.White,
++                Font = defaultFont
++            };
+             dataGridViewCheckBoxColumn1.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+-            // VirtualMode không bind DataSource → bỏ DataPropertyName, checkbox tự quản qua CellValueNeeded.
+-            dataGridViewCheckBoxColumn1.DataPropertyName = string.Empty;
+-            // ReadOnly: chặn edit-machinery của grid (EditOnEnter) toggle checkbox song song với
+-            // CellClick → tránh double-toggle triệt tiêu lẫn nhau. Toggle hoàn toàn qua CellClick.
+-            dataGridViewCheckBoxColumn1.ReadOnly = true;
++            dataGridViewCheckBoxColumn1.DataPropertyName = nameof(Account.Checked);
+ 
+             _form = form;
+             _platform = platform;
+@@ -80,10 +85,6 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             dataGridView1.SelectionChanged += DataGridView_SelectionChanged;
+             dataGridView1.CellFormatting += uiDataGridView1_CellFormatting;
+             dataGridView1.RowPrePaint += DataGridView1_RowPrePaint;
+-            dataGridView1.CellValueNeeded += DataGridView1_CellValueNeeded;
+-            dataGridView1.CellValuePushed += DataGridView1_CellValuePushed;
+-            dataGridView1.CellClick += DataGridView1_CellClick;
+-            dataGridView1.ColumnHeaderMouseClick += DataGridView1_ColumnHeaderMouseClick;
+             dataGridView1.RowTemplate.Height = Math.Max(22, dataGridView1.RowTemplate.Height);
+ 
+             _folderContext = new FolderContext();
+@@ -101,9 +102,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             menulist = null;
+             CreateMenuStrip();
+ 
+-            dataGridViewCheckBoxColumn1.Width = 40;
+-            dataGridViewCheckBoxColumn1.MinimumWidth = 40;
+-            dataGridViewCheckBoxColumn1.Resizable = DataGridViewTriState.True;
++            NormalizeAccountSelectorColumn();
+ 
+             dataGridViewTextBoxColumn1.Width = 40;
+             dataGridViewTextBoxColumn1.MinimumWidth = 40;
+@@ -112,14 +111,13 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+ 
+             // Empty state: delegated to SsaTheme.ApplyUcAccount (SSA styled)
+ 
+-            // Update checked/running counts via timer - dùng cached values, không LINQ mỗi giây.
+-            // Với >5000 acc, đếm lại mỗi giây trên UI thread gây giật → chỉ đếm khi nhỏ, còn lại
+-            // dùng cached (cập nhật ngay tại các thao tác tick/bỏ tick và sau LoadAccounts).
++            // Update checked/running counts via timer - dùng cached values, không LINQ mỗi giây
+             _countsTimer = new System.Windows.Forms.Timer { Interval = 2000 };
+             _countsTimer.Tick += (s, e) =>
+             {
+                 var snapshot = _accounts;
+                 if (snapshot == null) return;
++                // Chỉ đếm khi số lượng nhỏ (<= 5000), còn lại dùng cached
+                 if (snapshot.Count <= 5000)
+                 {
+                     _cachedCheckedCount = snapshot.Count(x => x.Checked);
+@@ -155,6 +153,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             }
+             ControlHelper.LoadConfigColums(dataGridView1, hideList);
+             ForceHideInternalColumns(dataGridView1);
++            NormalizeAccountSelectorColumn();
+ 
+             // Tooltip cho các icon button quản lý nhóm
+             var toolTip = new ToolTip { AutoPopDelay = 3000, InitialDelay = 300, ReshowDelay = 200 };
+@@ -188,6 +187,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             // khi headers đã final để visibility đúng theo lựa chọn của user.
+             ControlHelper.LoadConfigColums(dataGridView1, hideList);
+             ForceHideInternalColumns(dataGridView1);
++            NormalizeAccountSelectorColumn();
+ 
+             // Re-apply column visibility sau khi ConfigHelper restore (Load fire sau ctor)
+             // → đảm bảo grid paint lần đầu đã có đúng cấu hình cột.
+@@ -195,6 +195,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             {
+                 ControlHelper.LoadConfigColums(dataGridView1, hideList);
+                 ForceHideInternalColumns(dataGridView1);
++                NormalizeAccountSelectorColumn();
+             };
+         }
+ 
+@@ -338,6 +339,132 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             }
+         }
+ 
++        private void NormalizeAccountSelectorColumn()
++        {
++            if (dataGridView1 == null || dataGridViewCheckBoxColumn1 == null) return;
++
++            dataGridViewCheckBoxColumn1.Visible = true;
++            dataGridViewCheckBoxColumn1.ReadOnly = true;
++            dataGridViewCheckBoxColumn1.DataPropertyName = nameof(Account.Checked);
++            dataGridViewCheckBoxColumn1.HeaderText = "Chọn";
++            dataGridViewCheckBoxColumn1.ToolTipText = "Chọn tài khoản để chạy chức năng";
++            dataGridViewCheckBoxColumn1.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
++            dataGridViewCheckBoxColumn1.Width = 56;
++            dataGridViewCheckBoxColumn1.MinimumWidth = 56;
++            dataGridViewCheckBoxColumn1.Resizable = DataGridViewTriState.False;
++            dataGridViewCheckBoxColumn1.ValueType = typeof(bool);
++            dataGridViewCheckBoxColumn1.SortMode = DataGridViewColumnSortMode.NotSortable;
++            dataGridViewCheckBoxColumn1.DefaultCellStyle = new DataGridViewCellStyle
++            {
++                Alignment = DataGridViewContentAlignment.MiddleCenter,
++                Padding = Padding.Empty,
++                NullValue = false,
++                ForeColor = Color.Transparent,
++                SelectionForeColor = Color.Transparent
++            };
++
++            if (dataGridViewCheckBoxColumn1.Index >= 0)
++                dataGridViewCheckBoxColumn1.DisplayIndex = 0;
++
++            dataGridView1.CellPainting -= DataGridView1_AccountCheckboxCellPainting;
++            dataGridView1.CellPainting += DataGridView1_AccountCheckboxCellPainting;
++            dataGridView1.CellClick -= DataGridView1_AccountSelectorCellClick;
++            dataGridView1.CellClick += DataGridView1_AccountSelectorCellClick;
++            dataGridView1.CurrentCellDirtyStateChanged -= DataGridView1_CurrentCellDirtyStateChanged;
++            dataGridView1.CurrentCellDirtyStateChanged += DataGridView1_CurrentCellDirtyStateChanged;
++        }
++
++        private void DataGridView1_AccountSelectorCellClick(object? sender, DataGridViewCellEventArgs e)
++        {
++            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
++            if (!IsAccountSelectorColumn(e.ColumnIndex)) return;
++            if (dataGridView1.Rows[e.RowIndex].DataBoundItem is not Account account) return;
++
++            account.Checked = !account.Checked;
++            dataGridView1.Rows[e.RowIndex].Cells[e.ColumnIndex].Value = account.Checked;
++            dataGridView1.InvalidateCell(e.ColumnIndex, e.RowIndex);
++            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_accounts.Count(x => x.Checked)}");
++        }
++
++        private void DataGridView1_CurrentCellDirtyStateChanged(object? sender, EventArgs e)
++        {
++            try
++            {
++                if (!dataGridView1.IsCurrentCellDirty) return;
++                if (dataGridView1.CurrentCell?.OwningColumn != dataGridViewCheckBoxColumn1) return;
++                dataGridView1.CommitEdit(DataGridViewDataErrorContexts.Commit);
++            }
++            catch
++            {
++            }
++        }
++
++        private void DataGridView1_AccountCheckboxCellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
++        {
++            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
++            if (!IsAccountSelectorColumn(e.ColumnIndex)) return;
++
++            bool selected = e.State.HasFlag(DataGridViewElementStates.Selected);
++            e.PaintBackground(e.CellBounds, selected);
++
++            bool isChecked = false;
++            if (e.Value is bool value)
++            {
++                isChecked = value;
++            }
++            else if (dataGridView1.Rows[e.RowIndex].DataBoundItem is Account account)
++            {
++                isChecked = account.Checked;
++            }
++
++            int boxSize = Math.Max(16, Math.Min(20, Math.Min(e.CellBounds.Width, e.CellBounds.Height) - 10));
++            var box = new Rectangle(
++                e.CellBounds.Left + (e.CellBounds.Width - boxSize) / 2,
++                e.CellBounds.Top + (e.CellBounds.Height - boxSize) / 2,
++                boxSize,
++                boxSize);
++
++            Color borderColor = isChecked ? ColorPalette.Primary : (selected ? Color.White : Color.FromArgb(120, 120, 120));
++            Color fillColor = isChecked ? ColorPalette.Primary : Color.White;
++
++            var oldSmoothing = e.Graphics.SmoothingMode;
++            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
++
++            using (var fill = new SolidBrush(fillColor))
++            using (var border = new Pen(borderColor, selected || isChecked ? 2F : 1.5F))
++            {
++                e.Graphics.FillRectangle(fill, box);
++                e.Graphics.DrawRectangle(border, box);
++            }
++
++            if (isChecked)
++            {
++                using var checkPen = new Pen(Color.White, 2F)
++                {
++                    StartCap = System.Drawing.Drawing2D.LineCap.Round,
++                    EndCap = System.Drawing.Drawing2D.LineCap.Round,
++                    LineJoin = System.Drawing.Drawing2D.LineJoin.Round
++                };
++
++                var p1 = new Point(box.Left + boxSize / 4, box.Top + boxSize / 2);
++                var p2 = new Point(box.Left + boxSize / 2 - 1, box.Bottom - boxSize / 4 - 1);
++                var p3 = new Point(box.Right - boxSize / 4, box.Top + boxSize / 3);
++                e.Graphics.DrawLines(checkPen, new[] { p1, p2, p3 });
++            }
++
++            e.Graphics.SmoothingMode = oldSmoothing;
++            e.Handled = true;
++        }
++
++        private bool IsAccountSelectorColumn(int columnIndex)
++        {
++            if (columnIndex < 0 || columnIndex >= dataGridView1.Columns.Count) return false;
++            var column = dataGridView1.Columns[columnIndex];
++            return ReferenceEquals(column, dataGridViewCheckBoxColumn1)
++                || column.Name == dataGridViewCheckBoxColumn1.Name
++                || column.DataPropertyName == nameof(Account.Checked);
++        }
++
+         private DataGridViewColumn CreateColumnsDataGridView(string dataPropertyName, string header, string toolTip, bool visible, int miniWith, DataGridViewAutoSizeColumnMode size, DataGridViewCellStyle style)
+         {
+             DataGridViewTextBoxColumn column = new DataGridViewTextBoxColumn();
+@@ -407,179 +534,25 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         }
+ 
+         /// <summary>
+-        /// Tập account được tick checkbox (Account.Checked = true). Mọi action (cập nhật,
++        /// Tập rows được tick checkbox (Account.Checked = true). Mọi action (cập nhật,
+         /// xoá, chạy job, đổi proxy, ...) phải dựa vào checkbox thay vì bôi đen row.
+-        /// VirtualMode: đọc trực tiếp từ _accounts thay vì duyệt DataGridViewRow.
+         /// </summary>
+-        private IEnumerable<Account> CheckedAccounts => _accounts.Where(a => a.Checked);
+-
+-        /// <summary>Account ứng với row index hiện trên grid (VirtualMode: map vào _view).</summary>
+-        private Account AccountAtRow(int rowIndex)
+-            => (rowIndex >= 0 && rowIndex < _view.Count) ? _view[rowIndex] : null;
+-
+-        /// <summary>Account của các row đang bôi đen (highlight). VirtualMode: map theo row.Index vào _view.</summary>
+-        private IEnumerable<Account> SelectedAccounts
++        private IEnumerable<DataGridViewRow> CheckedRows
+         {
+             get
+             {
+-                foreach (DataGridViewRow row in dataGridView1.SelectedRows)
++                foreach (DataGridViewRow row in dataGridView1.Rows)
+                 {
+-                    var acc = AccountAtRow(row.Index);
+-                    if (acc != null) yield return acc;
++                    if (row.DataBoundItem is Account a && a.Checked)
++                        yield return row;
+                 }
+             }
+         }
+ 
+-        // ── VirtualMode core ───────────────────────────────────────────────────
+-        // Gán danh sách hiển thị + cập nhật RowCount. KHÔNG tạo DataGridViewRow vật lý.
+-        private void SetView(List<Account> view)
+-        {
+-            _view = view ?? new List<Account>();
+-            _suppressSelectionChanged = true;
+-            try
+-            {
+-                dataGridView1.RowCount = 0;
+-                if (_view.Count > 0)
+-                    dataGridView1.RowCount = _view.Count;
+-            }
+-            finally
+-            {
+-                _suppressSelectionChanged = false;
+-            }
+-            dataGridView1.Invalidate();
+-        }
+-
+-        // Grid hỏi giá trị cell khi cần vẽ → trả về từ _view[rowIndex].
+-        private void DataGridView1_CellValueNeeded(object? sender, DataGridViewCellValueEventArgs e)
+-        {
+-            var col = dataGridView1.Columns[e.ColumnIndex];
+-            var acc = AccountAtRow(e.RowIndex);
+-
+-            // acc == null khi grid hỏi 1 row index đã vượt _view.Count (xảy ra trong lúc
+-            // RowCount đang chuyển N→0→M lúc đổi nhóm/filter). PHẢI gán e.Value đúng kiểu:
+-            // cột checkbox không format được null → FormatException "wrong type".
+-            if (acc == null)
+-            {
+-                if (col == dataGridViewCheckBoxColumn1) e.Value = false;
+-                else if (col == dataGridViewTextBoxColumn1) e.Value = 0;
+-                else e.Value = string.Empty;
+-                return;
+-            }
+-
+-            if (col == dataGridViewCheckBoxColumn1) { e.Value = acc.Checked; return; }
+-            if (col == dataGridViewTextBoxColumn1) { e.Value = acc.STT; return; }
+-
+-            e.Value = GetAccountValue(acc, col.DataPropertyName);
+-        }
+-
+-        // Chỉ checkbox là editable → ghi ngược vào model.
+-        private void DataGridView1_CellValuePushed(object? sender, DataGridViewCellValueEventArgs e)
+-        {
+-            var acc = AccountAtRow(e.RowIndex);
+-            if (acc == null) return;
+-            if (dataGridView1.Columns[e.ColumnIndex] == dataGridViewCheckBoxColumn1)
+-                acc.Checked = e.Value is bool b && b;
+-        }
+-
+-        // Click vào cột checkbox → toggle Checked.
+-        private void DataGridView1_CellClick(object? sender, DataGridViewCellEventArgs e)
+-        {
+-            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+-            if (dataGridView1.Columns[e.ColumnIndex] != dataGridViewCheckBoxColumn1) return;
+-            var acc = AccountAtRow(e.RowIndex);
+-            if (acc == null) return;
+-            acc.Checked = !acc.Checked;
+-            dataGridView1.InvalidateCell(e.ColumnIndex, e.RowIndex);
+-            _cachedCheckedCount = _accounts.Count(x => x.Checked);
+-            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
+-        }
+-
+-        // Sau khi tick/bỏ tick hàng loạt (RightKey): VirtualMode không tự vẽ lại checkbox
+-        // → Invalidate để CellValueNeeded đọc lại Checked, đồng thời cập nhật label đếm
+-        // ngay (đồng bộ cache để timer không ghi đè giá trị cũ).
+-        private void RefreshCheckedVisual()
+-        {
+-            _cachedCheckedCount = _accounts.Count(x => x.Checked);
+-            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
+-            dataGridView1.Invalidate();
+-        }
+-
+-
+-        // VirtualMode không tự sort được → sort thủ công trên _view rồi refresh.
+-        private void DataGridView1_ColumnHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+-        {
+-            var col = dataGridView1.Columns[e.ColumnIndex];
+-            if (col == dataGridViewCheckBoxColumn1) return;
+-            string prop = col == dataGridViewTextBoxColumn1 ? nameof(Account.STT) : col.DataPropertyName;
+-            if (string.IsNullOrEmpty(prop)) return;
+-
+-            if (_sortColumnIndex == e.ColumnIndex)
+-                _sortOrder = _sortOrder == SortOrder.Ascending ? SortOrder.Descending : SortOrder.Ascending;
+-            else
+-            {
+-                _sortColumnIndex = e.ColumnIndex;
+-                _sortOrder = SortOrder.Ascending;
+-            }
+-
+-            int dir = _sortOrder == SortOrder.Ascending ? 1 : -1;
+-            _view.Sort((x, y) => dir * Comparer<object>.Default.Compare(
+-                GetAccountValue(x, prop), GetAccountValue(y, prop)));
+-            dataGridView1.Invalidate();
+-        }
+-
+-        // Đọc giá trị property theo tên cột (DataPropertyName). Tránh reflection trong hot path
+-        // bằng switch trên các cột thực sự hiển thị.
+-        private static object GetAccountValue(Account a, string prop) => prop switch
+-        {
+-            nameof(Account.Uid) => a.Uid,
+-            nameof(Account.FullName) => a.FullName,
+-            nameof(Account.Password) => a.Password,
+-            nameof(Account.TowFA) => a.TowFA,
+-            nameof(Account.Cookie) => a.Cookie,
+-            nameof(Account.Token) => a.Token,
+-            nameof(Account.Gender) => a.Gender,
+-            nameof(Account.Bio) => a.Bio,
+-            nameof(Account.Friends) => a.Friends,
+-            nameof(Account.PagePro5) => a.PagePro5,
+-            nameof(Account.Groups) => a.Groups,
+-            nameof(Account.Follow) => a.Follow,
+-            nameof(Account.Birthday) => a.Birthday,
+-            nameof(Account.DateCreate) => a.DateCreate,
+-            nameof(Account.Avatar) => a.Avatar,
+-            nameof(Account.Phone) => a.Phone,
+-            nameof(Account.Email) => a.Email,
+-            nameof(Account.PassMail) => a.PassMail,
+-            nameof(Account.MailClientId) => a.MailClientId,
+-            nameof(Account.MailRefreshToken) => a.MailRefreshToken,
+-            nameof(Account.EmailAddress) => a.EmailAddress,
+-            nameof(Account.UserAgent) => a.UserAgent,
+-            nameof(Account.PassPrivateEmailAddress) => a.PassPrivateEmailAddress,
+-            nameof(Account.DeviceInfo) => a.DeviceInfo,
+-            nameof(Account.NameFolder) => a.NameFolder,
+-            nameof(Account.NameScript) => a.NameScript,
+-            nameof(Account.Proxy) => a.Proxy,
+-            nameof(Account.Note) => a.Note,
+-            nameof(Account.JobToday) => a.JobToday,
+-            nameof(Account.JobTotal) => a.JobTotal,
+-            nameof(Account.Summary) => a.Summary,
+-            nameof(Account.Summary_Skip) => a.Summary_Skip,
+-            nameof(Account.RecentInteraction) => a.RecentInteraction,
+-            nameof(Account.Serial) => a.Serial,
+-            nameof(Account.TokenJob) => a.TokenJob,
+-            nameof(Account.XuToday) => a.XuToday,
+-            nameof(Account.State) => a.State,
+-            nameof(Account.Status) => a.Status,
+-            nameof(Account.STT) => a.STT,
+-            nameof(Account.Id) => a.Id,
+-            nameof(Account.ColorType) => a.ColorType,
+-            nameof(Account.Running) => a.Running,
+-            _ => ""
+-        };
+-
+         /// <summary>Warn khi user chưa tick checkbox nào — trả false để caller return sớm.</summary>
+         private bool RequireChecked()
+         {
+-            if (CheckedAccounts.Any()) return true;
++            if (CheckedRows.Any()) return true;
+             AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần thao tác.");
+             return false;
+         }
+@@ -600,9 +573,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         {
+             try
+             {
+-                if (e.RowIndex < 0 || e.RowIndex >= _view.Count) return;
++                if (e.RowIndex < 0 || e.RowIndex >= dataGridView1.Rows.Count) return;
+                 var row = dataGridView1.Rows[e.RowIndex];
+-                var acc = _view[e.RowIndex];
++                if (row.DataBoundItem is Account acc)
+                 {
+                     var style = row.DefaultCellStyle;
+ 
+@@ -642,7 +615,12 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             var col = dataGridView1.Columns[e.ColumnIndex];
+             if (col == null) return;
+ 
+-            if (col.DataPropertyName == nameof(Account.STT))
++            if (col.DataPropertyName == nameof(Account.Checked))
++            {
++                e.Value = string.Empty;
++                e.FormattingApplied = true;
++            }
++            else if (col.DataPropertyName == nameof(Account.STT))
+             {
+                 e.CellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+             }
+@@ -726,14 +704,14 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             {
+                 case "[ Chọn theo uid ]":
+                     button1.Enabled = button2.Enabled = false;
+-                    var fUid = new Facebook_Farm_NewFeed_PostStory.Views.Forms.fSelectByUid(_platform);
++                    var fUid = new LamToolAutoPhonePrime.Views.Forms.fSelectByUid(_platform);
+                     fUid.ShowDialog();
+                     if (fUid.Saved)
+                         _ = LoadAccounts();
+                     break;
+                 case "[ Chọn nhiều nhóm ]":
+                     button1.Enabled = button2.Enabled = false;
+-                    var fMulti = new Facebook_Farm_NewFeed_PostStory.Views.Forms.fSelectMultiFolder(_platform, _folderNames);
++                    var fMulti = new LamToolAutoPhonePrime.Views.Forms.fSelectMultiFolder(_platform, _folderNames);
+                     fMulti.ShowDialog();
+                     if (fMulti.Saved)
+                         _ = LoadAccounts();
+@@ -757,6 +735,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+ 
+         private async void button3_Click_1(object sender, EventArgs e)
+         {
++            if (!LoginGuard.EnsureLoggedIn(_form)) return;
+             fFolder f = new fFolder("AddFolder", _platform);
+             f.ShowDialog();
+             await LoadFolders();
+@@ -852,6 +831,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                                 else if (acc.State == "DIE" || acc.State == "CP_282" || acc.State == "CP_956") acc.ColorType = 1;
+                                 acc.STT = index++;
+ 
++                                if (string.IsNullOrEmpty(acc.NameScript)) acc.NameScript = ScriptNames.FarmXuVip;
++
+                                 if (!string.IsNullOrEmpty(acc.Uid) && todayCounts.TryGetValue(acc.Uid, out var counts))
+                                 {
+                                     acc.JobToday = $"{counts.success}/{counts.fail}";
+@@ -871,19 +852,29 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                     return list;
+                 });
+ 
+-                // Update UI
++                // Update UI - tránh block UI thread với số lượng lớn
+                 _accounts = result;
+                 toolStripLabel8.Text = _accounts.Count.ToMoneyString();
+ 
+-                // VirtualMode: gán _view = bản sao _accounts, không tạo DataGridViewRow vật lý.
+-                _sortColumnIndex = -1;
+-                _sortOrder = SortOrder.None;
+-                SetView(new List<Account>(_accounts));
+-
+-                // Update running/checked counts once + seed cache (timer bỏ qua recompute
+-                // khi >5000 acc → phải seed ở đây nếu không tick kế tiếp sẽ ghi đè label = 0).
++                // Cập nhật cached counts trước (tính 1 lần thôi)
+                 _cachedCheckedCount = _accounts.Count(x => x.Checked);
+                 _cachedRunningCount = _accounts.Count(x => x.Running);
++
++                // Với >5000 acc: tắt DoubleBuffering và dùng BeginUpdate để tránh repaint liên tục
++                dataGridView1.SuspendLayout();
++                dataGridView1.Visible = false;
++                try
++                {
++                    bindingList = new SortableBindingList<Account>(_accounts);
++                    dataGridView1.DataSource = bindingList;
++                }
++                finally
++                {
++                    dataGridView1.Visible = true;
++                    dataGridView1.ResumeLayout();
++                }
++
++                // Update running/checked counts từ cache (không LINQ lại)
+                 ControlHelper.SetToolStripLabelTextSafe(toolStripLabel2, $"{_cachedRunningCount}");
+                 ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
+ 
+@@ -932,6 +923,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+ 
+         private async void button16_Click(object sender, EventArgs e)
+         {
++            if (!LoginGuard.EnsureLoggedIn(_form)) return;
+             fAddAccount fAdd = new fAddAccount(_platform, true);
+             fAdd.ShowDialog();
+             await LoadFolders();
+@@ -960,6 +952,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             f.ShowDialog();
+             ControlHelper.LoadConfigColums(dataGridView1, new List<string> { nameof(Account.Id), nameof(Account.ColorType), nameof(Account.Running) });
+             ForceHideInternalColumns(dataGridView1);
++            NormalizeAccountSelectorColumn();
+         }
+ 
+         private CancellationTokenSource _searchCts;
+@@ -1005,14 +998,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             List<int> matched = await Task.Run(() =>
+             {
+                 var list = new List<int>(128);
+-                // VirtualMode: index phải khớp row trên grid → duyệt _view (đang hiển thị),
+-                // không phải _accounts gốc. Snapshot để tránh race khi _view đổi giữa chừng.
+-                var view = _view;
+-                for (int i = 0; i < view.Count; i++)
++                for (int i = 0; i < _accounts.Count; i++)
+                 {
+                     if (token.IsCancellationRequested) return list;
+ 
+-                    var acc = view[i];
++                    var acc = _accounts[i];
+                     if (acc.Uid?.Contains(searchValue, StringComparison.OrdinalIgnoreCase) == true ||
+                         acc.FullName?.Contains(searchValue, StringComparison.OrdinalIgnoreCase) == true ||
+                         acc.Email?.Contains(searchValue, StringComparison.OrdinalIgnoreCase) == true ||
+@@ -1292,9 +1282,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             {
+                 model.SettingGeneral = SettingsTool.GetSettings($"{nameof(fSettingRegsiner)}_{_platform}", true);
+                 string text = select1.Text.Trim();
+-                // VirtualMode: không còn bindingList; field này không được consumer nào đọc,
+-                // gán snapshot _view để giữ nguyên kiểu dữ liệu.
+-                model.Accounts = new SortableBindingList<Account>(_view);
++                model.Accounts = bindingList;
+                 if (text == "[ Tất cả các nhóm ]" || text == "[ Chọn theo uid ]" || text == "[ Chọn nhiều nhóm ]" || text == "[ Tài khoản đã xóa ]")
+                 {
+                     model.JobService = "";
+@@ -1606,132 +1594,141 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             }
+         }
+ 
++        private void UpdateCachedCounts()
++        {
++            var snapshot = _accounts;
++            if (snapshot == null) return;
++            _cachedCheckedCount = snapshot.Count(x => x.Checked);
++            _cachedRunningCount = snapshot.Count(x => x.Running);
++            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_cachedCheckedCount}");
++            ControlHelper.SetToolStripLabelTextSafe(toolStripLabel2, $"{_cachedRunningCount}");
++        }
++
+         private void RightKey(AntdUI.ContextMenuStripItem it)
+         {
+             // ── Chọn ──────────────────────────────────────────────────────────
+-            // Các thao tác tick/bỏ tick hàng loạt: mutate _accounts[].Checked rồi
+-            // PHẢI refresh grid (VirtualMode đọc checkbox qua CellValueNeeded — không
+-            // tự repaint) và cập nhật label đếm ngay, không đợi timer 1s.
+             if (it.Text.Equals("Tất cả"))
+             {
+                 _accounts.ForEach(x => x.Checked = true);
+-                RefreshCheckedVisual();
++                UpdateCachedCounts();
+             }
+             else if (it.Text.Equals("Bôi đen"))
+             {
+                 // Convert rows đang bôi đen (highlight) → Checked = true
+                 _accounts.ForEach(x => x.Checked = false);
+-                foreach (var a in SelectedAccounts) a.Checked = true;
+-                RefreshCheckedVisual();
++                foreach (DataGridViewRow row in dataGridView1.SelectedRows)
++                    if (row.DataBoundItem is Account a) a.Checked = true;
++                UpdateCachedCounts();
+             }
+             else if (it.Text.Equals("Bỏ chọn tất cả") || it.Text.Equals("Bỏ chọn bôi đen"))
+             {
+                 if (it.Text.Equals("Bỏ chọn tất cả"))
+                     _accounts.ForEach(x => x.Checked = false);
+                 else
+-                    foreach (var a in SelectedAccounts) a.Checked = false;
+-                RefreshCheckedVisual();
++                    foreach (DataGridViewRow row in dataGridView1.SelectedRows)
++                        if (row.DataBoundItem is Account a) a.Checked = false;
++                UpdateCachedCounts();
+             }
+             // ── Chọn theo tình trạng ─────────────────────────────────────────
+             else if (it.Text.Equals("LIVE"))
+             {
+                 _accounts.ForEach(x => x.Checked = x.State?.Equals("live", StringComparison.OrdinalIgnoreCase) == true);
+-                RefreshCheckedVisual();
++                UpdateCachedCounts();
+             }
+             else if (it.Text.Equals("DIE"))
+             {
+                 _accounts.ForEach(x => x.Checked = x.State?.Equals("die", StringComparison.OrdinalIgnoreCase) == true);
+-                RefreshCheckedVisual();
++                UpdateCachedCounts();
+             }
+             else if (it.Text.Equals("Chưa xác định"))
+             {
+                 _accounts.ForEach(x => x.Checked = string.IsNullOrEmpty(x.State));
+-                RefreshCheckedVisual();
++                UpdateCachedCounts();
+             }
+             else if (it.Text.Equals("Đang chạy"))
+             {
+                 _accounts.ForEach(x => x.Checked = x.Running);
+-                RefreshCheckedVisual();
++                UpdateCachedCounts();
+             }
+             // ── Copy ──────────────────────────────────────────────────────────
+             else if (it.Text.Equals("Copy email"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.Email), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.Email), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy pass"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                ConvertHelper.CopyFormat(nameof(Account.Password), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.Password), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy code 2fa"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                ConvertHelper.CopyFormat(nameof(Account.TowFA), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.TowFA), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy uid"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.Uid), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.Uid), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy name"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.FullName), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.FullName), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy mail"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy pass mail"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.PassMail), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.PassMail), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy mail recover"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.EmailAddress), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy pass mail recover"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.PassPrivateEmailAddress), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.PassPrivateEmailAddress), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy phone"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.Phone), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.Phone), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy cookie"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.Cookie), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.Cookie), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy token"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.Token), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.Token), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy proxy"))
+             {
+-                ConvertHelper.CopyFormat(nameof(Account.Proxy), CheckedAccounts);
++                ConvertHelper.CopyFormat(nameof(Account.Proxy), dataGridView1);
+             }
+             else if (it.Text.Equals("Copy uid|pass"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}", CheckedAccounts);
++                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}", dataGridView1);
+             }
+             else if (it.Text.Equals("Copy uid|pass|2fa"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}", CheckedAccounts);
++                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}", dataGridView1);
+             }
+             else if (it.Text.Equals("Copy uid|pass|2fa|cookie"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}|{nameof(Account.Cookie)}", CheckedAccounts);
++                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.TowFA)}|{nameof(Account.Cookie)}", dataGridView1);
+             }
+             else if (it.Text.Equals("Copy uid|pass|cookie"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}", CheckedAccounts);
++                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}", dataGridView1);
+             }
+             else if (it.Text.Equals("Copy uid|pass|cookie|2fa"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}|{nameof(Account.TowFA)}", CheckedAccounts);
++                ConvertHelper.CopyFormat($"{nameof(Account.Uid)}|{nameof(Account.Password)}|{nameof(Account.Cookie)}|{nameof(Account.TowFA)}", dataGridView1);
+             }
+             else if (it.Text.Equals("Copy tk bị checkpoint"))
+             {
+@@ -1757,7 +1754,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             else if (it.Text.Equals("Show password"))
+             {
+                 if (!VerifySubdyPassword()) return;
+-                var selected = CheckedAccounts.ToList();
++                var selected = CheckedRows.Cast<DataGridViewRow>()
++                    .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+                 if (!selected.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần xem."); return; }
+                 using var dlg = new Form
+                 {
+@@ -1787,7 +1785,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             else if (it.Text.Equals("Reset trạng thái"))
+             {
+                 var toUpdate = new List<Account>();
+-                foreach (var a in CheckedAccounts) { a.State = ""; toUpdate.Add(a); }
++                foreach (DataGridViewRow row in CheckedRows)
++                    if (row.DataBoundItem is Account a) { a.State = ""; toUpdate.Add(a); }
+                 if (!toUpdate.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần reset."); return; }
+                 _accountContext.Update(toUpdate);
+                 _ = LoadAccounts();
+@@ -1795,7 +1794,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             }
+             else if (it.Text.Equals("Copy debug lỗi"))
+             {
+-                var targets = CheckedAccounts
++                var targets = CheckedRows.Cast<DataGridViewRow>()
++                    .Select(r => r.DataBoundItem as Account).OfType<Account>()
+                     .Where(a => a.Running).ToList();
+                 if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Không có tài khoản nào vừa tick vừa đang chạy."); return; }
+                 var sb = new System.Text.StringBuilder();
+@@ -1807,7 +1807,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             else if (it.Text.Equals("Xóa định danh thiết bị"))
+             {
+                 var toUpdate = new List<Account>();
+-                foreach (var a in CheckedAccounts) { a.DeviceInfo = ""; toUpdate.Add(a); }
++                foreach (DataGridViewRow row in CheckedRows)
++                    if (row.DataBoundItem is Account a) { a.DeviceInfo = ""; toUpdate.Add(a); }
+                 if (toUpdate.Any()) { _accountContext.Update(toUpdate); _ = LoadAccounts(); }
+             }
+             else if (it.Text.Equals("Check live"))
+@@ -1879,12 +1880,14 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             else if (it.Text.Equals("[Không cần kịch bản]"))
+             {
+                 var toUpdate = new List<Account>();
+-                foreach (var a in CheckedAccounts) { a.NameScript = ""; toUpdate.Add(a); }
++                foreach (DataGridViewRow row in CheckedRows)
++                    if (row.DataBoundItem is Account a) { a.NameScript = ""; toUpdate.Add(a); }
+                 if (toUpdate.Any()) _accountContext.Update(toUpdate);
+             }
+             // ── Cập nhật dữ liệu ──────────────────────────────────────────────
+             else if (it.Text.Equals("Theo uid hoặc email"))
+             {
++                if (!LoginGuard.EnsureLoggedIn(_form)) return;
+                 fAddAccount fAdd = new fAddAccount(_platform, false);
+                 fAdd.ShowDialog();
+                 _ = LoadAccounts();
+@@ -1892,7 +1895,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             else if (it.Text.Equals("Proxy"))
+             {
+                 var ids = new List<Guid>();
+-                foreach (var a in CheckedAccounts) ids.Add(a.Id);
++                foreach (DataGridViewRow row in CheckedRows)
++                    if (row.DataBoundItem is Account a) ids.Add(a.Id);
+                 if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần cập nhật."); return; }
+                 new fImportProxy(ids).ShowDialog();
+                 _ = LoadAccounts();
+@@ -1900,7 +1904,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             else if (it.Text.Equals("Xóa Name"))
+             {
+                 var toUpdate = new List<Account>();
+-                foreach (var a in CheckedAccounts) { a.FullName = ""; toUpdate.Add(a); }
++                foreach (DataGridViewRow row in CheckedRows)
++                    if (row.DataBoundItem is Account a) { a.FullName = ""; toUpdate.Add(a); }
+                 if (!toUpdate.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần xóa."); return; }
+                 if (!AntdHelper.Confirm(_form, "Xác nhận", $"Xóa Name của {toUpdate.Count} tài khoản?")) return;
+                 _accountContext.Update(toUpdate);
+@@ -1949,7 +1954,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             }
+             else if (it.Text.Equals("Khôi phục về nhóm cũ"))
+             {
+-                var ids = CheckedAccounts.Where(a => !a.IsView).Select(a => a.Id).ToList();
++                var ids = new List<Guid>();
++                foreach (DataGridViewRow row in CheckedRows)
++                    if (row.DataBoundItem is Account a && !a.IsView) ids.Add(a.Id);
+                 if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần khôi phục."); return; }
+                 if (!AntdHelper.Confirm(_form, "Xác nhận", $"Bạn có chắc chắn muốn khôi phục {ids.Count} tài khoản?")) return;
+                 if (_accountContext.UpdateIsViewTrue(ids)) AntdHelper.MsgSuccess(_form, "Đã khôi phục thành công.");
+@@ -1958,7 +1965,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             }
+             else if (it.Text.Equals("Cập nhật token job"))
+             {
+-                var ids = CheckedAccounts.Select(a => a.Id.ToString()).ToList();
++                var ids = new List<string>();
++                foreach (DataGridViewRow row in CheckedRows)
++                    if (row.DataBoundItem is Account a) ids.Add(a.Id.ToString());
+                 if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox dòng cần cập nhật."); return; }
+                 new fUpdateData(ids, fUpdateData.TokenJob, _platform).ShowDialog();
+                 _ = LoadAccounts();
+@@ -1971,7 +1980,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                 if (matchFolder != null)
+                 {
+                     string folderName = matchFolder.Name ?? "";
+-                    var toUpdate = CheckedAccounts.ToList();
++                    var toUpdate = new List<Account>();
++                    foreach (DataGridViewRow row in CheckedRows)
++                        if (row.DataBoundItem is Account a) toUpdate.Add(a);
+                     if (!toUpdate.Any())
+                     {
+                         AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần chuyển nhóm.");
+@@ -1993,8 +2004,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                 if (matchScript != null)
+                 {
+                     string scriptName = matchScript.Name ?? "";
+-                    var toUpdate = CheckedAccounts.ToList();
+-                    foreach (var a in toUpdate) a.NameScript = scriptName;
++                    // "Làm Job QN" giờ dùng token login QN — bỏ popup nhập token.
++                    var toUpdate = new List<Account>();
++                    foreach (DataGridViewRow row in CheckedRows)
++                        if (row.DataBoundItem is Account a) { a.NameScript = scriptName; toUpdate.Add(a); }
+                     if (toUpdate.Any()) _accountContext.Update(toUpdate);
+                     return;
+                 }
+@@ -2048,16 +2061,14 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+ 
+         public void AddAccountThreadSafe(Account acc)
+         {
++            acc.STT = dataGridView1.RowCount + 1;
+             if (InvokeRequired)
+             {
+                 Invoke(new Action<Account>(AddAccountThreadSafe), acc);
+             }
+             else
+             {
+-                acc.STT = _accounts.Count + 1;
+-                _accounts.Add(acc);
+-                _view.Add(acc);
+-                dataGridView1.RowCount = _view.Count;
++                bindingList.Add(acc);
+             }
+         }
+ 
+@@ -2147,7 +2158,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                 accounts = _accounts.Where(x => x.State.ToLower() == state.ToLower()).ToList();
+             }
+             // Đây là UI event handler — gọi trực tiếp, không cần Invoke
+-            SetView(accounts);
++            bindingList = new SortableBindingList<Account>(accounts);
++            dataGridView1.SuspendLayout();
++            dataGridView1.DataSource = bindingList;
++            dataGridView1.ResumeLayout();
+         }
+ 
+         private void CboFilterAccount_SelectedValueChanged(object sender, AntdUI.ObjectsEventArgs e)
+@@ -2205,14 +2219,20 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+ 
+         private void ApplyFilterResult(List<Account> accounts)
+         {
+-            // Copy sang list mới: SetView/sort thao tác in-place trên _view,
+-            // không được làm xáo trộn thứ tự _accounts gốc.
+-            SetView(new List<Account>(accounts));
++            bindingList = new SortableBindingList<Account>(accounts);
++            dataGridView1.SuspendLayout();
++            dataGridView1.DataSource = bindingList;
++            dataGridView1.ResumeLayout();
+         }
+ 
+         private void ShowUpdateFieldPopup(string fieldLabel)
+         {
+-            var selectedAccounts = CheckedAccounts.ToList();
++            var selectedAccounts = CheckedRows
++                .Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account)
++                .Where(a => a != null)
++                .Cast<Account>()
++                .ToList();
+ 
+             if (!selectedAccounts.Any())
+             {
+@@ -2465,7 +2485,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+             bool needsAuth = selectedProps.Any(p => p == nameof(Account.Password) || p == nameof(Account.TowFA));
+             if (needsAuth && !VerifySubdyPassword()) return;
+ 
+-            ConvertHelper.CopyFormat(string.Join("|", selectedProps), CheckedAccounts);
++            ConvertHelper.CopyFormat(string.Join("|", selectedProps), dataGridView1);
+         }
+ 
+         // Lưu thứ tự 10 slot (kể cả slot rỗng) theo nền tảng hiện tại
+@@ -2486,8 +2506,105 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         private string CopyFormatSettingName => $"CopyFormat_{_platform}";
+         private const string CopyFormatKey = "Slots";
+ 
+-        // Login đã được loại bỏ khỏi project — không còn xác thực mật khẩu Subdy.
+-        private bool VerifySubdyPassword() => true;
++        /// <summary>
++        /// Hiển thị popup nhập mật khẩu Subdy để xác thực trước khi copy dữ liệu nhạy cảm.
++        /// Trả về true nếu xác thực thành công.
++        /// </summary>
++        private bool VerifySubdyPassword()
++        {
++            var user = Globals.User;
++            if (user == null) { AntdHelper.MsgWarn(_form, "Chưa đăng nhập tài khoản QN."); return false; }
++
++            const int W = 370, H = 200;
++            const int PAD = 20;
++
++            using var dlg = new Form
++            {
++                Text            = "Xác thực",
++                Width           = W,
++                Height          = H,
++                FormBorderStyle = FormBorderStyle.FixedSingle,
++                StartPosition   = FormStartPosition.CenterParent,
++                MaximizeBox     = false,
++                MinimizeBox     = false,
++                BackColor       = Color.White
++            };
++
++            // Header xanh
++            var pnlTop = new System.Windows.Forms.Panel
++            {
++                Left = 0, Top = 0, Width = W, Height = 60,
++                BackColor = Color.FromArgb(24, 144, 255)
++            };
++            var lblTitle = new System.Windows.Forms.Label
++            {
++                Text      = "🔐  Xác thực bảo mật",
++                Left      = 0, Top = 0, Width = W, Height = 60,
++                ForeColor = Color.White,
++                Font      = new Font("Segoe UI", 12f, FontStyle.Bold),
++                TextAlign = ContentAlignment.MiddleCenter
++            };
++            pnlTop.Controls.Add(lblTitle);
++
++            // Label
++            var lblUser = new System.Windows.Forms.Label
++            {
++                Text      = $"Nhập mật khẩu tài khoản  [{user.UserName}]:",
++                Left      = PAD, Top = 72, Width = W - PAD * 2, Height = 20,
++                Font      = new Font("Segoe UI", 9f),
++                ForeColor = Color.FromArgb(60, 60, 60)
++            };
++
++            // TextBox mật khẩu
++            var txtPass = new TextBox
++            {
++                Left                  = PAD, Top = 96, Width = W - PAD * 2 - 16, Height = 24,
++                UseSystemPasswordChar = true,
++                Font                  = new Font("Segoe UI", 10f),
++                BorderStyle           = BorderStyle.FixedSingle
++            };
++
++            // Buttons — tọa độ tuyệt đối, căn giữa
++            int btnW = 110, btnH = 30, btnTop = 135, gap = 10;
++            int totalW = btnW * 2 + gap;
++            int btnLeft = (W - 16 - totalW) / 2;
++
++            var btnOk = new System.Windows.Forms.Button
++            {
++                Text      = "Xác nhận",
++                Left      = btnLeft, Top = btnTop, Width = btnW, Height = btnH,
++                BackColor = Color.FromArgb(24, 144, 255),
++                ForeColor = Color.White,
++                FlatStyle = FlatStyle.Flat,
++                Font      = new Font("Segoe UI", 9f, FontStyle.Bold),
++                DialogResult = DialogResult.OK
++            };
++            btnOk.FlatAppearance.BorderSize = 0;
++
++            var btnCancel = new System.Windows.Forms.Button
++            {
++                Text      = "Hủy",
++                Left      = btnLeft + btnW + gap, Top = btnTop, Width = btnW, Height = btnH,
++                BackColor = Color.FromArgb(240, 240, 240),
++                ForeColor = Color.FromArgb(60, 60, 60),
++                FlatStyle = FlatStyle.Flat,
++                Font      = new Font("Segoe UI", 9f),
++                DialogResult = DialogResult.Cancel
++            };
++            btnCancel.FlatAppearance.BorderSize = 0;
++
++            dlg.Controls.AddRange(new Control[] { pnlTop, lblUser, txtPass, btnOk, btnCancel });
++            dlg.AcceptButton = btnOk;
++            dlg.CancelButton = btnCancel;
++            dlg.Shown += (_, __) => txtPass.Focus();
++
++            if (dlg.ShowDialog() != DialogResult.OK) return false;
++
++            if (txtPass.Text.Trim() == user.Password) return true;
++
++            AntdHelper.MsgError(_form, "Mật khẩu không đúng.");
++            return false;
++        }
+ 
+         private static bool IsVietnameseName(string name)
+         {
+@@ -2552,13 +2669,14 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                 e.Handled = true;
+             }
+             else if (e.KeyCode == Keys.Space)
+-            {
+-                // Toggle Checked của các dòng đang bôi đen (SelectedRows). VirtualMode:
+-                // map row index → _view, không dùng DataBoundItem.
+-                foreach (var account in SelectedAccounts)
+-                    account.Checked = !account.Checked;
+-                dataGridView1.Invalidate();
+-                ControlHelper.SetToolStripLabelTextSafe(toolStripLabel6, $"{_accounts.Count(x => x.Checked)}");
++            { 
++                foreach (DataGridViewRow row in CheckedRows)
++                {
++                    if (row.DataBoundItem is Account account)
++                    {
++                        account.Checked = !account.Checked;
++                    }
++                }
+                 e.Handled = true;
+             }
+             else if (e.KeyCode == Keys.Escape)
+@@ -2570,7 +2688,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // ── Chức năng: Check live / Kiểm tra avatar ────────────────────────────
+         private async Task RunCheckLiveAsync(bool checkAvatarMode)
+         {
+-            var targets = CheckedAccounts.ToList();
++            var targets = CheckedRows.Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần kiểm tra."); return; }
+ 
+             int live = 0, total = targets.Count, done = 0;
+@@ -2613,7 +2732,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // ── Chức năng: Kiểm tra cookie ─────────────────────────────────────────
+         private async Task RunCheckCookieAsync()
+         {
+-            var targets = CheckedAccounts
++            var targets = CheckedRows.Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account).OfType<Account>()
+                 .Where(a => !string.IsNullOrEmpty(a.Cookie)).ToList();
+             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Không có tài khoản nào đã tick có cookie."); return; }
+ 
+@@ -2645,7 +2765,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // ── Chức năng: Check name VN ───────────────────────────────────────────
+         private void RunCheckNameVN()
+         {
+-            var targets = CheckedAccounts.ToList();
++            var targets = CheckedRows.Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần kiểm tra."); return; }
+ 
+             int vnCount = targets.Count(a => IsVietnameseName(a.FullName));
+@@ -2655,7 +2776,8 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // ── Chức năng: Kiểm tra live proxy ────────────────────────────────────
+         private async Task RunCheckProxyAsync()
+         {
+-            var targets = CheckedAccounts.ToList();
++            var targets = CheckedRows.Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account).OfType<Account>().ToList();
+             if (!targets.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần kiểm tra."); return; }
+ 
+             var noProxy = targets.Where(a => string.IsNullOrEmpty(a.Proxy)).ToList();
+@@ -2747,7 +2869,7 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                         try
+                         {
+                             var svc = new Sunny.Subd.Core.Facebook.FacebookService();
+-                            var ext = await svc.Login(client, acc, ct, 180, null!);
++                            var ext = await svc.Login(client, acc, ct, 400, null!);
+                             string stateText = ext.SubdyEnum == Sunny.Subd.Core.Models.SubdyEnum.Success
+                                 ? "Login thành công"
+                                 : $"Login thất bại: {ext.Message}";
+@@ -2791,7 +2913,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+ 
+         private void BackupAction(BackupType type, BackupOp op)
+         {
+-            var selected = CheckedAccounts
++            var selected = CheckedRows
++                .Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account)
++                .OfType<Account>()
+                 .Where(a => !string.IsNullOrEmpty(a.Uid))
+                 .ToList();
+ 
+@@ -2934,7 +3059,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // ── Dọn dẹp backup dư thừa ───────────────────────────────────────────
+         private void CleanupRedundantBackups()
+         {
+-            var selectedUids = CheckedAccounts
++            var selectedUids = CheckedRows
++                .Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account)
++                .OfType<Account>()
+                 .Where(a => !string.IsNullOrEmpty(a.Uid))
+                 .Select(a => a.Uid!)
+                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
+@@ -3063,12 +3191,15 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // ══════════════════════════════════════════════════════════════════════
+         private void TrashSelectedAccounts()
+         {
+-            var ids = CheckedAccounts
++            var ids = CheckedRows
++                .Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account)
++                .OfType<Account>()
+                 .Where(a => a.IsView)
+                 .Select(a => a.Id)
+                 .ToList();
+             if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần xóa vào thùng rác."); return; }
+-            int total = CheckedAccounts.Count();
++            int total = CheckedRows.Count();
+             if (!AntdHelper.Confirm(_form, "Xóa vào thùng rác", $"Đưa {ids.Count}/{total} tài khoản vào thùng rác?")) return;
+             if (_accountContext.UpdateIsViewFalse(ids))
+             {
+@@ -3083,7 +3214,10 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // ══════════════════════════════════════════════════════════════════════
+         private void DeleteAccountsPermanently()
+         {
+-            var ids = CheckedAccounts
++            var ids = CheckedRows
++                .Cast<DataGridViewRow>()
++                .Select(r => r.DataBoundItem as Account)
++                .OfType<Account>()
+                 .Select(a => a.Id)
+                 .ToList();
+             if (!ids.Any()) { AntdHelper.MsgWarn(_form, "Vui lòng tick checkbox tài khoản cần xóa vĩnh viễn."); return; }
+@@ -3101,9 +3235,9 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+         // Dropdown kịch bản (toolbar): mass-apply NameScript cho tất cả account trong bindingList hiện tại.
+         public void ApplyScriptToAll(string scriptName)
+         {
+-            if (string.IsNullOrEmpty(scriptName) || _view == null) return;
++            if (string.IsNullOrEmpty(scriptName) || bindingList == null) return;
+             var toUpdate = new List<Account>();
+-            foreach (var acc in _view)
++            foreach (var acc in bindingList)
+             {
+                 if (acc == null) continue;
+                 if (acc.NameScript == scriptName) continue;
+@@ -3111,11 +3245,31 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
+                 toUpdate.Add(acc);
+             }
+             if (toUpdate.Any()) _accountContext.Update(toUpdate);
+-            dataGridView1.Invalidate();
++            dataGridView1.Refresh();
+         }
+ 
+         // Dropdown "Tùy chọn": reload bindingList từ DB để restore NameScript gốc.
+         public void RestoreScriptsFromDb() => _ = LoadAccounts();
+ 
++        #region ==== Tour targets ====
++        // Nhóm (folder): nút quản lý nhóm là AntdUI.Button được tạo động bởi SsaTheme
++        public Control TourBtnFolderManager => this.Controls.Find("ssaBtnFolderMgr", true).FirstOrDefault();
++        public Control TourCboGroup => select1;                 // Dropdown chọn nhóm
++        // Kịch bản & cài đặt
++        public Control TourBtnJobSettings => button4;           // Cài đặt jobs
++        public Control TourBtnGeneralSettings => button5;       // Cài đặt chung
++        public Control TourBtnInteract => button6;              // Tương tác
++        // Chạy / thêm tài khoản / tìm kiếm
++        public Control TourBtnRun => button7;                   // Chạy
++        public Control TourBtnStop => button8;                  // Dừng
++        public Control TourBtnImportAccount => button16;        // + Thêm tài khoản
++        public Control TourInputSearch => input6;               // Tìm kiếm
++        // Danh sách
++        public Control TourCboFilter => cboFilterAccount;       // Lọc tài khoản
++        public Control TourBtnReload => button9;                // Tải lại
++        public Control TourBtnToggleCols => this.Controls.Find("ssaBtnColumns", true).FirstOrDefault(); // "Hiển thị" (tạo động)
++        public Control TourDataGrid => dataGridView1;           // Bảng tài khoản
++        public ToolStrip TourToolStripStats => toolStrip1;      // Thanh thống kê
++        #endregion
+     }
+ }
