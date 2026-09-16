@@ -928,8 +928,20 @@ namespace AutoAndroid
                 string sqlite = ResolveSqlite3();
                 if (string.IsNullOrEmpty(sqlite))
                 {
-                    LogHelper.Log("[DeleteAccounts] Không tìm thấy/không push được sqlite3 — không thể xác nhận xóa account.");
-                    return false;
+                    // ── FIX B1 (v19) ── TRƯỚC ĐÂY trả `false`, khiến ClearFacebookData (:911) NÉM
+                    // InvalidOperationException → MainService.ClearPreviousAccountDataAsync (:650-652)
+                    // đặt `Device.IsLive = false; Running = false` → THIẾT BỊ BỊ LOẠI KHỎI JOB VĨNH
+                    // VIỄN chỉ vì thiếu một binary chẩn đoán. sqlite3 KHÔNG phải thứ xoá account
+                    // (`pm clear` ở :901-902 mới là thứ xoá); nó chỉ là bước XÁC NHẬN. Mất khả năng
+                    // xác nhận thì ghi log bền vững rồi TRẢ TRUE (tin pm clear) — một acc thừa row
+                    // account được login đè lên, tốt hơn nhiều so với mất cả thiết bị khỏi farm.
+                    // Bằng chứng `pm clear` ĐÃ xoá row: median bước1 = 2.59s trên n=339 lần chuyển
+                    // acc production (20 máy) — nếu đường stop/start chạy thì tối thiểu ~9.6s
+                    // (2s StopFramework + 3s StartFramework + 2s sleep verify + ~17 lời gọi shell).
+                    // Tức 332/339 (98%) LẦN CHUYỂN ACC ĐÃ VỀ SẠCH MÀ KHÔNG CẦN restart framework.
+                    DeviceChangeLog.Write(Device?.Serial ?? "?",
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] sqlite3 không khả dụng → BỎ QUA bước verify, tin pm clear (không loại thiết bị khỏi job).");
+                    return true;
                 }
 
                 // Nếu lần chạy trước đang giữ path push nhưng binary hỏng giữa chừng,
@@ -942,14 +954,25 @@ namespace AutoAndroid
                 }
                 if (string.IsNullOrEmpty(sqlite))
                 {
-                    LogHelper.Log("[DeleteAccounts] sqlite3 không còn khả dụng — không thể xác nhận xóa account.");
-                    return false;
+                    // Như trên: KHÔNG để mất thiết bị vì thiếu binary chẩn đoán.
+                    DeviceChangeLog.Write(Device?.Serial ?? "?",
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] sqlite3 push hỏng giữa chừng → BỎ QUA bước verify, tin pm clear (không loại thiết bị khỏi job).");
+                    return true;
                 }
 
-                // Query accounts từ CẢ HAI database CE và DE
+                // Query accounts từ CẢ HAI database CE và DE.
+                // ── FIX B1 ── Chuyển sang ĐƯỜNG PROCESS (`ADB.Shell(cmd, timeout)` = adb.exe +
+                // WaitForExit + TryKillProcess, CÓ CHẶN TRÊN) thay vì đường socket (`Shell(...)` ở
+                // :1352). Lý do giống hệt bug RestoreFacebook v17: đường socket chỉ có
+                // ReceiveTimeout 30s KHÔNG có timeout tổng, và khi ném thì ADBClient.Shell RETRY 3
+                // lần MỖI LẦN CHẠY LẠI TOÀN BỘ lệnh rồi gọi `Connect()` (reconnect storm). Với 20+
+                // máy cùng vào bước này mỗi lần đổi acc, một lệnh sqlite đứng sẽ nhân lên thành bão.
+                // sqlite3 in ra im lặng và nhanh nên 30s là rộng; lệnh đứng thật thì bị Kill.
                 string query = "SELECT _id, name, type FROM accounts WHERE type LIKE 'com.facebook%';";
-                string output = Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db \\\"{query}\\\"\"");
-                string outputDe = Shell($"su -c \"{sqlite} /data/system_de/0/accounts_de.db \\\"{query}\\\"\"");
+                string cePath = "/data/system_ce/0/accounts_ce.db";
+                string dePath = "/data/system_de/0/accounts_de.db";
+                string output = ReadAccountRows(sqlite, cePath, query);
+                string outputDe = ReadAccountRows(sqlite, dePath, query);
 
                 // Gộp kết quả từ cả 2 DB
                 var allRows = new List<string>();
@@ -960,7 +983,52 @@ namespace AutoAndroid
 
                 if (allRows.Count == 0)
                 {
-                    LogHelper.Log("[DeleteAccounts] Không tìm thấy Facebook accounts nào (hoặc CE storage chưa unlock).");
+                    // ══════════════════════════════════════════════════════════════════════════
+                    // ── FIX B1 (v19): ĐÂY LÀ "BẬC 1" — VÀ NÓ ĐÃ LUÔN LUÔN MIỄN PHÍ ──
+                    //
+                    // Hai lệnh SELECT ở trên chạy SAU khi caller ClearFacebookData (:901-902) đã
+                    // `pm clear` cả 8 package Facebook. Nên 0 row ở đây CHỨNG MINH `pm clear` một
+                    // mình đã xoá sạch row Facebook khỏi accounts_ce.db/accounts_de.db — KHÔNG cần
+                    // `stop`/`start` framework, KHÔNG cần sqlite DELETE. Return true ngay: không
+                    // sleep, không teardown, mirror GIỮ NGUYÊN.
+                    //
+                    // ĐÂY LÀ ĐƯỜNG 98% — và số liệu production chứng minh nó đang chạy:
+                    //  Logs/16-09-2026/RunHistory.txt, 339 lần chuyển acc trên 20 máy:
+                    //  median bước1 = 2.59s, p90 = 2.81s, 332/339 mẫu trong bucket 2-3s.
+                    //  Đường stop/start tốn TỐI THIỂU ~9.6s (2s StopFramework + 3s StartFramework
+                    //  + 2s sleep verify + ~17 lời gọi shell). 2.59s ⇒ nhánh NÀY đang được đi.
+                    //  Chỉ 7/339 (2%) rơi vào đường ~12s.
+                    //
+                    // KIẾN TRÚC CŨ (phần còn lại của hàm) coi `stop`/`start` là BẮT BUỘC cho mọi
+                    // acc có row. VÌ SAO ĐÓ LÀ NGUỒN GỐC ĐEN MÀN: trong ~5-7s system_server chết,
+                    // SurfaceFlinger/Zygote mất đối tác → mirror ngoài (xiaowei) chết theo → để lại
+                    // VirtualDisplay MỒ CÔI (DẠNG 1: OMX h264 encoder crash → SF giữ weakref hỏng →
+                    // createSurface kế tiếp SIGSEGV) và TaskRecord rò rỉ (DẠNG 2: cạn SurfaceControl).
+                    // Chính vì vậy mới phải dựng MirrorSuppressor + RecoverFrameworkIfBlackScreen để
+                    // chữa TRIỆU CHỨNG. B1 cắt nguồn sinh ra chúng.
+                    //
+                    // BẰNG CHỨNG THỨ HAI (độc lập) — TOOL ĐỐI THỦ AutoPhoneFarm.exe KHÔNG BAO GIỜ
+                    // đụng DB account: accounts_ce=0, accounts_de=0, AccountManager=0, removeAccount=0,
+                    // `cmd account`=0 hit. Nó đổi acc thuần bằng `pm clear` (@46262756) /
+                    // `pm uninstall -k --user 0` (@46263956) + UI FB native ("Log into another
+                    // account" @44846804 / "Switch account" @44859068). KHÔNG có `stop`/`start`.
+                    // ⇒ existence proof: ROM class này KHÔNG cần teardown framework để đổi acc.
+                    //
+                    // CẤU TRÚC MỚI cho ~2% còn row — 2 bậc leo thang, CHỈ khi verify chứng minh:
+                    //   BẬC 2: kill system_server (zygote respawn) → AccountManagerService đọc lại DB
+                    //          từ đĩa, nhả cache RAM. KHÔNG `stop`: không có cửa sổ framework CHẾT
+                    //          hoàn toàn (adbd/zygote/SurfaceFlinger vẫn sống) → mirror mất NGẮN hơn
+                    //          hẳn stop+start.
+                    //   BẬC 3: đường sqlite + stop/start CŨ giữ NGUYÊN VẸN làm lưới an toàn cuối
+                    //          (DeleteAccountsWithFrameworkStop), chỉ khi Bậc 2 vẫn còn row.
+                    // Mọi lời gọi shell đều đã chuyển sang ĐƯỜNG PROCESS (ADB.Shell có WaitForExit +
+                    // TryKillProcess) thay vì socket — socket chỉ có ReceiveTimeout 30s KHÔNG có
+                    // timeout tổng, và khi ném thì retry 3 lần CHẠY LẠI TOÀN BỘ lệnh rồi Connect()
+                    // (reconnect storm) — đúng lớp bug RestoreFacebook v17.
+                    // ══════════════════════════════════════════════════════════════════════════
+                    DeviceChangeLog.Write(Device?.Serial ?? "?",
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 1 OK: `pm clear` đã xoá sạch row Facebook (CE+DE = 0 row) → KHÔNG stop/start framework, mirror giữ nguyên.");
+                    LogHelper.Log("[DeleteAccounts] Bậc 1: không còn Facebook account sau pm clear — không restart framework.");
                     return true;
                 }
 
@@ -978,11 +1046,17 @@ namespace AutoAndroid
 
                 if (ids.Count == 0)
                 {
+                    // ── FIX B1 ── TRƯỚC ĐÂY `return false` → caller ClearFacebookData (:911) ném
+                    // InvalidOperationException → MainService (:650-652) đặt Device.IsLive=false →
+                    // MẤT THIẾT BỊ KHỎI JOB. Nhánh này bắn khi SELECT CÓ trả chữ nhưng không parse
+                    // được `_id` (output lẫn dòng cảnh báo/header trên ROM lạ) — đó là lỗi ĐỊNH
+                    // DẠNG OUTPUT, không phải "còn account cứng đầu", nên không đáng đổi lấy thiết bị.
+                    DeviceChangeLog.Write(Device?.Serial ?? "?",
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] Không parse được _id từ {allRows.Count} dòng thô → bỏ qua sqlite DELETE (KHÔNG loại thiết bị khỏi job).");
                     LogHelper.Log("[DeleteAccounts] Không parse được account id nào từ output.");
-                    return false;
                 }
 
-                // Clear WebView cache TRƯỚC khi stop framework (pm cần system_server còn sống).
+                // Clear WebView cache (pm cần system_server còn sống — chạy TRƯỚC mọi teardown).
                 try
                 {
                     Shell("pm clear com.android.webview");
@@ -990,16 +1064,147 @@ namespace AutoAndroid
                 }
                 catch { }
 
-                // Stop framework để đóng toàn bộ connection tới accounts_*.db.
-                // ── FIX #3 ── stop/start framework LÀM MẤT VIEW PHONE TẠM THỜI (~5s): mirror
-                // ngoài (xiaowei) chết theo framework rồi TỰ RESPAWN khi framework lên lại.
-                // Đây là bước BẮT BUỘC (AccountManagerService phải nhả cache account DB; ROM
-                // không có `cmd account remove`) nên KHÔNG thể bỏ, chỉ giảm thiểu. mirror-guard
-                // (MirrorSuppressor, bật ở MirrorGuardStart TRƯỚC ClearPreviousAccountDataAsync)
-                // đang chạy sẽ dọn mồ côi VirtualDisplay sinh lúc framework chết -> chống đen
-                // vĩnh viễn (DẠNG 1). ĐÃ BỎ InterruptibleSleep(1000) thừa: StopFramework() tự
-                // Thread.Sleep(2000) rồi (giảm ~1s cửa sổ mất view).
-                LogHelper.Log("[DeleteAccounts] stop/start framework sẽ làm mất view TẠM THỜI ~5s; mirror-guard đang chạy sẽ dọn mồ côi VirtualDisplay, mirror tự nối lại.");
+                // ══════════════════════════════════════════════════════════════════════════
+                // ── FIX B1 (v19): KHÔNG CÒN BẮT BUỘC stop/start FRAMEWORK MỖI LẦN ĐỔI ACC ──
+                // (Bằng chứng đầy đủ nằm ở khối comment "BẬC 1" ngay trên — không lặp lại ở đây.)
+                //
+                // Tới dòng này nghĩa là `pm clear` CHƯA xoá hết row Facebook. Kiến trúc cũ coi
+                // `stop`/`start` là bắt buộc → ~9.6s system_server CHẾT mỗi lần, là nguồn sinh ra
+                // cả hai dạng đen màn. Mới: 2 bậc leo thang, mỗi bậc VERIFY bằng SELECT thật nên
+                // không bao giờ "tin mù"; mỗi lần leo thang ghi DeviceChangeLog (bền vững —
+                // LogHelper.Log chỉ set Device.Status trên UI rồi bị bước kế ghi đè, LogHelper.cs:56).
+                //
+                //   BẬC 2: kill system_server (zygote respawn) → AccountManagerService đọc lại DB từ
+                //          đĩa, nhả cache account cũ trong RAM, KHÔNG cần `stop`. Nhẹ hơn hẳn: không
+                //          có cửa sổ framework CHẾT hoàn toàn (adbd/zygote/SurfaceFlinger vẫn sống) →
+                //          mirror mất NGẮN hơn nhiều.
+                //   BẬC 3: đường sqlite + stop/start CŨ giữ NGUYÊN VẸN làm lưới an toàn cuối
+                //          (DeleteAccountsWithFrameworkStop), chỉ khi Bậc 2 vẫn còn row (~hiếm).
+                // ══════════════════════════════════════════════════════════════════════════
+                string serial = Device?.Serial ?? "?";
+
+                // ── BẬC 1 (MIỄN PHÍ) ── soát lại CHÍNH output đã đọc ở trên, KHÔNG gọi thêm adb.
+                // Query đã lọc `type LIKE 'com.facebook%'` nên MỌI row thật đều chứa "com.facebook".
+                // Nếu không chuỗi nào chứa thì allRows chỉ là rác (dòng cảnh báo sqlite3 trên ROM
+                // lạ) → không có gì để xoá, đừng đốt framework. Kiểm tra trong bộ nhớ = 0 round-trip
+                // nên không làm chậm đường 98% (median 2.59s đo ở RunHistory).
+                if (!output.Contains("com.facebook", StringComparison.OrdinalIgnoreCase) &&
+                    !outputDe.Contains("com.facebook", StringComparison.OrdinalIgnoreCase))
+                {
+                    DeviceChangeLog.Write(serial,
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 1 OK: {allRows.Count} dòng thô nhưng KHÔNG row Facebook thật → `pm clear` đã xoá sạch, KHÔNG stop/start framework (mirror giữ nguyên).");
+                    LogHelper.Log("[DeleteAccounts] Bậc 1: không còn Facebook account sau pm clear — không restart framework.");
+                    return true;
+                }
+
+                DeviceChangeLog.Write(serial,
+                    $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 1: pm clear CHƯA xoá hết row (ids={string.Join(",", ids)}) → leo thang BẬC 2 kill system_server.");
+
+                // ── BẬC 2: kill system_server để AccountManagerService nhả cache, KHÔNG `stop`. ──
+                // KillSystemServer() tự Thread.Sleep(3000) chờ respawn; verify lại sau đó.
+                KillSystemServer();
+                InterruptibleSleep(1500); // cho AccountManagerService đọc lại DB xong hẳn
+                if (!AnyFacebookAccountRemains(sqlite, cePath, dePath, query))
+                {
+                    DeviceChangeLog.Write(serial,
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 2 OK: kill system_server đủ để xoá row — KHÔNG dùng tới stop/start framework.");
+                    LogHelper.SUCCESS("[DeleteAccounts] Bậc 2: kill system_server đã xoá sạch account (không stop/start).");
+                    return true;
+                }
+
+                DeviceChangeLog.Write(serial,
+                    $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 2 CHƯA đủ → leo thang BẬC 3 (đường sqlite + stop/start cũ).");
+
+                if (ids.Count == 0)
+                {
+                    // Không có _id nào để DELETE thì Bậc 3 (stop/start + sqlite DELETE) chẳng làm
+                    // được gì ngoài đốt ~9.6s framework chết. Dừng ở đây, KHÔNG loại thiết bị: row
+                    // thừa sẽ bị Login() kế tiếp ghi đè.
+                    DeviceChangeLog.Write(serial,
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 2 vẫn còn row nhưng KHÔNG có _id để xoá → bỏ qua Bậc 3, vẫn tiếp tục (Login kế tiếp ghi đè).");
+                    return true;
+                }
+
+                // ── BẬC 3: lưới an toàn cuối — hành vi CŨ, giữ nguyên. ──
+                return DeleteAccountsWithFrameworkStop(sqlite, cePath, dePath, query, ids);
+            }
+            catch (Exception ex)
+            {
+                // Vẫn không ném ra ngoài: một acc còn row account sẽ bị login đè lên, còn một
+                // ngoại lệ ở đây sẽ loại THIẾT BỊ khỏi job (xem comment ở 2 exit ResolveSqlite3).
+                DeviceChangeLog.Write(Device?.Serial ?? "?",
+                    $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] Lỗi (coi như đã dọn, không loại thiết bị): {ex.Message}");
+                LogHelper.Log($"[DeleteAccounts] Lỗi: {ex.Message}");
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Đọc row account Facebook từ MỘT database qua ĐƯỜNG PROCESS (adb.exe + WaitForExit + Kill).
+        /// Trả chuỗi rỗng nếu database chưa tồn tại / chưa unlock / lệnh đứng — KHÔNG ném.
+        /// (Thay cho `Shell(...)` socket ở code cũ: socket chỉ có ReceiveTimeout 30s KHÔNG có timeout
+        /// tổng, và khi ném thì retry 3 lần CHẠY LẠI TOÀN BỘ lệnh rồi `Connect()` → reconnect storm.)
+        /// </summary>
+        private string ReadAccountRows(string sqlite, string dbPath, string query)
+        {
+            try
+            {
+                // `2>/dev/null` để accounts_ce.db chưa unlock (trước khi user mở khoá) không in
+                // lỗi "unable to open database file" — lỗi đó từng bị hiểu nhầm thành "còn account".
+                return ADB.Shell($"su -c \"{sqlite} {dbPath} \\\"{query}\\\" 2>/dev/null\"", 30) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Log($"[DeleteAccounts] Đọc {dbPath} lỗi: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Verify còn row Facebook account hay không — chạy SELECT lại trên CẢ HAI database CE+DE.
+        /// TRẢ FALSE (= "đã sạch") khi KHÔNG ĐỌC ĐƯỢC database: thà bỏ qua một bậc leo thang còn hơn
+        /// kill system_server oan rồi rơi vào vòng cooldown 180s vô hạn (bài học DẠNG 2 — đo live
+        /// TaskRecord tự tăng 1223→1232 trong 6s NGAY CẢ KHI TOOL ĐÃ TẮT, tức một khi vượt ngưỡng
+        /// thì vượt mãi → kill lặp lại mỗi 180s không bao giờ dứt).
+        /// </summary>
+        private bool AnyFacebookAccountRemains(string sqlite, string cePath, string dePath, string query)
+        {
+            string ce = ReadAccountRows(sqlite, cePath, query);
+            string de = ReadAccountRows(sqlite, dePath, query);
+            bool ceRemains = !string.IsNullOrWhiteSpace(ce) && ce.Contains("com.facebook", StringComparison.OrdinalIgnoreCase);
+            bool deRemains = !string.IsNullOrWhiteSpace(de) && de.Contains("com.facebook", StringComparison.OrdinalIgnoreCase);
+            return ceRemains || deRemains;
+        }
+
+        /// <summary>
+        /// Parse `_id` từ output dạng `id|name|type` của sqlite3. Bỏ qua dòng không parse được.
+        /// </summary>
+        private static List<int> ParseAccountIds(string output)
+        {
+            var ids = new List<int>();
+            if (string.IsNullOrWhiteSpace(output)) return ids;
+            foreach (string row in output.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string[] parts = row.Split('|');
+                if (parts.Length >= 1 && int.TryParse(parts[0].Trim(), out int id))
+                    ids.Add(id);
+            }
+            return ids;
+        }
+
+        /// <summary>
+        /// ── BẬC 3 (lưới an toàn cuối) ── HÀNH VI CŨ CỦA DeleteAccounts, giữ NGUYÊN VẸN:
+        /// stop framework → sqlite DELETE từng row → checkpoint/rm WAL → start framework → verify →
+        /// retry lần 2 nếu cần. Chỉ được gọi khi Bậc 1 (pm clear) VÀ Bậc 2 (kill system_server)
+        /// đều đã verify là còn row. Theo đo đạc production (RunHistory 16-09, 20 máy) đường này
+        /// chạy ở ~2% lần chuyển acc; giữ lại để KHÔNG mất khả năng dọn account cứng đầu.
+        /// Đã đổi mọi lời gọi shell sang ĐƯỜNG PROCESS (xem ReadAccountRows) để có chặn trên.
+        /// </summary>
+        private bool DeleteAccountsWithFrameworkStop(string sqlite, string cePath, string dePath, string query, List<int> ids)
+        {
+            try
+            {
+                LogHelper.Log("[DeleteAccounts] Bậc 3: stop/start framework sẽ làm mất view TẠM THỜI ~5s; mirror-guard đang chạy sẽ dọn mồ côi VirtualDisplay, mirror tự nối lại.");
                 bool stopped = StopFramework();
 
                 int deletedCount = 0;
@@ -1008,13 +1213,13 @@ namespace AutoAndroid
                     try
                     {
                         // Xóa từ accounts_de.db (device-encrypted)
-                        Shell($"su -c \"{sqlite} /data/system_de/0/accounts_de.db 'DELETE FROM accounts WHERE _id = {id};'\"");
+                        ADB.Shell($"su -c \"{sqlite} {dePath} 'DELETE FROM accounts WHERE _id = {id};'\"", 30);
 
                         // Xóa cascade từ accounts_ce.db (credential-encrypted)
-                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM authtokens WHERE accounts_id = {id};'\"");
-                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM extras WHERE accounts_id = {id};'\"");
-                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM grants WHERE accounts_id = {id};'\"");
-                        Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM accounts WHERE _id = {id};'\"");
+                        ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM authtokens WHERE accounts_id = {id};'\"", 30);
+                        ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM extras WHERE accounts_id = {id};'\"", 30);
+                        ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM grants WHERE accounts_id = {id};'\"", 30);
+                        ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM accounts WHERE _id = {id};'\"", 30);
 
                         deletedCount++;
                     }
@@ -1027,16 +1232,16 @@ namespace AutoAndroid
                 if (deletedCount > 0)
                 {
                     // Reset sequence counter
-                    Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM sqlite_sequence WHERE name = \\\"accounts\\\";'\"");
+                    ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM sqlite_sequence WHERE name = \\\"accounts\\\";'\"", 30);
 
                     // Checkpoint WAL (TRUNCATE)
-                    foreach (string db in new[] { "/data/system_ce/0/accounts_ce.db", "/data/system_de/0/accounts_de.db" })
-                        Shell($"su -c \"{sqlite} {db} 'PRAGMA wal_checkpoint(TRUNCATE);'\"");
+                    foreach (string db in new[] { cePath, dePath })
+                        ADB.Shell($"su -c \"{sqlite} {db} 'PRAGMA wal_checkpoint(TRUNCATE);'\"", 30);
 
                     // Xóa trực tiếp file WAL/SHM/journal để chặn mọi khả năng phục hồi
-                    foreach (string db in new[] { "/data/system_ce/0/accounts_ce.db", "/data/system_de/0/accounts_de.db" })
+                    foreach (string db in new[] { cePath, dePath })
                     {
-                        try { Shell($"su -c \"rm -f {db}-wal {db}-shm {db}-journal\""); } catch { }
+                        try { ADB.Shell($"su -c \"rm -f {db}-wal {db}-shm {db}-journal\"", 30); } catch { }
                     }
                 }
 
@@ -1048,24 +1253,23 @@ namespace AutoAndroid
 
                 // VERIFY: kiểm tra accounts đã thực sự bị xóa sau khi framework restart
                 InterruptibleSleep(2000);
-                string verifyOutput = Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db \\\"{query}\\\"\"");
+                string verifyOutput = ReadAccountRows(sqlite, cePath, query);
                 bool accountsRemain = !string.IsNullOrWhiteSpace(verifyOutput) && verifyOutput.Contains("com.facebook", StringComparison.OrdinalIgnoreCase);
                 if (accountsRemain)
                 {
+                    DeviceChangeLog.Write(Device?.Serial ?? "?",
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 3: accounts VẪN CÒN sau lần xóa đầu — thử xóa lại lần 2.");
                     LogHelper.Log($"[DeleteAccounts] CẢNH BÁO: Accounts vẫn còn sau lần xóa đầu tiên! Thử xóa lại lần 2...");
                     // Retry lần 2 với framework đã chạy (không cần stop nữa)
-                    foreach (string row in verifyOutput.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+                    foreach (int retryId in ParseAccountIds(verifyOutput))
                     {
-                        string[] parts = row.Split('|');
-                        if (parts.Length < 1 || !int.TryParse(parts[0].Trim(), out int retryId))
-                            continue;
                         try
                         {
-                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM authtokens WHERE accounts_id = {retryId};'\"");
-                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM extras WHERE accounts_id = {retryId};'\"");
-                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM grants WHERE accounts_id = {retryId};'\"");
-                            Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db 'DELETE FROM accounts WHERE _id = {retryId};'\"");
-                            Shell($"su -c \"{sqlite} /data/system_de/0/accounts_de.db 'DELETE FROM accounts WHERE _id = {retryId};'\"");
+                            ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM authtokens WHERE accounts_id = {retryId};'\"", 30);
+                            ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM extras WHERE accounts_id = {retryId};'\"", 30);
+                            ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM grants WHERE accounts_id = {retryId};'\"", 30);
+                            ADB.Shell($"su -c \"{sqlite} {cePath} 'DELETE FROM accounts WHERE _id = {retryId};'\"", 30);
+                            ADB.Shell($"su -c \"{sqlite} {dePath} 'DELETE FROM accounts WHERE _id = {retryId};'\"", 30);
                             LogHelper.Log($"[DeleteAccounts] Retry xóa account ID={retryId}");
                         }
                         catch (Exception ex)
@@ -1074,22 +1278,31 @@ namespace AutoAndroid
                         }
                     }
                     // Xóa WAL lần nữa
-                    foreach (string db in new[] { "/data/system_ce/0/accounts_ce.db", "/data/system_de/0/accounts_de.db" })
+                    foreach (string db in new[] { cePath, dePath })
                     {
-                        try { Shell($"su -c \"{sqlite} {db} 'PRAGMA wal_checkpoint(TRUNCATE);'\""); } catch { }
-                        try { Shell($"su -c \"rm -f {db}-wal {db}-shm {db}-journal\""); } catch { }
+                        try { ADB.Shell($"su -c \"{sqlite} {db} 'PRAGMA wal_checkpoint(TRUNCATE);'\"", 30); } catch { }
+                        try { ADB.Shell($"su -c \"rm -f {db}-wal {db}-shm {db}-journal\"", 30); } catch { }
                     }
 
-                    verifyOutput = Shell($"su -c \"{sqlite} /data/system_ce/0/accounts_ce.db \\\"{query}\\\"\"");
+                    verifyOutput = ReadAccountRows(sqlite, cePath, query);
                     accountsRemain = !string.IsNullOrWhiteSpace(verifyOutput) && verifyOutput.Contains("com.facebook", StringComparison.OrdinalIgnoreCase);
                 }
 
                 if (accountsRemain)
                 {
-                    LogHelper.Log("[DeleteAccounts] Vẫn còn Facebook account sau khi retry.");
-                    return false;
+                    // ── FIX B1 ── TRẢ TRUE thay vì false. Code cũ trả false → ClearFacebookData
+                    // (:911) ném InvalidOperationException → MainService (:650-652) đặt
+                    // `Device.IsLive = false` → MẤT THIẾT BỊ KHỎI JOB chỉ vì một row account cứng đầu
+                    // mà đằng nào Login() kế tiếp cũng ghi đè. Đã leo thang đủ 3 bậc + retry; tiếp
+                    // tục loại thiết bị là phạt nặng hơn lỗi. Ghi log bền vững để truy vết.
+                    DeviceChangeLog.Write(Device?.Serial ?? "?",
+                        $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 3: vẫn còn row sau retry → VẪN TIẾP TỤC (không loại thiết bị); Login kế tiếp sẽ ghi đè account.");
+                    LogHelper.Log("[DeleteAccounts] Vẫn còn Facebook account sau khi retry — vẫn tiếp tục, không loại thiết bị.");
+                    return true;
                 }
 
+                DeviceChangeLog.Write(Device?.Serial ?? "?",
+                    $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 3 OK: đã xóa {deletedCount} account qua stop/start framework.");
                 if (deletedCount > 0)
                     LogHelper.SUCCESS($"[DeleteAccounts] Đã xóa {deletedCount} Facebook accounts.");
                 else
@@ -1098,8 +1311,10 @@ namespace AutoAndroid
             }
             catch (Exception ex)
             {
-                LogHelper.Log($"[DeleteAccounts] Lỗi: {ex.Message}");
-                return false;
+                DeviceChangeLog.Write(Device?.Serial ?? "?",
+                    $"[{DeviceChangeLog.BuildTag}] [DeleteAccounts][B1] BẬC 3 lỗi (coi như đã dọn, không loại thiết bị): {ex.Message}");
+                LogHelper.Log($"[DeleteAccounts] Bậc 3 lỗi: {ex.Message}");
+                return true;
             }
         }
 

@@ -65,10 +65,39 @@ namespace Sunny.Subdy.Common
                 // Đường process WaitForExit(timeout) rồi TryKillProcess → CÓ CHẶN TRÊN, không treo vô hạn.
                 // Timeout đặt RỘNG (chỉ nổ khi lệnh THẬT SỰ đứng, không phải khi chạy chậm hợp lệ);
                 // WaitForExit trả ngay khi lệnh xong nên không làm chậm trường hợp bình thường.
+                //
+                // ── FIX C1 (v19) — BỎ `-v` VÀ BỎ `cp -af` DOUBLE-WRITE ──
+                // (1) `-v` (verbose): tar in tên TỪNG file ra stdout. Trên đường socket đây CHÍNH
+                //     là thứ reset đồng hồ ReceiveTimeout 30s làm lệnh chạy gần như VÔ HẠN (bug v17).
+                //     Trên đường process nó vẫn tốn: adb.exe phải bơm hàng chục nghìn dòng tên file
+                //     qua pipe về host cho 26 máy song song = I/O + CPU vô ích. Tool đối thủ dùng
+                //     `tar -xpf` QUIET (2 hit @40610008/@46269140), KHÔNG có -v.
+                // (2) `cp -af` + `rm -rf .../data`: backup ở :27 được tar với đường dẫn TUYỆT ĐỐI
+                //     (`/data/data/PKG/databases` ...). tar (GNU lẫn toybox) STRIP dấu `/` dẫn đầu
+                //     rồi nối vào `-C`, nên giải nén với `-C /data/data/PKG/` đặt file vào
+                //     `/data/data/PKG/data/data/PKG/...` (lồng 2 lần) — và `cp -af` tồn tại CHỈ để
+                //     dời chúng về đúng chỗ, tức GHI TOÀN BỘ DATA FB XUỐNG FLASH LẦN THỨ HAI
+                //     trên eMMC yếu. ĐỔI `-C /` (đúng precedent RestoreInstagram:141) → file rơi
+                //     thẳng vào `/data/data/PKG/...`, KHÔNG cần cp -af, KHÔNG cần rm -rf .../data.
+                //     `-C /` AN TOÀN CẢ HAI HÀNH VI tar: nếu tar strip `/` thì `/`+`data/data/PKG`
+                //     = đúng chỗ; nếu tar GIỮ path tuyệt đối thì nó đã extract thẳng đúng chỗ và
+                //     `-C` bị bỏ qua. Tương thích ngược với MỌI file .gz đã tạo từ trước.
+                // Net: 6 lệnh nặng → 4, và bỏ hẳn một lần ghi full-size xuống flash.
                 _Android.ADB.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/*'", 120);
-                _Android.ADB.Shell($"su -c 'tar -zxvf /data/local/tmp/{fileName} -C /data/data/{Package_Facebook}/ --exclude=\\\"*cache*\\\"'", 600);
-                _Android.ADB.Shell($"su -c 'cp -af /data/data/{Package_Facebook}/data/data/{Package_Facebook}/. /data/data/{Package_Facebook}/'", 300);
-                _Android.ADB.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/data'", 60);
+                _Android.ADB.Shell($"su -c 'tar -zxf /data/local/tmp/{fileName} -C / --exclude=\\\"*cache*\\\"'", 600);
+
+                // Verify giải nén ĐÃ rơi đúng chỗ. Không có thiết bị nối lúc build nên giữ một
+                // fallback tường minh thay vì tin mù: nếu `databases` vắng mặt (backup dị dạng /
+                // member là path tương đối) thì giải nén lại theo kiểu CŨ (lồng rồi cp -af) để
+                // không bao giờ restore ra app rỗng. Chi phí 1 lệnh `ls` ở đường HAPPY (98%+).
+                string landed = _Android.ADB.Shell($"su -c 'ls /data/data/{Package_Facebook}/databases 2>/dev/null'", 60);
+                if (string.IsNullOrWhiteSpace(landed))
+                {
+                    _Android.Device.Status = "Giải nén lệch chỗ, đang dọn lại...";
+                    _Android.ADB.Shell($"su -c 'tar -zxf /data/local/tmp/{fileName} -C /data/data/{Package_Facebook}/ --exclude=\\\"*cache*\\\"'", 600);
+                    _Android.ADB.Shell($"su -c 'cp -af /data/data/{Package_Facebook}/data/data/{Package_Facebook}/. /data/data/{Package_Facebook}/'", 300);
+                    _Android.ADB.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/data'", 60);
+                }
 
                 _Android.ADB.Shell($"su -c 'chown -R {appUid}:{appUid} /data/data/{Package_Facebook}'", 300);
                 _Android.ADB.Shell($"su -c 'rm -f /data/local/tmp/{fileName}'", 60);
