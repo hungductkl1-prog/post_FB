@@ -1347,6 +1347,9 @@ namespace Sunny.Subd.Core.Facebook
             int count = 1;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động dài (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
                 if (count > totalSeconds)
                 {
                     break;
@@ -2572,6 +2575,9 @@ namespace Sunny.Subd.Core.Facebook
                 string status = statusPrefix + "Đang" + " " + actionName + ": ";
                 while (true)
                 {
+                    // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động xem story (mỗi vòng tìm story):
+                    // quá timeoutTaiKhoan/timeoutKichBan -> thoát tới end_Main -> return -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                    if (Stop()) goto end_Main;
                 IL_Restart:
                     SetStatusAccount(accountId, status + "Đang về trang chủ...");
                     OpenFacebookTimeline();
@@ -2830,6 +2836,9 @@ namespace Sunny.Subd.Core.Facebook
             int tickCount = Environment.TickCount;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động xem video (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
 
 
                 await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayTo, delayFrom), $"Xem video, đợi {{time}}s...", 2);
@@ -3029,6 +3038,9 @@ namespace Sunny.Subd.Core.Facebook
             int tickCount = Environment.TickCount;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động xem reel (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
 
 
                 await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayTo, delayFrom), $"Xem reel, đợi {{time}}s...", 2);
@@ -3187,6 +3199,9 @@ namespace Sunny.Subd.Core.Facebook
             int tickCount = Environment.TickCount;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động lướt newfeed (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
               //  await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(delayFrom, delayTo), $"Xem bài viết, đợi {{time}}s...", 2);
                 if (follow && followCount > 0)
                 {
@@ -3691,6 +3706,9 @@ namespace Sunny.Subd.Core.Facebook
             int count = 1;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động gửi lời mời kết bạn (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
 
                 if (count > totalRequests)
                 {
@@ -3967,6 +3985,9 @@ namespace Sunny.Subd.Core.Facebook
             int countFriends = 0;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động tương tác bạn bè (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
                 if (countFriends >= count)
                 {
                     break;
@@ -5795,6 +5816,9 @@ namespace Sunny.Subd.Core.Facebook
             List<string> old = new List<string>();
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động tương tác sự kiện (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
                 if (countTarget >= count)
                 {
                     break;
@@ -6010,6 +6034,9 @@ namespace Sunny.Subd.Core.Facebook
             int refail = 0;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động tham gia nhóm (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
                 if (joinedCount > totalCount || refail > 5) break;
                 switch (type)
                 {
@@ -7026,6 +7053,9 @@ namespace Sunny.Subd.Core.Facebook
             int tickCount = Environment.TickCount;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động tương tác wall (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
                 await _mainService.DelayMessageAsync(SubdyHelper.RandomValue(5, 10), $"Xem bài viết, đợi {{time}}s...", 2);
 
                 if (shouldInteract && reactions.Any())
@@ -8386,6 +8416,9 @@ namespace Sunny.Subd.Core.Facebook
             int countFriends = 0;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động tương tác nhóm (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
                 if (countFriends >= count)
                 {
                     break;
@@ -10316,6 +10349,9 @@ namespace Sunny.Subd.Core.Facebook
                 int refail = 0;
                 while (!_mainService._ct.IsCancellationRequested)
                 {
+                    // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động xác nhận kết bạn (mỗi vòng):
+                    // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                    if (Stop()) break;
                     if (confirmedCount > targetCount || refail > 5)
                     {
                         break;
@@ -10541,6 +10577,9 @@ namespace Sunny.Subd.Core.Facebook
             int count = 1;
             while (!_mainService._ct.IsCancellationRequested)
             {
+                // [TIME-LIMIT v21] Ép giới hạn thời gian NGAY TRONG hành động dài (mỗi vòng):
+                // quá timeoutTaiKhoan/timeoutKichBan -> break -> ExecuteAsync đổi tài khoản. KHÔNG đụng logic FB.
+                if (Stop()) break;
                 if (count > totalSeconds)
                 {
                     break;
