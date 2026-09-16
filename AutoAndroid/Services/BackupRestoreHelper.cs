@@ -55,13 +55,23 @@ namespace Sunny.Subdy.Common
                 _Android.Device.Status = "Đang đẩy file vào thiết bị...";
                 _Android.ADB.CMD($"push \"{escapedFile}\" /data/local/tmp/{fileName}", 100);
 
-                _Android.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/*'");
-                _Android.Shell($"su -c 'tar -zxvf /data/local/tmp/{fileName} -C /data/data/{Package_Facebook}/ --exclude=\"*cache*\"'");
-                _Android.Shell($"su -c 'cp -af /data/data/{Package_Facebook}/data/data/{Package_Facebook}/. /data/data/{Package_Facebook}/'");
-                _Android.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/data'");
+                // DÙNG ĐƯỜNG PROCESS adb.exe (_Android.ADB.Shell) CÓ TIMEOUT THẬT + KILL,
+                // GIỐNG BackupFacebook ở trên và giống tool đối thủ — KHÔNG dùng đường socket
+                // (_Android.Shell). Lý do: đường socket chỉ có ReceiveTimeout 30s trên socket;
+                // `tar -zxvf` có -v in liên tục nên ĐỒNG HỒ 30s BỊ RESET MÃI → lệnh chạy gần như
+                // VÔ HẠN; còn `cp`/`chown` im lặng quá 30s thì ném SocketException → ADBClient.Shell
+                // RETRY 3 lần, MỖI LẦN CHẠY LẠI TOÀN BỘ lệnh (tới 90s+) rồi gọi Connect() reconnect.
+                // 26 máy cùng vào bước này → bão I/O + reconnect storm → TREO MÁY.
+                // Đường process WaitForExit(timeout) rồi TryKillProcess → CÓ CHẶN TRÊN, không treo vô hạn.
+                // Timeout đặt RỘNG (chỉ nổ khi lệnh THẬT SỰ đứng, không phải khi chạy chậm hợp lệ);
+                // WaitForExit trả ngay khi lệnh xong nên không làm chậm trường hợp bình thường.
+                _Android.ADB.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/*'", 120);
+                _Android.ADB.Shell($"su -c 'tar -zxvf /data/local/tmp/{fileName} -C /data/data/{Package_Facebook}/ --exclude=\\\"*cache*\\\"'", 600);
+                _Android.ADB.Shell($"su -c 'cp -af /data/data/{Package_Facebook}/data/data/{Package_Facebook}/. /data/data/{Package_Facebook}/'", 300);
+                _Android.ADB.Shell($"su -c 'rm -rf /data/data/{Package_Facebook}/data'", 60);
 
-                _Android.Shell($"su -c 'chown -R {appUid}:{appUid} /data/data/{Package_Facebook}'");
-                _Android.Shell($"su -c 'rm -f /data/local/tmp/{fileName}'");
+                _Android.ADB.Shell($"su -c 'chown -R {appUid}:{appUid} /data/data/{Package_Facebook}'", 300);
+                _Android.ADB.Shell($"su -c 'rm -f /data/local/tmp/{fileName}'", 60);
                 _Android.LogHelper.SUCCESS("Restore Facebook thành công");
                 return true;
             }
