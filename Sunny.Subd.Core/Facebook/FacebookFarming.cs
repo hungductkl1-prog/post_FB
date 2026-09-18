@@ -61,7 +61,12 @@ namespace Sunny.Subd.Core.Facebook
         private MainService _mainService;
         private JsonHelper _configKichBan;
         private Dictionary<string, object> setting = new Dictionary<string, object>();
-        private Stopwatch _stopwatch = new Stopwatch();
+        // [TIME-LIMIT v25] Đồng hồ RIÊNG của lớp này đã BỎ. Hạn mức thời gian nay đo từ MỐC
+        // MainService bấm lúc BẮT ĐẦU CHUẨN BỊ tài khoản (xem AccountLimitElapsed) nên TÍNH CẢ
+        // thời gian chuẩn bị acc. Trước v25 lớp này tự Restart đồng hồ ở đầu ExecuteAsync — tức SAU
+        // các bước xóa dữ liệu/đổi thiết bị/đổi proxy/restore/login — nên thời gian chuẩn bị bị loại.
+        // QUY TRÌNH GIỮ NGUYÊN, chỉ đổi mốc tính thời gian.
+        private TimeSpan LimitElapsed => _mainService.AccountLimitElapsed;
         // Thư mục đích upload (/sdcard/pictures) chỉ cần bảo đảm TỒN TẠI một lần cho mỗi
         // thiết bị/lần chạy. Các story sau bỏ qua 3 lệnh mkdir qua ADB (~0.3-1s/story).
         private bool _remoteUploadFolderEnsured = false;
@@ -79,21 +84,21 @@ namespace Sunny.Subd.Core.Facebook
         {
             if (setting.ContainsKey("timeoutTaiKhoan"))
             {
-                if (_stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(setting["timeoutTaiKhoan"])))
+                if (LimitElapsed >= TimeSpan.FromMinutes(Convert.ToInt32(setting["timeoutTaiKhoan"])))
                 {
                     _mainService.SetStatus($"Đã quá {setting["timeoutTaiKhoan"]} phút cho tài khoản này!", 2);
                     AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
-                        $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi tài khoản ({setting["timeoutTaiKhoan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
+                        $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi tài khoản ({setting["timeoutTaiKhoan"]} phút, TÍNH CẢ chuẩn bị acc) đã hết sau {Math.Round(LimitElapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                     return true;
                 }
             }
             if (setting.ContainsKey("timeoutKichBan"))
             {
-                if (_stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(setting["timeoutKichBan"])))
+                if (LimitElapsed >= TimeSpan.FromMinutes(Convert.ToInt32(setting["timeoutKichBan"])))
                 {
                     _mainService.SetStatus($"Đã quá {setting["timeoutKichBan"]} phút cho kịch bản này!", 2);
                     AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
-                        $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi kịch bản ({setting["timeoutKichBan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
+                        $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi kịch bản ({setting["timeoutKichBan"]} phút, TÍNH CẢ chuẩn bị acc) đã hết sau {Math.Round(LimitElapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                     return true;
                 }
             }
@@ -171,9 +176,10 @@ namespace Sunny.Subd.Core.Facebook
             // Backend CŨ đọc sai tên (checkBox3/4 + numericUpDown6..9, là control của bản UI trước)
             // nên KHÔNG BAO GIỜ áp time limit; tệ hơn, nhánh checkBox2 cũ cắt cụt actions còn
             // RandomValue(1,5) hành động -> tích "Giới hạn thời gian" lại LÀM HỎNG kịch bản.
-            // Cơ chế ép limit đã có sẵn: Stop() so _stopwatch.Elapsed với 2 key này ở ĐẦU mỗi vòng
-            // action; quá hạn -> return -> MainService đổi sang tài khoản kế. Giữ fallback numericUpDown*
-            // cho config cũ; RandomValue cận trên LOẠI TRỪ nên +1 để [from..to] BAO GỒM cả 'to'.
+            // Cơ chế ép limit đã có sẵn: Stop() so thời gian đã chạy với 2 key này ở ĐẦU mỗi vòng
+            // action VÀ ngay TRONG các hành động dài (gate v21); quá hạn -> return -> MainService
+            // đổi sang tài khoản kế. Giữ fallback numericUpDown* cho config cũ; RandomValue cận trên
+            // LOẠI TRỪ nên +1 để [from..to] BAO GỒM cả 'to'.
             if (_configKichBan.GetBooleanValue("checkBox2"))
             {
                 int tkFrom = _configKichBan.GetIntType("nudTaiKhoanFrom", _configKichBan.GetIntType("numericUpDown7", 40));
@@ -186,7 +192,13 @@ namespace Sunny.Subd.Core.Facebook
                 int kbTo = _configKichBan.GetIntType("nudKichBanTo", _configKichBan.GetIntType("numericUpDown8", 10));
                 setting["timeoutKichBan"] = SubdyHelper.RandomValue(kbFrom, kbTo + 1);
             }
-            _stopwatch.Restart();
+            // [TIME-LIMIT v25] KHÔNG Restart đồng hồ ở đây nữa. Mốc bấm giờ do MainService đặt lúc
+            // BẮT ĐẦU CHUẨN BỊ tài khoản (_swAccountLimit.Restart() ngay sau _account.Running = true),
+            // nên hạn mức TÍNH CẢ thời gian chuẩn bị acc. Dòng ghi dưới đây chỉ để truy vết phần
+            // hạn mức đã bị chuẩn bị acc ăn mất (logging-only, không đổi hành vi).
+            AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
+                $"[TIMEOUT] uid={_account?.Uid} | bắt đầu chạy kịch bản; chuẩn bị acc đã dùng {Math.Round(LimitElapsed.TotalMinutes, 1)} phút"
+                + (setting.ContainsKey("timeoutTaiKhoan") ? $" trong hạn mức {setting["timeoutTaiKhoan"]} phút mỗi tài khoản." : "."));
             _mainService._sate = "Tải kịch bản";
 
             for (int i = 1; i <= actions.Count; i++)

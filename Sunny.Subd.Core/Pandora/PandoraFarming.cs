@@ -41,7 +41,9 @@ namespace Sunny.Subd.Core.Pandora
         private readonly ScriptActionContext _scriptActionContext;
         private readonly JsonHelper _configKichBan;
         private readonly Dictionary<string, object> _setting = new();
-        private readonly Stopwatch _stopwatch = new();
+        // [TIME-LIMIT v25] Hạn mức thời gian đo từ MỐC MainService bấm lúc BẮT ĐẦU CHUẨN BỊ tài
+        // khoản nên TÍNH CẢ thời gian chuẩn bị acc. Xem AccountLimitElapsed trong MainService.
+        private TimeSpan LimitElapsed => _mainService.AccountLimitElapsed;
         private Script _script;
 
         /// <summary>Bật log chi tiết ra Debug output (PandoraDebugSetup dùng cờ này).</summary>
@@ -312,19 +314,19 @@ namespace Sunny.Subd.Core.Pandora
         private bool Stop()
         {
             if (_setting.ContainsKey("timeoutTaiKhoan")
-                && _stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(_setting["timeoutTaiKhoan"])))
+                && LimitElapsed >= TimeSpan.FromMinutes(Convert.ToInt32(_setting["timeoutTaiKhoan"])))
             {
                 _mainService.SetStatus($"Đã quá {_setting["timeoutTaiKhoan"]} phút cho tài khoản này!", 2);
                 AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
-                    $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi tài khoản ({_setting["timeoutTaiKhoan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
+                    $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi tài khoản ({_setting["timeoutTaiKhoan"]} phút, TÍNH CẢ chuẩn bị acc) đã hết sau {Math.Round(LimitElapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                 return true;
             }
             if (_setting.ContainsKey("timeoutKichBan")
-                && _stopwatch.Elapsed >= TimeSpan.FromMinutes(Convert.ToInt32(_setting["timeoutKichBan"])))
+                && LimitElapsed >= TimeSpan.FromMinutes(Convert.ToInt32(_setting["timeoutKichBan"])))
             {
                 _mainService.SetStatus($"Đã quá {_setting["timeoutKichBan"]} phút cho kịch bản này!", 2);
                 AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
-                    $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi kịch bản ({_setting["timeoutKichBan"]} phút) đã hết sau {Math.Round(_stopwatch.Elapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
+                    $"[TIMEOUT] uid={_account?.Uid} | giới hạn thời gian mỗi kịch bản ({_setting["timeoutKichBan"]} phút, TÍNH CẢ chuẩn bị acc) đã hết sau {Math.Round(LimitElapsed.TotalMinutes, 1)} phút -> đổi tài khoản khác.");
                 return true;
             }
             return false;
@@ -382,7 +384,11 @@ namespace Sunny.Subd.Core.Pandora
                 _setting["timeoutKichBan"] = SubdyHelper.RandomValue(kbFrom, kbTo + 1);
             }
 
-            _stopwatch.Restart();
+            // [TIME-LIMIT v25] Không Restart đồng hồ ở đây: mốc do MainService đặt lúc bắt đầu
+            // chuẩn bị acc, nên hạn mức tính cả thời gian chuẩn bị. Logging-only dòng dưới đây.
+            AutoAndroid.RunHistoryLog.Note(_client?.Device?.Serial ?? "?",
+                $"[TIMEOUT] uid={_account?.Uid} | bắt đầu chạy kịch bản; chuẩn bị acc đã dùng {Math.Round(LimitElapsed.TotalMinutes, 1)} phút"
+                + (_setting.ContainsKey("timeoutTaiKhoan") ? $" trong hạn mức {_setting["timeoutTaiKhoan"]} phút mỗi tài khoản." : "."));
             _mainService._sate = "Tải kịch bản";
 
             // Mở app + đăng nhập một lần trước khi chạy chuỗi hành động.

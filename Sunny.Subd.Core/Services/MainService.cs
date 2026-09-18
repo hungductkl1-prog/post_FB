@@ -34,6 +34,25 @@ namespace Sunny.Subd.Core.Services
         public JsonHelper _settingGeneral, _settingScript, _settingScriptAction, _settingJob; // Cấu hình chung từ JSON
         public string _sate = string.Empty; // Trạng thái hiện tại của quá trình
         public Stopwatch _swTotal = new Stopwatch();
+        // ── [TIME-LIMIT v25] MỐC BẤM GIỜ "GIỚI HẠN THỜI GIAN CHẠY MỖI TÀI KHOẢN" ──────────────
+        // Trước v25 mỗi lớp Farming tự Restart đồng hồ RIÊNG ở ĐẦU ExecuteAsync, tức là SAU khi
+        // MainService đã chuẩn bị xong tài khoản (xóa dữ liệu -> đổi thiết bị -> đổi proxy ->
+        // restore -> login) => thời gian chuẩn bị KHÔNG bị tính vào hạn mức.
+        // Theo yêu cầu người dùng 2026-09-18: hạn mức nay TÍNH CẢ thời gian chuẩn bị acc. Đồng hồ
+        // chuyển về ĐÂY vì MainService mới là nơi chạy các bước chuẩn bị; các lớp Farming chỉ ĐỌC
+        // mốc này (xem LimitElapsed trong FacebookFarming/InstagramFarming/PandoraFarming).
+        // QUY TRÌNH GIỮ NGUYÊN: không thêm/bớt/đảo bước nào, chỉ đổi MỐC tính thời gian.
+        // Không bao giờ Stop() -> Elapsed luôn đúng kể cả khi vòng account bị ngoại lệ giữa chừng.
+        public readonly Stopwatch _swAccountLimit = new();
+
+        /// <summary>
+        /// [TIME-LIMIT v25] Thời gian đã trôi qua KỂ TỪ LÚC BẮT ĐẦU CHUẨN BỊ tài khoản hiện tại
+        /// (xóa dữ liệu -> đổi thiết bị -> đổi proxy -> restore -> login -> chạy kịch bản).
+        /// Các lớp Farming đọc giá trị này thay cho đồng hồ riêng của chúng, nhờ đó hạn mức
+        /// "Giới hạn thời gian chạy mỗi tài khoản / mỗi kịch bản" TÍNH CẢ thời gian chuẩn bị acc.
+        /// </summary>
+        public TimeSpan AccountLimitElapsed => _swAccountLimit.Elapsed;
+
         private BackupRestoreHelper _backupRestoreHelper;
         private bool _devicePrepared;
         private bool _facebookPermissionsReady;
@@ -960,6 +979,10 @@ namespace Sunny.Subd.Core.Services
 
                 if (_account == null) continue;
                 _account.Running = true;
+                // [TIME-LIMIT v25] Bấm giờ TỪ ĐÂY: hạn mức mỗi tài khoản TÍNH CẢ thời gian chuẩn bị
+                // acc (bước 1/6 ClearPreviousAccountData -> 2/6 ChangeInfo -> 3/6 ChangeProxy ->
+                // 4/6 Restore -> 5/6 Login) cộng với thời gian chạy kịch bản (6/6).
+                _swAccountLimit.Restart();
                 try
                 {
                     AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
@@ -1102,6 +1125,9 @@ namespace Sunny.Subd.Core.Services
                 if (_account == null) continue;
 
                 _account.Running = true;
+                // [TIME-LIMIT v25] Bấm giờ TỪ ĐÂY: hạn mức mỗi tài khoản TÍNH CẢ thời gian chuẩn bị
+                // acc (CheckLiveAsync + ConnectAndPrepareDeviceAsync) cộng với thời gian chạy kịch bản.
+                _swAccountLimit.Restart();
                 try
                 {
                     if (!await CheckLiveAsync()) continue;
