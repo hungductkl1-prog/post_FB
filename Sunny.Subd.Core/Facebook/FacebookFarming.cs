@@ -9555,6 +9555,7 @@ namespace Sunny.Subd.Core.Facebook
                     bool postSuccess = false;
                     bool textFilled = false;
                     bool musicSelected = false;
+                    bool privacyConfigured = false;
 
                     List<string> xpaths;
                     if (postType == 0)
@@ -9844,11 +9845,19 @@ namespace Sunny.Subd.Core.Facebook
                                 {
                                     break;
                                 }
+                                // LUỒNG CŨ (chờ xpath 'Privacy'/'Public' có label) CHỈ còn đúng với
+                                // FB bản cũ. Bản mới sheet KHÔNG label -> phải bấm row Privacy THEO
+                                // HÌNH HỌC, nếu không tool kẹt: mở sheet -> chờ 10s+10s hụt -> Back
+                                // systemui ĐÓNG sheet -> lặp tới timeout, không bao giờ tới 'Share'.
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Public...", 2);
-                                _client.ElementWithAttributes(foundElement, 1, xmlSource);
-                                _client.Delay(2);
-                                _client.ElementWithAttributes("//*[@text='Privacy' or @content-desc='Privacy']", 10, "");
-                                _client.Delay(2);
+                                if (!OpenStoryPrivacySheetByGeometry())
+                                {
+                                    // Fallback bản FB cũ: gear mở thẳng màn privacy có label.
+                                    _client.ElementWithAttributes(foundElement, 1, xmlSource);
+                                    _client.Delay(2);
+                                    _client.ElementWithAttributes("//*[@text='Privacy' or @content-desc='Privacy']", 10, "");
+                                    _client.Delay(2);
+                                }
                                 _client.ElementWithAttributes("//*[@text='Public' or @content-desc='Public']", 10, "");
                                 _client.Delay(2);
                                 var xpathsPublic = new List<string> { "//*[@text='SAVE' or @content-desc='SAVE']", "//*[@text='CHANGE' or @content-desc='CHANGE']", "//*[@text='CHANGE' or @text='SAVE'] or @content-desc='CHANGE'] or @content-desc='SAVE']", "//*[@text='Go to setting' or @content-desc='Go to setting']", "//*[@text='Add Public option' or @content-desc='Add Public option']" };
@@ -9863,6 +9872,11 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 _client.ElementWithAttributes("//*[@content-desc='Back']", 10, "");
                                 _client.Delay(2);
+                                // ĐÃ chốt privacy -> RÚT xpath bánh răng KHỎI list: sheet hết label
+                                // nên nếu giữ, mỗi vòng lặp tool lại MỞ sheet và không bao giờ rơi
+                                // xuống 'Share' (gear đứng TRƯỚC Share trong list ưu tiên).
+                                privacyConfigured = true;
+                                xpaths.Remove("//*[contains(@text, 'Settings') or contains(@content-desc, 'Settings')]");
                                 WaitForPostComplete(60);
                                 break;
                             case "//*[@text='Privacy' or @content-desc='Privacy']":
@@ -9870,15 +9884,30 @@ namespace Sunny.Subd.Core.Facebook
                                 {
                                     break;
                                 }
+                                if (privacyConfigured)
+                                {
+                                    // Privacy đã chốt ở vòng trước; node label sót lại chỉ khiến
+                                    // tool mở lại màn privacy vô ích -> rút xpath khỏi list.
+                                    xpaths.Remove(foundElement);
+                                    break;
+                                }
                                 _mainService.SetStatus($"({successCount + 1}/{targetCount}), Tap Public...", 2);
                                 _client.ElementWithAttributes(foundElement, 1, xmlSource);
                                 _client.Delay(2);
+                                if (!_client.ElementWithAttributes("//*[@text='Public' or @content-desc='Public']", 5, ""))
+                                {
+                                    // Sheet bản FB mới KHÔNG label: bấm row Privacy theo hình học.
+                                    OpenStoryPrivacySheetByGeometry();
+                                }
                                 _client.ElementWithAttributes("//*[@text='Public' or @content-desc='Public']", 10, "");
                                 _client.Delay(2);
                                 _client.ElementWithAttributes(new List<string> { "//*[@text='SAVE' or @content-desc='SAVE']", "//*[@text='CHANGE' or @content-desc='CHANGE']", "//*[@text='CHANGE' or @text='SAVE'] or @content-desc='CHANGE'] or @content-desc='SAVE']" }, 5, xmlSource);
                                 _client.Delay(2);
                                 _client.ElementWithAttributes("//*[@content-desc='Back']", 10, "");
                                 _client.Delay(2);
+                                privacyConfigured = true;
+                                xpaths.Remove("//*[contains(@text, 'Settings') or contains(@content-desc, 'Settings')]");
+                                xpaths.Remove(foundElement);
                                 WaitForPostComplete(60);
                                 break;
                             case "//*[@text='Public' or @content-desc='Public']":
@@ -9888,6 +9917,8 @@ namespace Sunny.Subd.Core.Facebook
                                 }
                                 _client.ElementWithAttributes("//*[@text='CHANGE' or @text='SAVE']", 5, "");
                                 _client.ElementWithAttributes("//*[@content-desc='Back']", 1, xmlSource);
+                                privacyConfigured = true;
+                                xpaths.Remove("//*[contains(@text, 'Settings') or contains(@content-desc, 'Settings')]");
                                 WaitForPostComplete(60);
                                 break;
                             case "//*[@content-desc=\"Share\"]":
@@ -14252,6 +14283,71 @@ namespace Sunny.Subd.Core.Facebook
 
             return PerformSwipe(startPoint, endPoint, speed, direction, repeatCount); // method_53
         }
+        // Composer story bản FB mới (InspirationComposerActivity, đo live 21-09-2026 trên
+        // 5200ef68feda15cf): sheet "Privacy / Save / Add AI Label" vẽ nhãn lên canvas React-Native
+        // nên MỌI node trong sheet đều text="" content-desc="" (ViewGroup NAF="true") -> xpath
+        // 'Privacy'/'Public' KHÔNG BAO GIỜ khớp, tool kẹt vòng lặp mở/đóng sheet tới timeout 300s.
+        // Nhận diện BẰNG HÌNH HỌC: sheet = ViewGroup clickable desc='Close' (handle kéo) + con
+        // LinearLayout; các ROW là ViewGroup clickable='true' NAF='true' full-width, thứ tự cố định
+        // row1=Privacy, row2=Save, row3=Add AI Label (kèm Switch). Trả bounds của row thứ rowIndex.
+        private string FindStorySheetRowBounds(string xmlSource, int rowIndex)
+        {
+            if (string.IsNullOrEmpty(xmlSource)) return null;
+            try
+            {
+                var nodes = _client.GetAttributeValuesFromXmlNodes(xmlSource,
+                    "//android.view.ViewGroup[@clickable='true' and @NAF='true']", "bounds");
+                var rows = new List<string>();
+                foreach (var b in nodes)
+                {
+                    if (string.IsNullOrEmpty(b)) continue;
+                    var r = new RectangleArea(b);
+                    // ROW sheet: full-width (trái ~0, phải ~màn hình) và cao ~150-300px.
+                    // Loại node nền composer (nút tròn cạnh phải, khay sticker…) không full-width.
+                    if (r.Left <= 5 && r.Right - r.Left >= 1000 && r.Bottom - r.Top >= 120 && r.Bottom - r.Top <= 400)
+                        rows.Add(b);
+                }
+                rows.Sort((a, b2) => new RectangleArea(a).Top.CompareTo(new RectangleArea(b2).Top));
+                return rowIndex < rows.Count ? rows[rowIndex] : null;
+            }
+            catch (Exception ex)
+            {
+                RunHistoryLog.Step(_client.Device?.Serial ?? "?", $"[StorySheet] FindStorySheetRowBounds lỗi: {ex.Message}");
+                return null;
+            }
+        }
+
+        // Mở sheet bằng bánh răng (desc='Story Settings Menu') rồi bấm row Privacy THEO HÌNH HỌC
+        // (row 0) — xem ghi chú FindStorySheetRowBounds. Màn "Story privacy" mở ra CÓ label đầy đủ
+        // (RadioButton 'Public'/'Friends'/'Custom') nên phần chọn Public + SAVE tái dụng luồng cũ.
+        // Trả TRUE nếu đã bấm được row Privacy (màn privacy mở ra hoặc đã đổi cảnh).
+        private bool OpenStoryPrivacySheetByGeometry()
+        {
+            try
+            {
+                if (!_client.ElementWithAttributes("//*[@content-desc='Story Settings Menu']", 5, ""))
+                    return false;
+                _client.Delay(2);
+                string xmlSheet = _client.GetXMLSource();
+                string rowBounds = FindStorySheetRowBounds(xmlSheet, 0);
+                if (rowBounds == null)
+                {
+                    RunHistoryLog.Step(_client.Device?.Serial ?? "?", "[StorySheet] KHÔNG thấy row Privacy trong sheet (dump không có ViewGroup NAF full-width)");
+                    return false;
+                }
+                var pt = new RectangleArea(rowBounds).GetCenterPoint();
+                _mainService.SetStatus($"Tap row Privacy theo hình học {rowBounds}...", 2);
+                _client.Click(pt.X, pt.Y);
+                _client.Delay(2);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                RunHistoryLog.Step(_client.Device?.Serial ?? "?", $"[StorySheet] OpenStoryPrivacySheetByGeometry lỗi: {ex.Message}");
+                return false;
+            }
+        }
+
         public bool WaitForPostComplete(int E40D7F04)
         {
             try
