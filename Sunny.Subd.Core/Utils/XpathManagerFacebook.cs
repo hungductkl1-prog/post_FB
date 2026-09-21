@@ -186,7 +186,19 @@ namespace Sunny.Subd.Core.Utils
           "//*[@text=\"Save\"]",
           "//*[@content-desc=\"Save\"]",
           "//*[@text=\"SAVE\"]",
-          "//*[contains(@text, \"Save\")]",
+          // LƯỚI contains() bắt nút confirm "Save info"/"Save login info" của dialog
+          // "Save your login info?" — CHỈ contains mới khớp nhãn dài; exact @text="Save"
+          // ở trên KHÔNG bắt được, và trong repo KHÔNG có entry exact nào cho "Save info".
+          // 2026-09-21: THÊM not(contains(@text,"post")) vì trên newsfeed node action-bar có
+          // text="Save post" (nút bookmark nhỏ cạnh Like/Comment/Share, verify LIVE trên
+          // 5200ef68feda15cf: Button clickable=true bounds=[1106,1570][1440,1724]) ->
+          // contains(@text,"Save") CŨ khớp và BẤM NHẦM nó. Nhóm NavigationButton được nạp
+          // TOÀN CỤC ở mọi vòng farming (FacebookFarming.cs:9653, FacebookService.cs, …) nên
+          // lỗi lan khắp nơi. Loại chữ "post" nhưng GIỮ "Save info" (dialog login-info không
+          // chứa "post"). contains()+and → CanUseManualAttributeFallback=false (ADBClient.cs:4094)
+          // → chỉ chạy XPath thật, contains() case-SENSITIVE, not() được tôn trọng, không bị
+          // fallback hoa/thường phá luật loại trừ.
+          "//*[contains(@text, \"Save\") and not(contains(@text, \"post\"))]",
           // ── META "USE FOR FREE WITH ADS": DỜI XUỐNG ĐÂY (cạnh Skip/Save) 2026-09-08 theo
           // yêu cầu. Trước đây 2 entry này đứng ở ĐẦU nhóm (ngay sau "Only allow essential
           // cookies") -> với luật XPATH-KHỚP-ĐẦU-TIÊN của ADBClient.FindElement chúng THẮNG và
