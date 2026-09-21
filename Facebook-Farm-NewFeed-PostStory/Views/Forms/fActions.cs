@@ -134,6 +134,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             FontUtil.ApplyFontToAllControls(this); Facebook_Farm_NewFeed_PostStory.Utils.Design.VietnameseFont.Enforce(this);
         }
 
+        // Ẩn thẻ "Kháng spam" khỏi danh sách chọn hành động (CHỈ ẩn UI — quy trình chạy giữ nguyên:
+        // script đã lưu chứa HDKhangSpam vẫn chạy, vẫn mở sửa được ở màn chi tiết kịch bản).
+        // Muốn hiện lại thẻ: đổi thành true rồi build lại.
+        const bool HienTileKhangSpam = false;
+
         void LoadList()
         {
             // Project mới: chỉ 6 action — chia 2 nhóm (Nuôi tương tác / Đổi thông tin).
@@ -182,7 +187,11 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Forms
             foreach (var it in dir)
             {
                 var list_sub = new List<AntdUI.VirtualItem>(it.Value.Length);
-                foreach (var item in it.Value) list_sub.Add(new VItem(item));
+                foreach (var item in it.Value)
+                {
+                    if (item.id == FacebookFarmingType.HDKhangSpam && !HienTileKhangSpam) continue;
+                    list_sub.Add(new VItem(item));
+                }
                 list.Add(new TItem(it.Key, list_sub));
                 list.AddRange(list_sub);
             }
