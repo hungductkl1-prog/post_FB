@@ -1476,32 +1476,182 @@ namespace Sunny.Subd.Core.Facebook
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // HOOK TOÀN CỤC GỘP — detector/interceptor cho CẢ Meta consent LẪN quiet mode.
+        // IXT "You're back on Facebook" — bottom sheet hiện sau khi acc được gỡ suspend.
+        // ─────────────────────────────────────────────────────────────────────────
+        // LIVE 2026-09-25 trên 5200ef68feda15cf: acc vừa được gỡ suspend thì FB mở
+        // com.facebook.katana/...ixt.enrollmenttrigger.IXTEnrollmentActivity — bottom sheet
+        // "You're back on Facebook / Your account is no longer suspended". Màn này GIẾT job:
+        //   • Nội dung Litho/Bloks: dump KHÔNG có text/content-desc nào (subtree sheet chỉ là
+        //     ViewGroup trần + RecyclerView) -> xpath tiếng Anh KHÔNG BAO GIỜ khớp, detector
+        //     chuỗi cũng mù luôn.
+        //   • Sheet KHÔNG cuộn (input swipe trong sheet không ăn — đã xác minh), nút duy nhất
+        //     nằm dưới nếp gấp -> không tap target nào xuất hiện.
+        //   • uiautomator dump bị KILL trên màn này (exit 137) — chỉ kênh ATX sống.
+        // LỐI THOÁT xác minh LIVE: tap SCRIM (vùng tối phía trên sheet) — sheet dismiss như
+        // bottom sheet cancelable thường, trả về FbMainTabActivity (feed). Back cũng thoát nhưng
+        // để làm fallback thôi (scrim đúng ngữ nghĩa "dismiss" hơn, không rủi ro pop nhầm).
+        //
+        // Detector: prefilter chuỗi (id obfuscate của wrapper sheet) + HÌNH HỌC (handle + thân
+        // sheet + wrapper disabled neo đáy) — xem IsIxtReinstatementPopup. KHÔNG dùng chuỗi đơn
+        // thuần: id đó phủ gần mọi node FB nên feed thường cũng chứa nó. Vẫn thuần đọc, không shell.
+        //
+        // Interceptor: gate BẰNG ACTIVITY (IXTEnrollmentActivity) vì id obfuscate kia có thể bị
+        // sheet Bloks khác dùng chung — tap scrim sai màn sẽ dismiss UI thật. Toạ độ tap suy
+        // THUẦN HÌNH HỌC từ drag-handle (xem FindIxtScrimTapByGeometry). Xác minh bằng dump:
+        // marker sheet phải BIẾN MẤT; không bao giờ trả true mò.
+
+        private const string IxtSheetWrapperId = "com.facebook.katana:id/(name removed)";
+
+        /// <summary>
+        /// Detector cho màn IXT "You're back on Facebook". KHÔNG thể chỉ đọc chuỗi: id
+        /// `com.facebook.katana:id/(name removed)` là id OBFUSCATE mà FB gán cho GẦN MỌI node
+        /// (đo LIVE 2026-09-25: feed thường có ~25 node mang id này, kể cả một wrapper
+        /// `enabled="false"` full-width `[0,632][1440,1281]`) -> detector chuỗi thuần sẽ bốc cháy
+        /// trên MỌI dump của feed. Vì vậy: prefilter chuỗi (rẻ, loại 99% dump không phải FB-sheet)
+        /// rồi HÌNH HỌC (handle + thân sheet + wrapper disabled neo ĐÁY màn — feed không có handle
+        /// và wrapper của feed lơ lửng giữa màn chứ không neo đáy). Vẫn THUẦN đọc, không shell.
+        /// </summary>
+        public static bool IsIxtReinstatementPopup(string xml)
+        {
+            if (string.IsNullOrEmpty(xml)) return false;
+            if (xml.IndexOf(IxtSheetWrapperId, StringComparison.Ordinal) < 0) return false;
+            return FindIxtScrimTapByGeometry(xml) != null;
+        }
+
+        /// <summary>
+        /// Điểm tap SCRIM phía trên sheet IXT, suy THUẦN HÌNH HỌC (sheet không nhãn). Trả null
+        /// khi KHÔNG ĐỦ bằng chứng (caller tuyệt đối không đoán mò):
+        ///  1. Handle TRẦN: node không text/desc, hẹp (W &lt;= 20% màn), mỏng (H &lt;= 3% màn),
+        ///     nằm GIỮA trục X và ở dải giữa màn hình (20%..80% chiều cao) — đo LIVE
+        ///     [650,1112][790,1126] trên màn 1440x2560.
+        ///  2. Thân sheet: node RỘNG FULL màn bắt đầu NGAY dưới handle (trong 5% chiều cao).
+        ///  3. Wrapper disabled full-width phải BỌC thân sheet — chứng tỏ đây đúng sheet IXT
+        ///     (id marker) chứ không phải một View tình cờ giống handle ở màn khác.
+        /// Điểm tap: (giữa màn, giữa dải scrim phía trên sheet) — vùng tối đã xác minh ăn tap.
+        /// </summary>
+        internal static System.Drawing.Point? FindIxtScrimTapByGeometry(string xml)
+        {
+            var nodes = ParseUiNodes(xml, out int maxR, out int maxB);
+            if (nodes == null || nodes.Count == 0 || maxR <= 0 || maxB <= 0) return null;
+
+            // (1) drag-handle: View trần, nhỏ, giữa màn. Lấy cái TRÊN CÙNG nếu có nhiều ứng viên.
+            UiNode? handle = null;
+            foreach (var nd in nodes)
+            {
+                if (nd.Tx.Length > 0 || nd.Cd.Length > 0) continue;
+                if (nd.W > maxR / 5 || nd.H > maxB * 3 / 100 || nd.H < 2) continue;
+                if (Math.Abs(nd.Cx - maxR / 2) > maxR / 20) continue;
+                if (nd.Cy < maxB / 5 || nd.Cy > maxB * 4 / 5) continue;
+                if (handle == null || nd.Cy < handle.Value.Cy) handle = nd;
+            }
+            if (handle == null) return null;
+
+            // (2) thân sheet: full-width, mép trên sát dưới handle.
+            int sheetTop = 0;
+            foreach (var nd in nodes)
+            {
+                if (nd.W < maxR * 95 / 100) continue;
+                if (nd.T < handle.Value.B || nd.T > handle.Value.B + maxB / 20) continue;
+                if (sheetTop == 0 || nd.T < sheetTop) sheetTop = nd.T;
+            }
+            if (sheetTop == 0) return null;
+
+            // (3) wrapper disabled full-width bọc thân sheet (= id marker của sheet IXT).
+            bool wrapperOk = false;
+            foreach (var nd in nodes)
+            {
+                if (!nd.Disabled || nd.W < maxR / 2) continue;
+                if (nd.T > sheetTop + maxB / 50 || nd.B < maxB * 9 / 10) continue;
+                wrapperOk = true;
+                break;
+            }
+            if (!wrapperOk) return null;
+
+            int y = sheetTop / 2;
+            if (y < maxB / 20 || y >= handle.Value.T) return null;   // dải scrim quá mỏng -> bỏ
+            return new System.Drawing.Point(maxR / 2, y);
+        }
+
+        /// <summary>
+        /// Interceptor TỰ-GATE cho sheet IXT (chữ ký khớp Func&lt;ADBClient,string,bool&gt; để nối
+        /// vào hook toàn cục). Trả FALSE nhanh nếu không phải màn IXT. Bản ĐỒNG BỘ vì hook trong
+        /// GetXMLSource là hàm sync.
+        /// </summary>
+        public static bool TryHandleIxtReinstatementPopup(ADBClient client, string xml)
+        {
+            if (client == null || !IsIxtReinstatementPopup(xml)) return false;
+
+            // Gate BẰNG ACTIVITY: id wrapper là id Bloks obfuscate nên sheet khác của FB có thể
+            // dùng chung -> tap scrim sai màn sẽ dismiss UI thật. IXTEnrollmentActivity là màn
+            // DUY NHẤT phép dismiss này thuộc về.
+            string activity = string.Empty;
+            try
+            {
+                var info = client.AppCurrent();
+                if (info != null) activity = info.Activity ?? string.Empty;
+            }
+            catch { }
+            if (activity.IndexOf("IXTEnrollmentActivity", StringComparison.OrdinalIgnoreCase) < 0) return false;
+
+            var scrim = FindIxtScrimTapByGeometry(xml);
+            if (scrim == null) return false;
+
+            Log(client, "[PopupInterceptor] sheet IXT 'You're back on Facebook' -> tap scrim để dismiss");
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                client.ThrowIfStopped();
+                client.Click(scrim.Value.X, scrim.Value.Y);
+                Thread.Sleep(1200);
+                string xmlNow = client.GetXMLSource();
+                if (string.IsNullOrEmpty(xmlNow)) { Thread.Sleep(400); continue; }
+                if (!IsIxtReinstatementPopup(xmlNow))
+                {
+                    Log(client, "[IXT] XONG — sheet đã dismiss (xác minh dump: hết wrapper id)");
+                    return true;
+                }
+                // Scrim tap không ăn (biến thể sheet?) -> thử Back trước khi chịu thua.
+                client.Shell("input keyevent 4");
+                Thread.Sleep(1200);
+                xmlNow = client.GetXMLSource();
+                if (!string.IsNullOrEmpty(xmlNow) && !IsIxtReinstatementPopup(xmlNow))
+                {
+                    Log(client, "[IXT] XONG — sheet đã dismiss bằng Back (xác minh dump)");
+                    return true;
+                }
+            }
+            Log(client, "[IXT] THẤT BẠI — sheet VẪN còn sau 3 lượt; trả FALSE để van an toàn hạ nhiệt");
+            return false;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // HOOK TOÀN CỤC GỘP — detector/interceptor cho Meta consent, quiet mode VÀ sheet IXT.
         // ─────────────────────────────────────────────────────────────────────────
         // ADBClient chỉ có MỘT cặp slot GlobalPopupDetector/GlobalPopupInterceptor (gán 1 lần
         // từ Program.Main của mỗi app — AutoAndroid KHÔNG reference Sunny.Subd.Core). Gán chồng
-        // sẽ GHI ĐÈ slot trước. Vì vậy phải GỘP: detector OR cả hai, interceptor thử Meta consent
-        // trước (tự-gate, trả false nhanh nếu không phải) rồi tới quiet mode (tự-gate). Mỗi
-        // handler con tự nhận diện CHÍNH XÁC nên không giẫm chân nhau; cả hai đều hưởng chung
-        // van an toàn fail-streak/cooldown của RunGlobalPopupInterceptor.
+        // sẽ GHI ĐÈ slot trước. Vì vậy phải GỘP: detector OR cả ba, interceptor thử Meta consent
+        // trước (tự-gate, trả false nhanh nếu không phải) rồi quiet mode rồi sheet IXT (đều
+        // tự-gate). Mỗi handler con tự nhận diện CHÍNH XÁC nên không giẫm chân nhau; cả ba đều
+        // hưởng chung van an toàn fail-streak/cooldown của RunGlobalPopupInterceptor.
         //
         // Cập nhật 2 Program.cs (LamToolAutoPhonePrime + Facebook-Farm-NewFeed-PostStory) trỏ vào
         // IsGlobalPopup / TryHandleGlobalPopup thay vì IsMetaConsentPopup / TryHandleMetaConsentPopup.
 
-        /// <summary>Detector toàn cục gộp: consent Meta HOẶC quiet mode. RẺ — chỉ đọc chuỗi.</summary>
+        /// <summary>Detector toàn cục gộp: consent Meta HOẶC quiet mode HOẶC sheet IXT. RẺ — chỉ đọc chuỗi.</summary>
         public static bool IsGlobalPopup(ADBClient client, string xml)
-            => IsMetaConsentPopup(client, xml) || IsQuietModePopup(xml);
+            => IsMetaConsentPopup(client, xml) || IsQuietModePopup(xml) || IsIxtReinstatementPopup(xml);
 
         /// <summary>
-        /// Interceptor toàn cục gộp: thử Meta consent trước (tự-gate), rồi quiet mode (tự-gate).
-        /// Trả TRUE nếu MỘT trong hai đã xử lý. Bản ĐỒNG BỘ (hook trong GetXMLSource là sync).
+        /// Interceptor toàn cục gộp: thử Meta consent trước (tự-gate), rồi quiet mode (tự-gate),
+        /// rồi sheet IXT (tự-gate). Trả TRUE nếu MỘT trong ba đã xử lý. Bản ĐỒNG BỘ (hook trong
+        /// GetXMLSource là sync).
         /// </summary>
         public static bool TryHandleGlobalPopup(ADBClient client, string xml)
         {
             // TryHandleMetaConsentPopup tự gate bằng IsMetaConsentPopup + xpath/hình học -> màn
-            // quiet mode khiến nó trả false NGAY, không tốn thao tác tap nào.
+            // quiet mode / sheet IXT khiến nó trả false NGAY, không tốn thao tác tap nào.
             if (TryHandleMetaConsentPopup(client, xml)) return true;
             if (TryHandleQuietModePopup(client, xml)) return true;
+            if (TryHandleIxtReinstatementPopup(client, xml)) return true;
             return false;
         }
 

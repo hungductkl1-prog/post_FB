@@ -315,6 +315,68 @@ namespace Sunny.Subd.Core.Services
             _accountContext.Update(_account);
         }
 
+        // [v30] Lưu cookie/token CHO ACC PHÁT HIỆN BỊ CHECKPOINT 282 lúc login app FB.
+        // Gọi từ nhánh catch của RunAsync (KHÔNG nằm trong 6 bước chạy) => acc KHÔNG bị 282
+        // không bao giờ đi qua đây, giữ nguyên hành vi cũ (vẫn lưu ở bước 5/6 sau Login).
+        // BẢN RÚT GỌN: chỉ đọc GetAuthenticationInfo + gán Cookie/Token + Update. KHÔNG gọi
+        // ExtractAndUpdateAuthenticationInfoAsync vì hàm đó KÈM backup profile/device => sẽ THÊM
+        // bước cho acc 282 (đụng quy trình). Gate checkBox10: bỏ tích => KHÔNG lưu.
+        // Không bao giờ ghi đè cookie/token ĐÃ CÓ bằng chuỗi rỗng (phiên 282 có thể pending).
+        private void TrySaveCookieTokenOnCheckpoint()
+        {
+            string serial = _client.Device?.Serial ?? "?";
+            try
+            {
+                bool saveCookieToken = _settingGeneral.GetBooleanValue("checkBox10", true);
+                if (!saveCookieToken) return;                 // bỏ tích ô "Lưu cookie, token" => KHÔNG lưu
+                if (_account == null) return;
+                if (!_client.IsRoot()) return;
+
+                // Acc đã có đủ cookie+token (từ lần login khỏe trước) => KHÔNG đọc lại, tránh
+                // ghi đè dữ liệu tốt bằng phiên đang chờ xác minh của màn 282.
+                if (!string.IsNullOrEmpty(_account.Cookie) && !string.IsNullOrEmpty(_account.Token))
+                {
+                    AutoAndroid.RunHistoryLog.Note(serial,
+                        $"[CP282-AUTH] uid={_account?.Uid} | acc đã có cookie+token trong DB, bỏ qua đọc lại (không ghi đè).");
+                    return;
+                }
+
+                string value = FacebookHander.GetAuthenticationInfo(_client);
+                var parts = value.Split('|');
+                if (parts.Length < 3)
+                {
+                    AutoAndroid.RunHistoryLog.Note(serial,
+                        $"[CP282-AUTH] uid={_account?.Uid} | GetAuthenticationInfo trả chuỗi không hợp lệ, không lưu được cookie/token.");
+                    return;
+                }
+
+                bool changed = false;
+                if (!string.IsNullOrEmpty(parts[0])) { _account.Uid = parts[0]; changed = true; }
+                if (!string.IsNullOrEmpty(parts[1])) { _account.Token = parts[1]; changed = true; }
+                if (!string.IsNullOrEmpty(parts[2])) { _account.Cookie = parts[2]; changed = true; }
+
+                if (changed)
+                {
+                    _accountContext.Update(_account);
+                    AutoAndroid.RunHistoryLog.Note(serial,
+                        $"[CP282-AUTH] uid={_account?.Uid} | acc bị CP_282: ĐÃ lưu cookie/token "
+                        + $"(cookie={(_account.Cookie?.Length ?? 0)}b, token={(_account.Token?.Length ?? 0)}b).");
+                }
+                else
+                {
+                    AutoAndroid.RunHistoryLog.Note(serial,
+                        $"[CP282-AUTH] uid={_account?.Uid} | acc bị CP_282 nhưng file auth FB app chưa có session "
+                        + "(đọc rỗng) — không lưu được cookie/token.");
+                }
+            }
+            catch (Exception exCp)
+            {
+                // logging-only: không bao giờ để việc lưu cookie làm hỏng nhánh xử lý lỗi.
+                AutoAndroid.RunHistoryLog.Note(serial,
+                    $"[CP282-AUTH] uid={_account?.Uid} | lưu cookie/token khi CP_282 THẤT BẠI: {exCp.Message}");
+            }
+        }
+
         // Thay đổi thông tin thiết bị
         // Luôn chạy trong luồng job: thứ tự đã chốt là change device TRƯỚC change
         // proxy. Không gate theo checkBox1 nữa vì toggle đó bị ẩn trong UI và giá
@@ -1098,6 +1160,14 @@ namespace Sunny.Subd.Core.Services
                     AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
                         $"[{AutoAndroid.DeviceChangeLog.BuildTag}] RunAsync: NGOẠI LỆ ở bước [{_sate}] uid={_account?.Uid}: {ex.Message}");
                     HanderCase(ex);
+                    // [v30] Acc phát hiện bị checkpoint 282 lúc login app FB thì Login() ném CP_282
+                    // TRƯỚC dòng lưu cookie/token ở bước 5/6 (:1089) => trước đây KHÔNG lưu được.
+                    // Ở đây (nhánh lỗi, NGOÀI 6 bước chạy) bắt cookie/token cho riêng CP_282.
+                    // Acc KHÔNG bị 282 không bao giờ ném CP_282 => không vào nhánh này => giữ nguyên.
+                    if ((ex as SubdyExtension)?.SubdyEnum == SubdyEnum.CP_282)
+                    {
+                        TrySaveCookieTokenOnCheckpoint();
+                    }
                 }
                 finally
                 {
