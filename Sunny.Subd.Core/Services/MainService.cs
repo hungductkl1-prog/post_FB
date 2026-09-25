@@ -207,10 +207,24 @@ namespace Sunny.Subd.Core.Services
                         throw new Exception("Chuỗi xác thực không hợp lệ.");
                     }
                 }
-                catch
+                catch (Exception exAuth)
                 {
+                    // [v29] logging-only: trước đây catch{} rỗng nuốt MỌI lỗi đọc auth => "tích ô
+                    // lưu cookie/token nhưng tool không lưu" mà không có dấu vết. Ghi ra RunHistory
+                    // để biết tại sao (KHÔNG đổi quy trình: vẫn không ném, vẫn chạy tiếp các bước sau).
+                    AutoAndroid.RunHistoryLog.Note(_client.Device?.Serial ?? "?",
+                        $"[AUTH] uid={_account?.Uid} | GetAuthenticationInfo THẤT BẠI (saveCookieToken={saveCookieToken}): {exAuth.Message}");
                 }
 
+            }
+            // [v29] logging-only: nếu user TÍCH ô lưu cookie/token mà sau bước này Cookie/Token VẪN
+            // rỗng thì báo rõ trong log (file auth FB app có thể chưa tồn tại nếu acc chưa đăng nhập
+            // app — vd luồng kháng spam 282 login bằng Chrome cookie, không mở app FB).
+            if (saveCookieToken && (string.IsNullOrEmpty(_account.Cookie) || string.IsNullOrEmpty(_account.Token)))
+            {
+                AutoAndroid.RunHistoryLog.Note(_client.Device?.Serial ?? "?",
+                    $"[AUTH] uid={_account?.Uid} | ô 'Lưu cookie, token' ĐANG TÍCH nhưng Cookie/Token vẫn RỖNG sau khi trích xuất "
+                    + $"(cookie={(_account.Cookie?.Length ?? 0)}b, token={(_account.Token?.Length ?? 0)}b) — file auth FB app có thể chưa có.");
             }
             if (string.IsNullOrEmpty(_account.FullName))
             {

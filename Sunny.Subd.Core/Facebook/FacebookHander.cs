@@ -1556,9 +1556,28 @@ namespace Sunny.Subd.Core.Facebook
             string catData = "";
             try
             {
+                // [v29] Đọc file authentication của FB app qua ĐƯỜNG PROCESS (adb.exe) làm
+                // CHÍNH, với đường TUYỆT ĐỐI + quote 'cat ...' (dạng đã kiểm chứng chạy trong
+                // repo: ucManagerDevices/MaxChangeService đều quote). Socket giữ làm DỰ PHÒNG.
+                // Bản cũ: socket `su -c cat data/...` (relative, KHÔNG quote) và bọc cả 4 lần
+                // retry trong MỘT try — một lần socket timeout/hang (ReceiveTimeout 30s, xem v17)
+                // nuốt hết retry rồi trả "||"; caller nuốt tiếp trong catch{} => KHÔNG lưu
+                // cookie/token mà KHÔNG có log nào. Mỗi lần đọc giờ có try riêng + delay ngắn
+                // (file auth được FB ghi trễ một nhịp sau khi login). GIỮ NGUYÊN contract trả
+                // về `uid|token|cookie` và toàn bộ logic parse bên dưới.
+                string pkg = Package(PlatformModel.Facebook);
+                string authPath = "/data/data/" + pkg + "/app_light_prefs/" + pkg + "/authentication";
                 for (int i = 0; i < 4; i++)
                 {
-                    catData = client.Shell("su -c cat data/data/" + Package(PlatformModel.Facebook) + "/app_light_prefs/" + Package(PlatformModel.Facebook) + "/authentication");
+                    if (i > 0) System.Threading.Thread.Sleep(600);
+                    try { catData = client.ADB.Shell("su -c 'cat " + authPath + "'", 20); }
+                    catch { catData = ""; }
+                    if (string.IsNullOrEmpty(catData))
+                    {
+                        // Dự phòng: socket transport (đường cũ) nếu process trả rỗng.
+                        try { catData = client.Shell("su -c cat " + authPath); }
+                        catch { }
+                    }
                     if (!string.IsNullOrEmpty(catData))
                     {
                         try
