@@ -438,15 +438,19 @@ namespace Sunny.Subd.Core.Facebook
         // LƯU Ý: bản Python gốc KHÔNG làm việc này (clear_superproxy / stop_superproxy /
         // reset_network_on_device định nghĩa nhưng không gọi; chỗ reset IP trong auto_loop
         // chỉ là stub in thông báo). Đây là cải tiến theo yêu cầu, không phải bug port thiếu.
-        private async Task ChangeProxyAsync()
+        // v38: trả về ipAfter để caller (ConnectAndPrepareDeviceAsync) dùng luôn cho
+        // _account.IP/_account.Serial và bỏ bước recheck IsInternetAsync sau khi mở
+        // Facebook — mỗi acc giờ chỉ mở app changer đúng 1 lần change + 1 lần đọc IP
+        // (trước đây GetIp chạy 3 lần/acc = 3 lần AppStart app changer rồi force-stop).
+        private async Task<string> ChangeProxyAsync()
         {
             _sate = "Thay đổi IP/Proxy (SuperProxy)";
             SetStatus("Đang tắt/bật lại proxy com.scheler.superproxy để đổi IP...", 2);
             bool ok = false;
-            string ipBefore = string.Empty;
+            // v38: BỎ lần đọc IP TRƯỚC restart — nó mở app changer lên rồi force-stop
+            // chỉ để ghép note "IP trước → IP sau", không ai dùng ipBefore ngoài note.
             try
             {
-                ipBefore = await _client.GetIp();
                 var superProxy = new SuperProxyService(_client);
                 ok = await superProxy.RestartAsync();
             }
@@ -457,14 +461,12 @@ namespace Sunny.Subd.Core.Facebook
             }
 
             // Đọc lại IP sau khi bật để biết proxy có thật sự ra mạng ngoài hay không.
+            // v38: đây là lần GetIp DUY NHẤT của acc này (bỏ cả lần đọc trước restart
+            // lẫn lần recheck sau mở Facebook khi IP đã đọc được).
             string ipAfter = string.Empty;
             try { ipAfter = await _client.GetIp(); } catch { }
 
-            string ipNote = string.IsNullOrEmpty(ipAfter)
-                ? "IP: (không đọc được)"
-                : (string.IsNullOrEmpty(ipBefore) || ipBefore == ipAfter
-                    ? $"IP: {ipAfter}"
-                    : $"IP: {ipBefore} → {ipAfter}");
+            string ipNote = string.IsNullOrEmpty(ipAfter) ? "IP: (không đọc được)" : $"IP: {ipAfter}";
 
             SetStatus(ok
                 ? $"Đổi IP proxy thành công - {ipNote} - {_lastDeviceChange}"
@@ -473,6 +475,11 @@ namespace Sunny.Subd.Core.Facebook
 
             int timeDelay = _settingGeneral.GetIntType("numericUpDown3", 10);
             await DelayMessageAsync(timeDelay, "Delay sau khi bật proxy.", 2);
+
+            // Trace xác minh live (LogHelper chỉ ghi đè ô trạng thái UI, không vào file).
+            AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-IP] GetIP sau restart proxy: {(string.IsNullOrEmpty(ipAfter) ? "(rong)" : ipAfter)}, superProxy={(ok ? "OK" : "FAIL")}");
+            return ipAfter;
         }
 
         // Kiểm tra kết nối internet
@@ -559,9 +566,26 @@ namespace Sunny.Subd.Core.Facebook
             // 2. Change device
             await ChangeInfoAsync();
             // 3. Bật SuperProxy (vào app com.scheler.superproxy bấm start)
-            await ChangeProxyAsync();
+            // v38: ChangeProxyAsync trả về IP đọc được sau khi bật proxy.
+            string ipAfter = await ChangeProxyAsync();
             // 4. Mở Facebook để bắt đầu reg acc
             await OpenFacebookAndSizeAsync();
+
+            // v38: đọc được IP sau restart proxy = proxy đã xác thực ra mạng ngoài
+            // → ghi thẳng _account.IP/_account.Serial rồi return, KHÔNG chạy
+            // IsInternetAsync (nó GetIp lần nữa = mở app changer lần nữa chỉ để
+            // đọc lại chính IP vừa đọc). Các lưới an toàn bên dưới (reboot checkbox4,
+            // wifi retry, join wifi) giờ CHỈ chạy khi ipAfter rỗng.
+            if (!string.IsNullOrEmpty(ipAfter))
+            {
+                SetStatus($"IP:[{ipAfter}].", 2);
+                if (_account != null)
+                {
+                    _account.IP = ipAfter;
+                    _account.Serial = $"[{_client.Device.NameDevice} - {_client.Device.Serial}]";
+                }
+                return true;
+            }
 
             if (_settingGeneral.GetBooleanValue("checkBox4", false))
             {
