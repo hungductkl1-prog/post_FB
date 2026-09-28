@@ -377,6 +377,8 @@ namespace Sunny.Subd.Core.Facebook
         private async Task ChangeInfoAsync()
         {
             _sate = "Thay đổi thông tin thiết bị";
+            AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                $"[{AutoAndroid.DeviceChangeLog.BuildTag}] RegFacebookRegsiner: BẮT ĐẦU (uid={_account?.Uid}).");
             _client.LogHelper.SUCCESS(">>> BƯỚC ĐỔI THIẾT BỊ (chạy trước đổi proxy)");
             _client.LogHelper.State = _sate;
             try
@@ -390,7 +392,15 @@ namespace Sunny.Subd.Core.Facebook
                     string profileDir = _settingGeneral.GetValuesFromInputString("textBox2", Path.Combine(AppContext.BaseDirectory, "Backup", "Device", _regLabel));
                     profileDir = Path.Combine(profileDir);
                     Directory.CreateDirectory(profileDir);
-                    filezip = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
+                    // Acc MỚI chưa có uid (GetAccount chưa gán — uid chỉ có sau khi reg xong).
+                    // Nếu vẫn nối path thì filename chỉ còn ".tar.gz" — trùng file rác cũ chứa
+                    // fingerprint của một acc khác, Change() sẽ Restore nó ra => KHÔNG sinh
+                    // thiết bị mới. Giữ filezip rỗng để acc mới LUÔN GenerateNewDevice.
+                    // Acc đã có uid (checkpoint v35) vẫn nạp lại đúng profile của chính nó.
+                    if (!string.IsNullOrEmpty(_account?.Uid))
+                    {
+                        filezip = Path.Combine(profileDir, $"{_account.Uid}.tar.gz");
+                    }
                 }
                 if (await _client.ChangInfo(filezip, backup, "", "VN"))
                 {

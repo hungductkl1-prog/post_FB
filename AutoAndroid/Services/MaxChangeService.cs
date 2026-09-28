@@ -419,7 +419,20 @@ namespace AutoAndroid
                 //    sinh mới (trước đây code luôn broadcast CHANGE làm mất profile này).
                 //  - CHƯA có profile: sinh thông tin thiết bị MỚI và xác nhận fingerprint
                 //    thực sự thay đổi (không chỉ tin vào chuỗi "Broadcast completed").
-                bool hasProfile = !string.IsNullOrEmpty(filePath) && File.Exists(filePath);
+                // File rác "....\.tar.gz" (caller nối path với uid rỗng) tồn tại thật nhưng
+                // filename không có phần tên -> coi như KHÔNG có profile, nếu không mọi acc
+                // mới nạp lại cùng một fingerprint cũ. Caller hợp lệ (farming) luôn truyền
+                // <uid>.tar.gz hoặc chuỗi rỗng nên không bị ảnh hưởng.
+                // LƯU Ý: Path.GetFileNameWithoutExtension(".tar.gz") trả về ".tar" (KHÔNG
+                // rỗng) nên phải soi fileName trực tiếp: chấm ĐẦU TIÊN phải đứng sau ít
+                // nhất 1 ký tự tên (uid) thì file profile mới hợp lệ.
+                string fileName = string.IsNullOrEmpty(filePath) ? string.Empty : Path.GetFileName(filePath);
+                bool validProfileFile = fileName.IndexOf('.') > 0;
+                if (!string.IsNullOrEmpty(filePath) && !validProfileFile)
+                {
+                    Trace($"BỎ qua file rác filename không có tên [{filePath}] -> coi như chưa có profile.");
+                }
+                bool hasProfile = validProfileFile && File.Exists(filePath);
 
                 if (hasProfile)
                 {
