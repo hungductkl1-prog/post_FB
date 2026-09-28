@@ -335,6 +335,14 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             _form = form;
             _platform = platform;
 
+            // Module "Reg Facebook": đổi nhãn nút "Cài đặt chung" thành "Hành động" cho
+            // đúng luồng người dùng mô tả ("vào hành động điền key shopmailmmo.com").
+            // Chỉ áp cho Reg Facebook — Facebook/Pandora giữ nguyên nhãn gốc.
+            if (_platform == PlatformModel.RegFacebook)
+            {
+                button5.Text = "Hành động";
+            }
+
             LoadColumnsDataGridView();
             // Fill ở cấp grid + VirtualMode + hàng chục nghìn dòng → layout/header hỏng, UI đơ.
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
@@ -3593,6 +3601,15 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
 
         private void button5_Click(object sender, EventArgs e)
         {
+            // Module "Reg Facebook": nút này mở form cài đặt RIÊNG (fSettingRegFacebook) —
+            // nơi điền key shopmailmmo.com + toàn bộ cấu hình đăng ký (decision #2).
+            // Facebook/Pandora vẫn mở fSettingDefault như cũ.
+            if (_platform == PlatformModel.RegFacebook)
+            {
+                fSettingRegFacebook fReg = new fSettingRegFacebook(_platform);
+                fReg.ShowDialog();
+                return;
+            }
             fSettingDefault fSetting = new fSettingDefault(_platform);
             fSetting.ShowDialog();
         }
@@ -3652,6 +3669,15 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
 
         private async void button7_Click(object sender, EventArgs e)
         {
+            // Module "Reg Facebook": luồng ĐĂNG KÝ chạy theo THIẾT BỊ (mỗi thiết bị tạo
+            // account mới cho tới khi Dừng), KHÁC luồng farm chạy theo account đã tick.
+            // Nhánh riêng để không đụng vào logic farm của Facebook/Pandora bên dưới.
+            if (_platform == PlatformModel.RegFacebook)
+            {
+                await RunRegFacebookAsync();
+                return;
+            }
+
             // Validate nhanh trên UI thread — chỉ check trạng thái in-memory, không IO.
             if (!HasAnyChecked())
             {
@@ -3853,7 +3879,13 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
             }
             else
             {
-                model.SettingGeneral = SettingsTool.GetSettings($"{nameof(fSettingRegsiner)}_{_platform}", true);
+                // Module "Reg Facebook" đọc cài đặt từ form RIÊNG (fSettingRegFacebook) —
+                // khóa config = "fSettingRegFacebook_Reg Facebook" — để cách ly hoàn toàn
+                // với cài đặt đăng ký của Facebook thường. Các platform khác giữ nguyên.
+                string regFormName = _platform == PlatformModel.RegFacebook
+                    ? nameof(fSettingRegFacebook)
+                    : nameof(fSettingRegsiner);
+                model.SettingGeneral = SettingsTool.GetSettings($"{regFormName}_{_platform}", true);
                 string text = select1.Text.Trim();
                 // Windowed cache: _fullView rỗng → lấy account đã tick từ DB (theo Id).
                 var regAccounts = _useWindowedCache ? GetCheckedAccountsForJob() : _fullView;
@@ -4831,6 +4863,94 @@ namespace Facebook_Farm_NewFeed_PostStory.Views.Controls
                     }));
                 }
                 await Task.WhenAll(tasks);
+            }
+            finally
+            {
+                Enable(true);
+                fMain.StartTime = null;
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // RunRegFacebookAsync — luồng ĐĂNG KÝ cho module "Reg Facebook" (nút "Chạy").
+        //
+        // Khác luồng farm (button7_Click bên dưới chạy theo account đã tick): đăng ký
+        // chạy theo THIẾT BỊ — mỗi thiết bị chọn chạy RegFacebookRegsiner, engine tự
+        // tạo account mới vòng lặp cho tới khi người dùng bấm "Dừng" (CancellationToken).
+        // Account mới được OnAccountAdded → AddAccountThreadSafe đẩy lên lưới mục
+        // "Reg Facebook" (cách ly theo Platformt). Cấu hình đọc từ form "Hành động"
+        // (fSettingRegFacebook) mà user đã điền + lưu trước đó qua GetConfigModel(true).
+        //
+        // KHÔNG đụng vào FacebookRegsiner/FacebookRegsiner.cs — dùng engine clone riêng
+        // RegFacebookRegsiner (cùng chữ ký ctor, drop-in với call-site Reg() chết).
+        // ─────────────────────────────────────────────────────────────────────────────
+        private async Task RunRegFacebookAsync()
+        {
+            // Chọn thiết bị chạy reg (đúng dialog "chọn số lượng thiết bị" như luồng farm).
+            Enable(false);
+            try
+            {
+                if (!SeleceterDevice()) return;
+
+                var model = GetConfigModel(true);
+                if (model == null) return;
+
+                fMain.StartTime = DateTime.Now;
+                Globals.CancellationTokenSource = new CancellationTokenSource();
+                CancellationToken ct = Globals.CancellationTokenSource.Token;
+
+                // Xóa registry client cũ trước batch mới (giống button7_Click).
+                while (_activeClients.TryTake(out _)) { }
+
+                var tasks = new List<Task>();
+                foreach (var device in DeviceServices.DeviceModels.Where(x => x.Checked))
+                {
+                    if (ct.IsCancellationRequested) break;
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        ADBClient client = new ADBClient(device);
+                        // Đăng ký client để nút "Dừng" force-stop được (set Running=false).
+                        _activeClients.Add(client);
+                        device.Status = "Đang kiểm tra kết nối ADB...";
+                        device.TypeColor = 2;
+                        try
+                        {
+                            if (!client.Connect())
+                            {
+                                device.Status = "Không thể kết nối ADB, dừng thiết bị.";
+                                device.TypeColor = 1;
+                                return;
+                            }
+
+                            // Đổi ngôn ngữ + bật ADB keyboard (giống call-site Reg() gốc).
+                            ChangeLanguageService changeLanguage = new ChangeLanguageService(client);
+                            await changeLanguage.Change("en", "US");
+                            await client.TurnOnADBKeyboard();
+
+                            RegFacebookRegsiner service = new RegFacebookRegsiner(_platform, client, model, ct);
+                            service.AccountAdded += (s, acc) => AddAccountThreadSafe(acc);
+                            await service.RunAsync();
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            device.Status = "Đã dừng theo yêu cầu.";
+                            device.TypeColor = 1;
+                        }
+                        catch (Exception ex)
+                        {
+                            device.Status = $"Lỗi worker: {ex.Message}";
+                            device.TypeColor = 1;
+                            LogManager.Error(ex);
+                        }
+                        finally
+                        {
+                            try { client.AppClear(FacebookHander.Package(PlatformModel.Facebook)); } catch { }
+                            client.Running = false;
+                        }
+                    }));
+                }
+
+                try { await Task.WhenAll(tasks); } catch { }
             }
             finally
             {

@@ -239,6 +239,7 @@ namespace Facebook_Farm_NewFeed_PostStory
 
         private ucdgvAccount _ucFacebook;
         private ucdgvAccount _ucPandora;
+        private ucdgvAccount _ucRegFacebook;
         public ucManagerDevices _ucDevices;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel pMenu;

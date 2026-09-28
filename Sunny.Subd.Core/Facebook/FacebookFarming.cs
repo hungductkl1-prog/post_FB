@@ -9785,8 +9785,12 @@ namespace Sunny.Subd.Core.Facebook
                                         _client.ATX.Press(PressKey.Enter);
                                         // Bỏ Delay(3) cứng: ElementWithAttributes bên dưới tự poll node
                                         // 'Music Track' tối đa 10s (chờ theo UI-state + fallback).
-                                        if (_client.ElementWithAttributes("(//*[contains(@content-desc, 'Music Track') or contains(@text, 'Music Track')])[1]", 10, ""))
+                                        // click=false: CHỈ chờ list kết quả hiện ra, KHÔNG bấm bừa dòng [1]
+                                        // nữa — list KHÔNG theo thứ tự và lẫn bài trùng tên khác nghệ sĩ.
+                                        if (_client.ElementWithAttributes("(//*[contains(@content-desc, 'Music Track') or contains(@text, 'Music Track')])[1]", 10, "", false))
                                         {
+                                            // Chọn ĐÚNG bài theo tên (title + artist) đã gõ.
+                                            ClickSongRowByKeyword(musicText);
                                             // Bỏ Delay(3) cứng: lệnh ngay sau tự poll node 'Music' tối đa 10s.
                                             _client.ElementWithAttributes("//*[@text='Music' or @content-desc='Music']", 10, "");
                                             _mainService.SetStatus($"({successCount + 1}/{targetCount}), Chon kieu Album Art...", 2);
@@ -14416,6 +14420,183 @@ namespace Sunny.Subd.Core.Facebook
             catch
             {
             }
+        }
+
+        /// <summary>
+        /// Chọn ĐÚNG dòng bài hát trong list kết quả tìm nhạc theo tên đã gõ (title + artist).
+        /// FB trả kết quả KHÔNG theo thứ tự, mỗi dòng là "Music Track. &lt;Title&gt;. &lt;Artist&gt;."
+        /// nên KHÔNG được bấm bừa dòng [1] nữa.
+        /// Thuật toán: tokenize keyword (bỏ dấu + lowercase), yêu cầu MỌI token khớp theo
+        /// WHOLE-WORD trong content-desc của dòng → phân biệt được "Mercy Mun" (khớp) với
+        /// "Mercy Munyoki" (token 'mun' KHÔNG khớp vì là 'munyoki').
+        /// Ưu tiên: dòng khớp ĐỦ token (full match) &gt; điểm cao hơn &gt; dòng trên cùng.
+        /// Fallback: dòng khớp nhiều token nhất; nếu không khớp token nào thì bấm dòng đầu
+        /// (giữ hành vi cũ, tránh treo job).
+        /// </summary>
+        private bool ClickSongRowByKeyword(string keyword)
+        {
+            try
+            {
+                var keywordTokens = NormalizeSongTokens(keyword);
+                string rowXPath = "//*[contains(@content-desc,'Music Track') or contains(@text,'Music Track')]";
+
+                string bestBounds = null;
+                string bestDesc = null;
+                int bestScore = -1;
+                bool bestIsFullMatch = false;
+
+                // List có thể render dần: poll vài lần, gặp dòng khớp ĐỦ token thì bấm ngay;
+                // hết deadline thì dùng dòng khớp tốt nhất tìm được.
+                const int maxAttempts = 4;
+                for (int attempt = 0; attempt < maxAttempts; attempt++)
+                {
+                    string xml = _client.GetXMLSource();
+                    if (!string.IsNullOrEmpty(xml))
+                    {
+                        foreach (var row in ReadSongRows(xml, rowXPath))
+                        {
+                            string desc = row[0];
+                            string bounds = row[1];
+                            var rowTokens = NormalizeSongTokens(desc);
+                            int score = keywordTokens.Count(rowTokens.Contains);
+                            bool fullMatch = keywordTokens.Count > 0 && score == keywordTokens.Count;
+
+                            // 'better': nâng lên full match, hoặc cùng hạng nhưng điểm cao hơn.
+                            // Duyệt theo thứ tự tài liệu (trên→dưới) nên dòng TRÊN CÙNG thắng
+                            // khi điểm bằng nhau (không thay thế khi score == bestScore).
+                            bool better =
+                                (fullMatch && !bestIsFullMatch) ||
+                                (fullMatch == bestIsFullMatch && score > bestScore);
+                            if (better)
+                            {
+                                bestIsFullMatch = fullMatch;
+                                bestScore = score;
+                                bestBounds = bounds;
+                                bestDesc = desc;
+                            }
+                        }
+
+                        if (bestIsFullMatch)
+                        {
+                            break; // đã thấy dòng khớp đủ, khỏi chờ thêm
+                        }
+                    }
+
+                    if (attempt < maxAttempts - 1)
+                    {
+                        _client.Delay(1);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(bestBounds) && bestScore > 0)
+                {
+                    var point = new RectangleArea(bestBounds).GetCenterPoint();
+                    _mainService.SetStatus($"Chọn bài: {ShortenSongDesc(bestDesc)} (khớp {bestScore}/{keywordTokens.Count})", 2);
+                    _client.Click(point.X, point.Y);
+                    _client.Delay(1);
+                    return true;
+                }
+
+                // Không khớp token nào (hoặc không đọc được dòng): bấm dòng đầu như hành vi cũ.
+                var firstBounds = _client.FindBounds("", rowXPath, 5);
+                if (firstBounds.Any())
+                {
+                    _mainService.SetStatus("Không khớp tên bài, chọn dòng đầu tiên...", 2);
+                    var point = new RectangleArea(firstBounds.First()).GetCenterPoint();
+                    _client.Click(point.X, point.Y);
+                    _client.Delay(1);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _mainService.SetStatus($"ClickSongRowByKeyword lỗi: {ex.Message}", 2);
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Tách chuỗi thành tập token để so khớp: bỏ dấu (đ→d, ư→u...), lowercase,
+        /// cắt theo mọi ký tự không phải chữ/số. Dùng cho cả keyword lẫn content-desc.
+        /// </summary>
+        private static HashSet<string> NormalizeSongTokens(string text)
+        {
+            var set = new HashSet<string>();
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return set;
+            }
+
+            string normalized = SubdyHelper.RemoveDiacritics(text).ToLowerInvariant();
+            foreach (var tok in Regex.Split(normalized, "[^0-9a-z]+"))
+            {
+                if (!string.IsNullOrEmpty(tok))
+                {
+                    set.Add(tok);
+                }
+            }
+            return set;
+        }
+
+        /// <summary>
+        /// Đọc cặp {content-desc (hoặc text), bounds} của MỌI node khớp xpath từ CÙNG một
+        /// node — tránh lệch thứ tự so với gọi 2 lần riêng. Trả list string[2] theo thứ tự
+        /// tài liệu (trên→dưới).
+        /// </summary>
+        private List<string[]> ReadSongRows(string xml, string xpath)
+        {
+            var list = new List<string[]>();
+            try
+            {
+                var doc = new System.Xml.XmlDocument();
+                doc.LoadXml(xml);
+                var nodes = doc.SelectNodes(xpath);
+                if (nodes != null)
+                {
+                    foreach (System.Xml.XmlNode node in nodes)
+                    {
+                        if (node.Attributes == null)
+                        {
+                            continue;
+                        }
+                        string desc = node.Attributes["content-desc"]?.Value;
+                        if (string.IsNullOrWhiteSpace(desc))
+                        {
+                            desc = node.Attributes["text"]?.Value ?? "";
+                        }
+                        string bounds = node.Attributes["bounds"]?.Value ?? "";
+                        if (!string.IsNullOrWhiteSpace(bounds))
+                        {
+                            list.Add(new[] { desc, bounds });
+                        }
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// "Music Track. &lt;Title&gt;. &lt;Artist&gt;." → "&lt;Title&gt; - &lt;Artist&gt;" (chỉ để hiển thị status).
+        /// </summary>
+        private static string ShortenSongDesc(string desc)
+        {
+            if (string.IsNullOrWhiteSpace(desc))
+            {
+                return "";
+            }
+            var parts = desc.Split('.')
+                            .Select(p => p.Trim())
+                            .Where(p => p.Length > 0)
+                            .ToList();
+            if (parts.Count >= 3 && parts[0].IndexOf("Music", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return parts[1] + " - " + parts[2];
+            }
+            return desc;
         }
 
         private bool ClickRandomAlbumArtStyle(int timeoutSeconds = 10)

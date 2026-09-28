@@ -17,6 +17,7 @@ using Sunny.Subdy.Data.Models;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Xml;
 
 namespace Sunny.Subd.Core.Facebook
 {
@@ -116,6 +117,50 @@ namespace Sunny.Subd.Core.Facebook
         private int _ageScreenLastClickTick = 0;
         private const int AgeScreenClickCooldownMs = 15000;
         private const int AgeScreenMaxAttempts = 4;
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // NGÀY SINH > 33 TUỔI (2026-09-28) — bản v36.
+        //
+        // Bản v35 tua bánh xe ngày sinh bằng `Swipe(..., RandomValue(7, 12), n)` — thời
+        // lượng 7-12ms là vùng FLING: quán tính cuốn số bước KHÔNG đoán được, và code cũ
+        // KHÔNG hề đọc lại giá trị sau khi tua, `elementsDate.Count != 3` thì `return` IM
+        // LẶNG rồi vẫn bấm SET với ngày mặc định → tuổi ≤ 33 → màn "How old are you?" →
+        // nhập 34-51 không khớp ngày sinh → 4 lần → bỏ acc.
+        //
+        // Bản v36 đọc 3 bánh xe từ XML MỚI, xác định giá trị đích, rồi TUA TỪNG BƯỚC có
+        // XÁC MINH: mỗi bước bấm hàng kề (android.widget.Button không có resource-id) —
+        // bấm hàng DƯỚI = +1, bấm hàng TRÊN = -1 — rồi dump lại đọc giá trị thật. Tap không
+        // ăn thì mới lùi về vuốt CHẬM 240-330ms (dưới ngưỡng fling). CHỈ bấm SET khi CẢ 3
+        // giá trị đã khớp.
+        // ─────────────────────────────────────────────────────────────────────────
+        private int _dobReopenAttempts = 0;
+        // Ngân sách thử cho việc đặt ngày sinh của MỘT acc. Mỗi CHU KỲ thất bại tiêu 2 đơn vị
+        // (1 cho lần bấm mở lại picker ở HandleDateOfBirth + 1 cho lượt chỉnh trong picker ở
+        // HandleDatePicker) → 6 đơn vị = 3 chu kỳ. Cạn ngân sách thì bỏ acc, KHÔNG để vòng lặp
+        // quét lại picker tới hết _timeOut 30 phút. Bình thường chỉ tốn 1 đơn vị vì lượt đầu
+        // đã đặt đúng (khi đó HandleDateOfBirth không bấm gì nên không tiêu gì).
+        private const int DobReopenMaxAttempts = 6;
+
+        // Đo LIVE 2026-09-28 trên 5200d7ad5a6315d5: ô input [314,1176][538,1344] cao 168,
+        // hàng kề trên [314,945][538,1176] và dưới [314,1344][538,1575] cao ~231 → tâm hàng
+        // kề cách MÉP ô input ~115px. Dùng để bấm đúng hàng kề theo hình học.
+        private const int DobWheelNeighborOffset = 115;
+
+        private static readonly string[] DobMonths =
+        {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        };
+
+        // Một bánh xe của NumberPicker. Toạ độ đọc lại từ XML mỗi lần nên luôn là dữ liệu mới.
+        private sealed class DobWheel
+        {
+            public string Kind = "";   // "month" | "day" | "year"
+            public int Value = 0;      // 1..12 | 1..31 | năm
+            public int XCenter = 0;
+            public int Top = 0;
+            public int Bottom = 0;
+        }
 
         public RegFacebookRegsiner(string platform, ADBClient device, ConfigModel config, CancellationToken ct)
         {
@@ -865,6 +910,8 @@ namespace Sunny.Subd.Core.Facebook
             _mailCodeEntered = false;
             _ageScreenAttempts = 0;
             _ageScreenLastClickTick = 0;
+            // Cùng lý do: ngân sách xử lý ngày sinh (mở lại picker + tua bánh xe) phải về 0.
+            _dobReopenAttempts = 0;
             List<string> firstnames = GetFirstnames();
             List<string> lastnames = GetLastnames();
             _account.Password = GetPassword();
@@ -1064,10 +1111,25 @@ namespace Sunny.Subd.Core.Facebook
 
             string dateText = elementsBirth.First().Attributes["text"].Value;
             int age = ExtractAgeFromText(dateText);
-            // Yêu cầu 2026-09-28: tuổi PHẢI > 33. Nếu picker ngày sinh hiện tuổi <= 33
-            // thì bấm lại dòng "Date of birth" để mở lại picker cho HandleDatePicker chọn năm sinh lớn hơn.
-            if (age <= 33)
-                _client.ElementWithAttributes("//*[contains(@text, 'Date of birth') and contains(@text, 'years old')]", 5);
+            // Yêu cầu 2026-09-28: tuổi PHẢI > 33. Nếu tuổi hiện tại <= 33 thì bấm lại dòng
+            // "Date of birth" để mở lại NumberPicker cho HandleDatePicker chọn năm sinh lớn hơn.
+            if (age > 33) return;
+
+            // Mỗi lần bấm mở lại picker là MỘT lượt tiêu ngân sách. Không có trần thì acc bị
+            // Facebook trả tuổi ≤ 33 mãi sẽ mở lại picker cho tới hết _timeOut (30 phút) rồi
+            // mới chết — giống hệt cái bẫy đã gặp ở màn "I agree". Cạn ngân sách thì bỏ acc
+            // cho vòng ngoài sang tài khoản khác.
+            if (_dobReopenAttempts >= DobReopenMaxAttempts)
+            {
+                _client.LogHelper.ERROR(
+                    $"Ngày sinh vẫn ≤ 33 tuổi sau {_dobReopenAttempts} lượt đặt ngày sinh. Bỏ tài khoản để sang acc khác.");
+                throw new SubdyExtension(SubdyEnum.Stop, "Không đặt được ngày sinh cho tuổi > 33.");
+            }
+
+            _client.ElementWithAttributes("//*[contains(@text, 'Date of birth') and contains(@text, 'years old')]", 5);
+            _dobReopenAttempts++;
+            _client.Delay(2);
+            SetStatus(string.Empty, 2, logDetail: $"[DOB] Ngày sinh đang là {age} tuổi (≤ 33) — đã bấm mở lại picker (lượt {_dobReopenAttempts}).");
         }
 
         private int ExtractAgeFromText(string text)
@@ -1077,24 +1139,306 @@ namespace Sunny.Subd.Core.Facebook
             return match.Success ? Convert.ToInt32(match.Value) : 0;
         }
 
+        // ─────────────────────────────────────────────────────────────────────────
+        // ĐỌC 3 BÁNH XE NGÀY SINH TỪ XML MỚI.
+        // XML raw (không hạ chữ) để còn thấy "Nov" chứ không phải "nov".
+        // Sắp xếp 3 ô input theo TÂM X tăng dần = tháng / ngày / năm (KHÔNG hardcode toạ độ
+        // vì độ phân giải máy khác nhau). Đọc hỏng thì trả null để caller thử lại.
+        // ─────────────────────────────────────────────────────────────────────────
+        private List<DobWheel> ReadDobWheels()
+        {
+            string xml = _client.GetXMLSource();
+            if (string.IsNullOrWhiteSpace(xml)) return null;
+
+            List<XmlNode> nodes = _client.FindElementsNotToLower(5, xml, "//*[@resource-id=\"android:id/numberpicker_input\"]");
+            if (nodes == null || nodes.Count != 3) return null;
+
+            List<DobWheel> inputs = new List<DobWheel>();
+            foreach (XmlNode node in nodes)
+            {
+                try
+                {
+                    var rect = new RectangleArea(node.Attributes["bounds"].Value);
+                    string text = (node.Attributes["text"]?.Value ?? string.Empty).Trim();
+                    if (string.IsNullOrEmpty(text)) return null;
+
+                    int value;
+                    int monthIndex = Array.FindIndex(DobMonths, m => m.Equals(text, StringComparison.OrdinalIgnoreCase));
+                    if (monthIndex >= 0)
+                    {
+                        value = monthIndex + 1;
+                    }
+                    else if (!int.TryParse(text, out value))
+                    {
+                        // Ô đang ở giữa animation: text chưa phải tên tháng / số → đọc lại sau.
+                        return null;
+                    }
+
+                    inputs.Add(new DobWheel
+                    {
+                        Value = value,
+                        XCenter = rect.GetCenterPoint().X,
+                        Top = rect.Top,
+                        Bottom = rect.Bottom
+                    });
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+
+            inputs = inputs.OrderBy(w => w.XCenter).ToList();
+            inputs[0].Kind = "month";
+            inputs[1].Kind = "day";
+            inputs[2].Kind = "year";
+            return inputs;
+        }
+
+        /// <summary>
+        /// Tua MỘT bánh xe tới giá trị đích. Hai pha:
+        ///   • PHA NHANH — khi còn xa đích (|delta| &gt; 3): bấm liên tiếp hàng kề nhiều nhịp
+        ///     (mỗi nhịp đúng 1 nấc vì đây là Button clickable thật), rồi ĐỌC LẠI một lần để
+        ///     biết còn lệch bao nhiêu. Bấm hàng kề là bước ĐO ĐƯỢC (không quán tính như vuốt)
+        ///     nên gộp nhịp vẫn chính xác, mà tránh phải dump XML 1 lần cho mỗi nấc — bánh NĂM
+        ///     có thể phải đi vài chục nấc, dump từng nấc sẽ ăn hết _timeOut.
+        ///   • PHA CHÍNH XÁC — khi còn ≤ 3 nấc: từng bước một, đọc lại xác minh, tap không ăn
+        ///     thì lùi về vuốt chậm.
+        /// Mỗi vòng đều tính lại delta từ giá trị ĐỌC ĐƯỢC nên tự sửa sai, không tích luỹ lỗi.
+        /// </summary>
+        private List<DobWheel> StepDobWheelToTarget(List<DobWheel> wheels, int kindIndex, int target, int maxSteps)
+        {
+            if (wheels == null || kindIndex < 0 || kindIndex >= wheels.Count) return wheels;
+
+            int spent = 0;
+            while (spent < maxSteps)
+            {
+                DobWheel wheel = wheels[kindIndex];
+                int delta = DeltaToTarget(wheel.Kind, wheel.Value, target);
+                if (delta == 0)
+                {
+                    SetDobStatus($"[DOB] {wheel.Kind} đã đúng ({wheel.Value}) sau {spent} nhịp.");
+                    return wheels;
+                }
+
+                int direction = Math.Sign(delta);
+                int remaining = Math.Abs(delta);
+                int taps = remaining > 3 ? Math.Min(remaining - 1, 10) : 1;
+
+                List<DobWheel> after;
+                if (taps > 1)
+                {
+                    after = TapDobWheelBulk(wheel, direction, taps);
+                    spent += taps;
+                }
+                else
+                {
+                    after = StepDobWheelOnce(wheel, direction);
+                    spent++;
+                }
+
+                if (after == null)
+                {
+                    // Đọc lại không được (ô đang chạy animation) — để vòng sau tính lại từ đầu.
+                    DobSettle();
+                    continue;
+                }
+
+                DobWheel now = after[WheelIndexOf(after, wheel.Kind)];
+                SetDobStatus($"[DOB] {wheel.Kind}: {wheel.Value} → {now.Value} ({(taps > 1 ? $"bấm {taps} nhịp" : "1 bước")}, còn {Math.Abs(DeltaToTarget(wheel.Kind, now.Value, target))} nấc)");
+                wheels = after;
+            }
+
+            return wheels;
+        }
+
+        /// <summary>
+        /// PHA NHANH: bấm liên tiếp hàng kề của đúng bánh xe này <paramref name="taps"/> nhịp
+        /// (mỗi nhịp +1 nếu direction &gt; 0, −1 nếu &lt; 0), rồi đọc lại một lần.
+        /// </summary>
+        private List<DobWheel> TapDobWheelBulk(DobWheel wheel, int direction, int taps)
+        {
+            int neighborY = direction > 0
+                ? wheel.Bottom + DobWheelNeighborOffset
+                : wheel.Top - DobWheelNeighborOffset;
+
+            for (int i = 0; i < taps; i++)
+            {
+                _client.Click(wheel.XCenter, neighborY);
+                // Nhịp NGẮN để cú bấm không bị tính thành long-press (hàng kề long-clickable).
+                System.Threading.Thread.Sleep(140);
+            }
+
+            DobSettle();
+            return ReadDobWheels();
+        }
+
+        /// <summary>
+        /// MỘT bước tua: bấm hàng kề đúng HÌNH HỌC (hàng kề nằm ngay trên/dưới ô input, cùng
+        /// tâm X — bấm hàng DƯỚI = +1, hàng TRÊN = −1). Tap không ăn thì lùi về vuốt chậm
+        /// dưới ngưỡng fling (~180-200px trong 240-330ms) — vì đo LIVE 2026-09-28: vuốt
+        /// NHANH/NGẮN (7-12ms của bản v35) bị quán tính cuốn nhiều bước không đoán được.
+        /// Trả về giá trị các bánh xe ĐỌC LẠI SAU bước này (null nếu không đọc được).
+        /// </summary>
+        private List<DobWheel> StepDobWheelOnce(DobWheel wheel, int direction)
+        {
+            int neighborY;
+            int swipeStartY;
+            if (direction > 0)
+            {
+                // Tăng 1 đơn vị: bấm hàng kề DƯỚI ô input; vuốt dự phòng kéo TỪ DƯỚI LÊN.
+                neighborY = wheel.Bottom + DobWheelNeighborOffset;
+                swipeStartY = wheel.Bottom + 22;
+            }
+            else
+            {
+                // Giảm 1 đơn vị: bấm hàng kề TRÊN ô input; vuốt dự phòng kéo TỪ TRÊN XUỐNG.
+                neighborY = wheel.Top - DobWheelNeighborOffset;
+                swipeStartY = wheel.Top - 22;
+            }
+
+            _client.Click(wheel.XCenter, neighborY);
+            DobSettle();
+
+            List<DobWheel> after = ReadDobWheels();
+            if (after != null && IsDobStepDone(wheel.Kind, wheel.Value, after[WheelIndexOf(after, wheel.Kind)].Value, direction))
+            {
+                return after;
+            }
+
+            // Tap không ăn → vuốt chậm 1 bước (1 lần vuốt chậm ≈ đúng 1 nấc, đo LIVE
+            // 2026-09-28: 190px trong 900ms = 1 nấc; 240-330ms vẫn dưới ngưỡng fling).
+            // Vuốt XUỐNG = −1 (đầu ngón đi xuống), vuốt LÊN = +1.
+            int distance = (wheel.Bottom - wheel.Top) + SubdyHelper.RandomValue(15, 40);
+            int x1 = wheel.XCenter + SubdyHelper.RandomValue(3, 30);
+            int x2 = wheel.XCenter - SubdyHelper.RandomValue(3, 30);
+            int y2 = direction > 0
+                ? Math.Max(wheel.Top - 60, swipeStartY - distance)
+                : Math.Min(wheel.Bottom + 60, swipeStartY + distance);
+
+            _client.Swipe(x1, swipeStartY, x2, y2, SubdyHelper.RandomValue(240, 330));
+            DobSettle();
+            return ReadDobWheels();
+        }
+
+        /// <summary>
+        /// Chờ bánh xe ổn định sau một bước — NGẮN thôi, vì giá trị luôn được ĐỌC LẠI để xác
+        /// minh chứ không tin vào thời gian chờ. Dùng DelayMessageAsync(1) thì mỗi bước tốn
+        /// nguyên 1 giây, mà bánh NĂM có thể cần vài chục bước (mặc định → 1976..1991).
+        /// </summary>
+        private static void DobSettle()
+        {
+            System.Threading.Thread.Sleep(350);
+        }
+
+        private static int WheelIndexOf(List<DobWheel> wheels, string kind)
+        {
+            for (int i = 0; i < wheels.Count; i++)
+            {
+                if (wheels[i].Kind == kind) return i;
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Bước vừa rồi có tiến ĐÚNG HƯỚNG mong muốn không. Tháng là bánh xe VÒNG nên
+        /// 12 → 1 (đi tới) và 1 → 12 (đi lùi) đều phải tính là tiến — nếu chỉ so `&gt;`/`&lt;`
+        /// thì 2 lần vòng/năm sẽ bị coi là "không ăn" rồi bấm thừa một nấc.
+        /// </summary>
+        private static bool IsDobStepDone(string kind, int before, int after, int direction)
+        {
+            if (kind == "month")
+            {
+                int forward = ((after - before) % 12 + 12) % 12;
+                if (forward == 0) return false;
+                return direction > 0 ? forward <= 6 : forward >= 6;
+            }
+            return direction > 0 ? after > before : after < before;
+        }
+
+        /// <summary>Số nấc ngắn nhất từ giá trị hiện tại tới đích (tháng vòng 12; ngày/năm đi thẳng).</summary>
+        private static int DeltaToTarget(string kind, int current, int target)
+        {
+            int raw = target - current;
+            if (kind == "month")
+            {
+                int forward = ((raw % 12) + 12) % 12;
+                return forward <= 6 ? forward : forward - 12;
+            }
+            return raw;
+        }
+
+        private void SetDobStatus(string detail)
+        {
+            SetStatus(string.Empty, 2, logDetail: detail);
+        }
+
         private async Task HandleDatePicker()
         {
             if (!_client.ElementWithAttributes(_client.FindElement("", new List<string> { "//*[@text=\"SET\"]", "//*[@text=\"Next\"]" }, 5), 1, click: false)) return;
 
-            var elementsDate = _client.FindBounds("", "//*[@resource-id=\"android:id/numberpicker_input\"]");
-            if (elementsDate.Count != 3) return;
-
-            for (int i = 0; i < elementsDate.Count; i++)
+            // Trần CỨNG cho cả lượt chỉnh này: mỗi lần mở picker là một lượt, cộng dồn tối đa
+            // DobReopenMaxAttempts lượt cho mỗi acc. Cạn thì BÁO LỖI RÕ RÀNG rồi bỏ acc —
+            // nhất quyết KHÔNG bấm SET với ngày sai (v35 bấm SET dù chưa tua được gì, và
+            // còn `return` IM LẶNG khi đọc không đủ 3 ô).
+            if (_dobReopenAttempts >= DobReopenMaxAttempts)
             {
-                string element = elementsDate[i];
-                // Yêu cầu 2026-09-28: năm sinh (picker i==2) phải cho tuổi > 33 →
-                // số bước tua = RandomValue(34, 50) → tuổi 34-50. Ngày/tháng giữ nguyên 1-12.
-                int indexRandom = i == 2 ? 50 : 12;
-                int indexMin = i == 2 ? 34 : 1;
-                var point = new RectangleArea(element).GetCenterPoint();
-                _client.Swipe(point.X, point.Y - 100, point.X, point.Y + 100, SubdyHelper.RandomValue(7, 12), SubdyHelper.RandomValue(indexMin, indexRandom));
+                _client.LogHelper.ERROR(
+                    $"Không đặt được ngày sinh sau {_dobReopenAttempts} lượt chỉnh. Bỏ tài khoản để sang acc khác.");
+                throw new SubdyExtension(SubdyEnum.Stop, "Không đặt được ngày sinh cho tuổi > 33.");
+            }
+            _dobReopenAttempts++;
+
+            // Yêu cầu 2026-09-28: năm sinh phải cho tuổi > 33. RandomValue là [min, max)
+            // → 1976..1991, tệ nhất là 1991 (2026 − 1991 = 35 tuổi) nên LUÔN > 33 kể cả khi
+            // chưa tới sinh nhật. Tháng 1..12, ngày 1..28 để an toàn cho mọi tháng.
+            int targetMonth = SubdyHelper.RandomValue(1, 13);
+            int targetDay = SubdyHelper.RandomValue(1, 29);
+            int targetYear = SubdyHelper.RandomValue(1976, 1992);
+            SetDobStatus($"[DOB] Đích ngày sinh: {targetDay}/{targetMonth}/{targetYear}");
+
+            List<DobWheel> wheels = null;
+            for (int read = 0; read < 5 && wheels == null; read++)
+            {
+                wheels = ReadDobWheels();
+                if (wheels == null)
+                {
+                    DobSettle();
+                }
+            }
+            if (wheels == null)
+            {
+                SetDobStatus("[DOB] Không đọc được 3 bánh xe ngày sinh (numberpicker_input) — để vòng ngoài xử lý lại.");
+                return;
             }
 
+            SetDobStatus($"[DOB] Hiện tại: {wheels[1].Value}/{wheels[0].Value}/{wheels[2].Value} | X tâm = {wheels[0].XCenter}/{wheels[1].XCenter}/{wheels[2].XCenter}");
+
+            // Trần bước mỗi bánh: tháng vòng nên tối đa 6 nấc, ngày tối đa 28 nấc, năm tối đa
+            // ~92 nấc (1976..1991 là khoảng rộng nhất có thể gặp) + biên an toàn.
+            wheels = StepDobWheelToTarget(wheels, 0, targetMonth, 8);
+            wheels = StepDobWheelToTarget(wheels, 1, targetDay, 32);
+            wheels = StepDobWheelToTarget(wheels, 2, targetYear, 100);
+
+            // CHỈ bấm SET khi CẢ 3 giá trị đã khớp — còn lệch thì bỏ lượt này, vòng ngoài sẽ
+            // mở lại picker (bộ đếm _dobReopenAttempts chặn ở DobReopenMaxAttempts lượt).
+            List<DobWheel> final = ReadDobWheels();
+            if (final == null || final.Count != 3)
+            {
+                SetDobStatus("[DOB] Không đọc lại được ngày sinh sau khi tua — KHÔNG bấm SET.");
+                return;
+            }
+
+            int gotMonth = final[0].Value;
+            int gotDay = final[1].Value;
+            int gotYear = final[2].Value;
+            if (gotMonth != targetMonth || gotDay != targetDay || gotYear != targetYear)
+            {
+                SetDobStatus($"[DOB] Lệch đích: được {gotDay}/{gotMonth}/{gotYear}, cần {targetDay}/{targetMonth}/{targetYear} — KHÔNG bấm SET.");
+                return;
+            }
+
+            SetDobStatus($"[DOB] Khớp đích {gotDay}/{gotMonth}/{gotYear} — bấm SET.");
             _client.ElementWithAttributes(new List<string> { "//*[@text=\"SET\"]" }, 5);
             await DelayMessageAsync(2, _account.Status, 2);
             var xpaths = XpathManagerFacebook.Get(XpathType.NavigationButton);

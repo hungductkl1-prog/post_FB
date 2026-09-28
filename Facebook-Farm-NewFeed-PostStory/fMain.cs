@@ -82,6 +82,9 @@ namespace Facebook_Farm_NewFeed_PostStory
             // Project mới chỉ giữ Facebook + Thiết bị — bỏ Dashboard/IG/Threads.
             CreateMenu("Facebook", "facebook", Properties.Resources.icons8_facebook_30);
             CreateMenu("Pandora", "pandora", Properties.Resources.icons8_facebook_30);
+            // Mục "Reg Facebook" riêng (tách kiểu Pandora) — đăng ký acc Facebook mới.
+            // Dùng chung icon Facebook; không sửa resx.
+            CreateMenu("Reg Facebook", "regfacebook", Properties.Resources.icons8_facebook_30);
             CreateMenu("Thiết bị", "android", Properties.Resources.icons8_android_30_New);
 
             // Title cố định — không đổi theo section
@@ -228,6 +231,7 @@ namespace Facebook_Farm_NewFeed_PostStory
                     Keys.D1 => "btn_android",
                     Keys.D2 => "btn_facebook",
                     Keys.D3 => "btn_pandora",
+                    Keys.D4 => "btn_regfacebook",
                     _ => null
                 };
                 if (target != null)
@@ -277,6 +281,7 @@ namespace Facebook_Farm_NewFeed_PostStory
                 "Thiết bị" => "Quản lý thiết bị",
                 "Facebook" => "Quản lý tài khoản Facebook",
                 "Pandora" => "Quản lý tài khoản Pandora",
+                "Reg Facebook" => "Đăng ký tài khoản Facebook",
                 "Instagram" => "Quản lý tài khoản Instagram",
                 "Thread" => "Quản lý tài khoản Thread",
                 "Dashboard" => "Dashboard",
@@ -293,6 +298,7 @@ namespace Facebook_Farm_NewFeed_PostStory
                 case "btn_android": _ucDevices?.BringToFront(); break;
                 case "btn_facebook": _ucFacebook?.BringToFront(); break;
                 case "btn_pandora": _ucPandora?.BringToFront(); break;
+                case "btn_regfacebook": _ucRegFacebook?.BringToFront(); break;
             }
 
             // Chỉ hiện button thu gọn/mở rộng panel khi ở tab Thiết bị
@@ -311,6 +317,7 @@ namespace Facebook_Farm_NewFeed_PostStory
         {
             "btn_android" => Properties.Resources.icons8_android_30_Acti,
             "btn_facebook" => Properties.Resources.icons8_facebook_30_Acti,
+            "btn_regfacebook" => Properties.Resources.icons8_facebook_30_Acti,
             "btn_instagram" => Properties.Resources.icons8_instagram_30_Acti,
             "btn_threads" => Properties.Resources.icons8_threads_30_Acti,
             "btn_history" => Properties.Resources.icons8_history_30_Acti,
@@ -321,6 +328,7 @@ namespace Facebook_Farm_NewFeed_PostStory
         {
             "btn_android" => Properties.Resources.icons8_android_30_New,
             "btn_facebook" => Properties.Resources.icons8_facebook_30,
+            "btn_regfacebook" => Properties.Resources.icons8_facebook_30,
             "btn_instagram" => Properties.Resources.icons8_instagram_30,
             "btn_threads" => Properties.Resources.icons8_threads_30,
             "btn_history" => Properties.Resources.icons8_history_30,
@@ -449,6 +457,14 @@ namespace Facebook_Farm_NewFeed_PostStory
             _ucPandora.Dock = DockStyle.Fill;
             pContent.Controls.Add(_ucPandora);
             EnableDoubleBuffer(_ucPandora);
+
+            // Mục "Reg Facebook" — dùng chung ucdgvAccount với nhãn platform riêng để
+            // cách ly DB/config/backup (account.Platformt = "Reg Facebook"). Không ảnh
+            // hưởng tab Facebook/Pandora.
+            _ucRegFacebook = new ucdgvAccount(this, PlatformModel.RegFacebook);
+            _ucRegFacebook.Dock = DockStyle.Fill;
+            pContent.Controls.Add(_ucRegFacebook);
+            EnableDoubleBuffer(_ucRegFacebook);
 
             pContent.ResumeLayout(false);
             pContent.PerformLayout();
@@ -632,6 +648,7 @@ namespace Facebook_Farm_NewFeed_PostStory
             {
                 _ucFacebook.SaveConfig();
                 _ucPandora?.SaveConfig();
+                _ucRegFacebook?.SaveConfig();
                 this.Close();
                 Environment.Exit(0);
             }
