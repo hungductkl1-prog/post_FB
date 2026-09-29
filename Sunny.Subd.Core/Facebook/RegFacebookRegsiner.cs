@@ -157,6 +157,7 @@ namespace Sunny.Subd.Core.Facebook
         {
             public string Kind = "";   // "month" | "day" | "year"
             public int Value = 0;      // 1..12 | 1..31 | năm
+            public bool MonthName = false; // ô hiển thị TÊN THÁNG ("Mar") chứ không phải số
             public int XCenter = 0;
             public int Top = 0;
             public int Bottom = 0;
@@ -246,6 +247,77 @@ namespace Sunny.Subd.Core.Facebook
             }
         }
 
+        /// <summary>
+        /// v39 (2a): wrapper đọc auth CÓ RETRY/SETTLING. FacebookHander.GetAuthenticationInfo
+        /// (hàm DÙNG CHUNG — không sửa) thỉnh thoảng đọc rỗng/ rác ("||" khi đọc hỏng) ngay
+        /// sau khi app FB vừa ghi session; đợi rồi đọc lại vài lần trước khi kết luận thất
+        /// bại. Giữ contract "uid|token|cookie" — uid khác rỗng mới coi là đọc được.
+        /// </summary>
+        private async Task<string> GetAuthenticationInfoWithRetryAsync(int maxAttempts = 5, int settleMs = 2000)
+        {
+            string value = string.Empty;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    value = FacebookHander.GetAuthenticationInfo(_client);
+                }
+                catch
+                {
+                    // Lỗi đọc (adb/ thiết bị) coi như lần đọc hỏng — thử lại.
+                    value = string.Empty;
+                }
+                string[] probe = value?.Split('|') ?? Array.Empty<string>();
+                if (probe.Length >= 3 && !string.IsNullOrWhiteSpace(probe[0])) return value;
+                if (attempt < maxAttempts) await Task.Delay(settleMs);
+            }
+            return value;
+        }
+
+        /// <summary>
+        /// v39 (2b): UID dự phòng từ ĐĨA (2 nguồn của gmailus.py _extract_uid) — dùng khi
+        /// file auth rỗng/ hỏng nhưng acc ĐÃ tồn tại thật (đã nhập mã mail):
+        ///   1) /data/data/com.facebook.katana/files/strings/qt_scoped/ — file/ thư mục
+        ///      tên TOÀN SỐ bắt đầu bằng "6" chính là uid.
+        ///   2) /data/data/com.facebook.katana/databases/ — DB tên omnistore_&lt;uid&gt;_v…
+        /// Chỉ lấy được UID (không có cookie/token). Trả về rỗng nếu không tìm thấy.
+        /// </summary>
+        private string ReadUidFromDisk()
+        {
+            try
+            {
+                // Nguồn 1: qt_scoped.
+                string qtScoped = _client.Shell("su -c 'ls /data/data/com.facebook.katana/files/strings/qt_scoped/'");
+                if (!string.IsNullOrWhiteSpace(qtScoped))
+                {
+                    foreach (string line in qtScoped.Split('\n'))
+                    {
+                        string name = line.Trim();
+                        if (name.Length > 1 && name.All(char.IsDigit) && name[0] == '6')
+                        {
+                            return name;
+                        }
+                    }
+                }
+
+                // Nguồn 2: omnistore — tên DB có dạng omnistore_<uid>_v… (gmailus.py: ls | grep omnistore_).
+                string omnistore = _client.Shell("su -c 'ls /data/data/com.facebook.katana/databases/ | grep omnistore_'");
+                if (!string.IsNullOrWhiteSpace(omnistore))
+                {
+                    Match omniMatch = Regex.Match(omnistore, @"omnistore_(\d+)_v");
+                    if (omniMatch.Success)
+                    {
+                        return omniMatch.Groups[1].Value;
+                    }
+                }
+            }
+            catch (Exception exUid)
+            {
+                _client.LogHelper.ERROR($"[REGFB-UID] đọc uid dự phòng từ đĩa lỗi (bỏ qua): {exUid.Message}");
+            }
+            return string.Empty;
+        }
+
         private async Task ExtractAndUpdateAuthenticationInfoAsync()
         {
             if (!_client.IsRoot()) return;
@@ -256,8 +328,12 @@ namespace Sunny.Subd.Core.Facebook
             {
                 case PlatformModel.Facebook:
                     {
-                        string value = FacebookHander.GetAuthenticationInfo(_client);
-                        if (string.IsNullOrWhiteSpace(value))
+                        // v39 (2a): đọc auth CÓ RETRY/SETTLING — file auth có thể chưa kịp
+                        // ghi xong ngay sau lúc đăng ký (wrapper không sửa hàm dùng chung).
+                        // Đọc rác "||" (uid rỗng) cũng coi như chưa đọc được → ném lỗi để
+                        // nhánh catch chạy TrySaveCheckpointAccountAsync (có fallback uid đĩa).
+                        string value = await GetAuthenticationInfoWithRetryAsync();
+                        if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(value.Split('|')[0]))
                             throw new Exception("Không thể lấy thông tin xác thực.");
 
                         var parts = value.Split('|');
@@ -323,28 +399,37 @@ namespace Sunny.Subd.Core.Facebook
                 if (!_client.IsRoot()) return;
                 if (_account == null || string.IsNullOrWhiteSpace(_account.Uid) == false) return;
 
-                string value = FacebookHander.GetAuthenticationInfo(_client);
-                if (string.IsNullOrWhiteSpace(value))
+                // v39 (2c): đọc auth CÓ RETRY vài lần — acc vừa kẹt thì file auth có thể
+                // chưa kịp ghi xong; wrapper tự nuốt lỗi từng lần đọc, không sửa hàm chung.
+                string value = await GetAuthenticationInfoWithRetryAsync(maxAttempts: 3);
+                var parts = string.IsNullOrWhiteSpace(value) ? null : value.Split('|');
+                if (parts != null && parts.Length >= 3 && !string.IsNullOrWhiteSpace(parts[0]))
                 {
-                    // Phiên 282/pending có thể CHƯA ghi session vào file auth của app FB
-                    // → đọc rỗng là HỢP LỆ, không phải lỗi. Bỏ qua cho acc này.
-                    _client.LogHelper.Log("[REGFB-AUTH] acc kẹt nhưng file auth FB rỗng/ chưa có session — bỏ qua lưu cookie/token.");
-                    return;
+                    _account.Uid = parts[0];
+                    if (_settingGeneral.GetBooleanValue("checkBox10", true))
+                    {
+                        if (!string.IsNullOrWhiteSpace(parts[2])) _account.Cookie = parts[2];
+                        if (!string.IsNullOrWhiteSpace(parts[1])) _account.Token = parts[1];
+                    }
+                    _client.LogHelper.SUCCESS($"[REGFB-AUTH] acc kẹt ({_account.State}) vẫn còn auth — đã lấy uid {_account.Uid}.");
                 }
-                var parts = value.Split('|');
-                if (parts.Length < 3)
+                else
                 {
-                    _client.LogHelper.Log("[REGFB-AUTH] chuỗi auth không hợp lệ — bỏ qua lưu.");
-                    return;
+                    // v39 (2b): auth rỗng/hỏng nhưng acc ĐÃ nhập mã mail (uid/pass đã tồn tại
+                    // trên server FB) → uid thật vẫn nằm trên đĩa theo 2 nguồn của gmailus.py
+                    // (_extract_uid: qt_scoped + omnistore). Chỉ lấy được UID (không cookie/
+                    // token) nhưng đủ để LƯU acc + BACKUP file (yêu cầu user 2026-09-28).
+                    string diskUid = ReadUidFromDisk();
+                    if (string.IsNullOrWhiteSpace(diskUid))
+                    {
+                        // Phiên 282/pending có thể CHƯA ghi session vào file auth của app FB
+                        // → đọc rỗng là HỢP LỆ, không phải lỗi. Bỏ qua cho acc này.
+                        _client.LogHelper.Log("[REGFB-AUTH] acc kẹt nhưng file auth FB rỗng/ chưa có session — bỏ qua lưu cookie/token.");
+                        return;
+                    }
+                    _account.Uid = diskUid;
+                    _client.LogHelper.SUCCESS($"[REGFB-UID] file auth rỗng nhưng đọc được uid trên đĩa — lấy uid {_account.Uid} (không cookie/token).");
                 }
-
-                _account.Uid = parts[0];
-                if (_settingGeneral.GetBooleanValue("checkBox10", true))
-                {
-                    if (!string.IsNullOrWhiteSpace(parts[2])) _account.Cookie = parts[2];
-                    if (!string.IsNullOrWhiteSpace(parts[1])) _account.Token = parts[1];
-                }
-                _client.LogHelper.SUCCESS($"[REGFB-AUTH] acc kẹt ({_account.State}) vẫn còn auth — đã lấy uid {_account.Uid}.");
 
                 // Backup profile + device theo đúng gate của bản lưu thường (checkBox3/checkBox2).
                 if (_settingGeneral.GetBooleanValue("checkBox3", true))
@@ -906,7 +991,18 @@ namespace Sunny.Subd.Core.Facebook
                     _client.MirrorGuardStop();
                     if (_account != null)
                     {
-                        _accountContext.Update(_account);
+                        // v39 (2d): chỉ Update acc CÓ uid — acc chưa từng tới bước nhập mã
+                        // mail thì chưa tồn tại trên server FB, Update sẽ ghi bản ghi uid
+                        // rỗng vào DB. Acc không uid vẫn chạy đủ phần còn lại (Running,
+                        // Telegram) cho vòng lặp/ UI không treo.
+                        if (!string.IsNullOrWhiteSpace(_account.Uid))
+                        {
+                            _accountContext.Update(_account);
+                        }
+                        else
+                        {
+                            _client.LogHelper.ERROR($"[REGFB] Bỏ qua lưu acc chưa có uid (chưa tồn tại trên server FB) — State: {_account.State}.");
+                        }
                         _account.Running = false;
                         if (TelegramBotServices.BotTelegram != null)
                         {
@@ -1176,8 +1272,18 @@ namespace Sunny.Subd.Core.Facebook
         // ─────────────────────────────────────────────────────────────────────────
         // ĐỌC 3 BÁNH XE NGÀY SINH TỪ XML MỚI.
         // XML raw (không hạ chữ) để còn thấy "Nov" chứ không phải "nov".
-        // Sắp xếp 3 ô input theo TÂM X tăng dần = tháng / ngày / năm (KHÔNG hardcode toạ độ
-        // vì độ phân giải máy khác nhau). Đọc hỏng thì trả null để caller thử lại.
+        // PHÂN LOẠI THEO NỘI DUNG (v40) — KHÔNG theo vị trí trái/giữa/phải:
+        //   • MỘT ô hiển thị TÊN THÁNG ("Mar"/"Apr"/"May") → chính là bánh THÁNG.
+        //     Dump thật 5200d7ad (28-09) cho thấy tháng luôn render dạng tên, kể cả
+        //     khi máy đặt DD/MM (en-GB/CA/AU) — day/year luôn là số.
+        //   • Trong 2 ô còn lại: ô giá trị ≥ 100 là NĂM (1976..1992), ô còn lại là NGÀY.
+        //   • Fallback khi CẢ 3 ô đều là số (máy theo locale số-tháng, hiếm): ô ≥ 100
+        //     là năm; trong 2 ô còn lại đúng MỘT ô > 12 là ngày (tháng không bao giờ
+        //     vượt 12), ô kia là tháng; cả hai ≤ 12 thì MƠ HỒ → trả null để caller
+        //     đọc lại/ bỏ lượt — KHÔNG BAO GIỜ bấm SET với nhầm tháng↔ngày.
+        // Trả về list theo thứ tự [tháng, ngày, năm] — caller (HandleDatePicker) vẫn
+        // dùng chỉ số vị trí 0/1/2 nên không đổi. Có ≥ 2 ô tên tháng hoặc không suy
+        // ra nổi → null. Ô đang giữa animation (text chưa parse được) → cũng null.
         // ─────────────────────────────────────────────────────────────────────────
         private List<DobWheel> ReadDobWheels()
         {
@@ -1211,6 +1317,7 @@ namespace Sunny.Subd.Core.Facebook
                     inputs.Add(new DobWheel
                     {
                         Value = value,
+                        MonthName = monthIndex >= 0,
                         XCenter = rect.GetCenterPoint().X,
                         Top = rect.Top,
                         Bottom = rect.Bottom
@@ -1222,11 +1329,50 @@ namespace Sunny.Subd.Core.Facebook
                 }
             }
 
-            inputs = inputs.OrderBy(w => w.XCenter).ToList();
-            inputs[0].Kind = "month";
-            inputs[1].Kind = "day";
-            inputs[2].Kind = "year";
-            return inputs;
+            // ── Phân loại theo NỘI DUNG (v40): độc lập với thứ tự trái/phải nên chạy
+            // đúng trên cả máy M/D/Y (en-US) lẫn DD/MM (en-GB/CA/AU). ─────────────
+            DobWheel monthWheel = inputs.FirstOrDefault(w => w.MonthName);
+            List<DobWheel> others = inputs.Where(w => !w.MonthName).ToList();
+
+            if (monthWheel != null)
+            {
+                if (others.Count != 2) return null; // ≥ 2 ô tên tháng → không hợp lệ.
+                DobWheel yearWheel = others.FirstOrDefault(w => w.Value >= 100);
+                if (yearWheel == null) return null;
+                DobWheel dayWheel = others.FirstOrDefault(w => w != yearWheel);
+                monthWheel.Kind = "month";
+                dayWheel.Kind = "day";
+                yearWheel.Kind = "year";
+                return new List<DobWheel> { monthWheel, dayWheel, yearWheel };
+            }
+
+            // Cả 3 ô đều là số — phân loại bằng khoảng giá trị.
+            DobWheel numericYear = inputs.FirstOrDefault(w => w.Value >= 100);
+            if (numericYear == null) return null;
+            List<DobWheel> numericOthers = inputs.Where(w => w != numericYear).ToList();
+            if (numericOthers.Count != 2) return null;
+            if (numericOthers[0].Value > 12 && numericOthers[1].Value <= 12)
+            {
+                numericOthers[0].Kind = "day";
+                numericOthers[1].Kind = "month";
+            }
+            else if (numericOthers[1].Value > 12 && numericOthers[0].Value <= 12)
+            {
+                numericOthers[1].Kind = "day";
+                numericOthers[0].Kind = "month";
+            }
+            else
+            {
+                // Cả 2 ô đều ≤ 12 (ngày 1..12 & tháng bất kỳ) → mơ hồ, không đoán.
+                return null;
+            }
+            numericYear.Kind = "year";
+            return new List<DobWheel>
+            {
+                numericOthers.First(w => w.Kind == "month"),
+                numericOthers.First(w => w.Kind == "day"),
+                numericYear
+            };
         }
 
         /// <summary>
