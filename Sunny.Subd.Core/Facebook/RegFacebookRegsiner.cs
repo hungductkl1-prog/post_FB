@@ -1106,6 +1106,10 @@ namespace Sunny.Subd.Core.Facebook
             // kể cả khi sau đó kẹt CP_282 / lỗi / Stop — xem TrySaveCheckpointAccountAsync.
             _mailCodeEntered = true;
             await DelayMessageAsync(10, _account.Status, 2);
+            // Mọi loại mail đều bấm gửi lại 1 lần khi chưa thấy mã sau ~10s — đúng nhịp
+            // gmailus.py get_otp_from_funotp (resend ở lần poll thứ 3, ~10-15s). Xem
+            // TryResendMailCodeAsync.
+            await TryResendMailCodeAsync();
             string code = await GetCode();
             if (string.IsNullOrEmpty(code))
             {
@@ -1123,6 +1127,40 @@ namespace Sunny.Subd.Core.Facebook
             _client.SendTextADB("//*[@class=\"android.widget.EditText\"]", code, timeout: 10);
             _client.ElementWithAttributes(new List<string> { "//*[@text=\"Next\"]", "//*[@content-desc=\"Next\"]" }, 5);
             await DelayMessageAsync(10, _account.Status, 2);
+        }
+
+        // Bấm gửi lại mã xác nhận mail 1 lần (best-effort, KHÔNG bao giờ throw) khi chưa thấy
+        // mã sau ~10s chờ ban đầu. Đúng nhịp gmailus.py get_otp_from_funotp: resend đúng 1
+        // lần ở lần poll thứ 3 (~10-15s chưa có OTP), nghỉ 6.5s + 1.5s sau khi bấm (cổng
+        // sang đây 8s), rồi vòng poll tiếp tục chạy hết 30 lần x 5s = 150s trong GetCode.
+        // Chạy TRƯỚC GetCode: bản shopmailmmo chặn (block) 150s bên trong không có móc
+        // giữa vòng, còn bản thường thì vòng 180s chỉ bắt đầu sau bước này. Gmail/Gmail_Bait
+        // GetCode xong mới KEYCODE_APP_SWITCH nên lúc bấm vẫn đang ở màn FB (nút resend
+        // nằm đó). Bait đã bấm resend riêng ở Agreement() → màn hình lúc này thường hết
+        // nút → click timeout 5s, ghi log bỏ qua rồi đi tiếp — vô hại.
+        private async Task TryResendMailCodeAsync()
+        {
+            try
+            {
+                AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                    $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Chưa thấy mã sau ~10s — bấm gửi lại mã");
+                bool clicked = _client.ElementWithAttributes("//*[@text=\"I didn’t get the code\"]", 5);
+                if (clicked)
+                {
+                    await DelayMessageAsync(8, _account.Status, 2);
+                    AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Đã bấm gửi lại mã — chờ mã mới");
+                }
+                else
+                {
+                    AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Không thấy nút gửi lại (màn hình khác / Bait đã bấm trước đó) — bỏ qua");
+                }
+            }
+            catch
+            {
+                // Best-effort như try/except của gmailus.py: lỗi resend không được làm hỏng luồng.
+            }
         }
 
         private async Task HandleEmailInput()

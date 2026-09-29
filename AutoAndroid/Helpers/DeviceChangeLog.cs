@@ -15,7 +15,7 @@ namespace AutoAndroid
         // Đổi giá trị này mỗi lần build để file log tự khai bản binary đang chạy.
         // Nếu DeviceChange.txt không xuất hiện hoặc thiếu tag mới nhất => process
         // đang chạy KHÔNG phải exe vừa build.
-        public const string BuildTag = "build-2026-09-29-v40";
+        public const string BuildTag = "build-2026-09-29-v41";
 
         public static void Write(string serial, string message)
         {
