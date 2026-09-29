@@ -1105,12 +1105,21 @@ namespace Sunny.Subd.Core.Facebook
             // server FB. Bật cờ để RunAsync (nhánh catch) biết acc này cần được LƯU + BACKUP
             // kể cả khi sau đó kẹt CP_282 / lỗi / Stop — xem TrySaveCheckpointAccountAsync.
             _mailCodeEntered = true;
-            await DelayMessageAsync(10, _account.Status, 2);
-            // Mọi loại mail đều bấm gửi lại 1 lần khi chưa thấy mã sau ~10s — đúng nhịp
-            // gmailus.py get_otp_from_funotp (resend ở lần poll thứ 3, ~10-15s). Xem
-            // TryResendMailCodeAsync.
-            await TryResendMailCodeAsync();
+            // v42: GỌI LẤY MÃ TRƯỚC, bấm gửi lại SAU. GetCode tự poll tới khi có mã
+            // (shopmailmmo 30x5s=150s, loại khác 180s) và TRẢ VỀ SỚM ngay khi mã về —
+            // nên nếu mã đã tới thì resend KHÔNG BAO GIỜ được bấm (v41 sai ở đây: chờ
+            // cứng 10s rồi bấm vô điều kiện, mã về trước 10s vẫn bị bấm resend).
             string code = await GetCode();
+            if (string.IsNullOrEmpty(code))
+            {
+                // Hết cả 150-180s mà vẫn chưa có mã mới bấm gửi lại — "delay lâu hơn"
+                // tự nhiên = trọn vẹn vòng poll đầu. Phải bấm HAI nút liên tiếp (v41
+                // chỉ bấm nút đầu → không gọi lại được mã): "I didn’t get the code"
+                // xong ~3s phải bấm tiếp "Resend confirmation code".
+                await TryResendMailCodeAsync();
+                code = await GetCode();
+            }
+
             if (string.IsNullOrEmpty(code))
             {
                 _client.LogHelper.ERROR("Không nhận được mã xác nhận.");
@@ -1129,32 +1138,47 @@ namespace Sunny.Subd.Core.Facebook
             await DelayMessageAsync(10, _account.Status, 2);
         }
 
-        // Bấm gửi lại mã xác nhận mail 1 lần (best-effort, KHÔNG bao giờ throw) khi chưa thấy
-        // mã sau ~10s chờ ban đầu. Đúng nhịp gmailus.py get_otp_from_funotp: resend đúng 1
-        // lần ở lần poll thứ 3 (~10-15s chưa có OTP), nghỉ 6.5s + 1.5s sau khi bấm (cổng
-        // sang đây 8s), rồi vòng poll tiếp tục chạy hết 30 lần x 5s = 150s trong GetCode.
-        // Chạy TRƯỚC GetCode: bản shopmailmmo chặn (block) 150s bên trong không có móc
-        // giữa vòng, còn bản thường thì vòng 180s chỉ bắt đầu sau bước này. Gmail/Gmail_Bait
-        // GetCode xong mới KEYCODE_APP_SWITCH nên lúc bấm vẫn đang ở màn FB (nút resend
-        // nằm đó). Bait đã bấm resend riêng ở Agreement() → màn hình lúc này thường hết
-        // nút → click timeout 5s, ghi log bỏ qua rồi đi tiếp — vô hại.
+        // Bấm gửi lại mã xác nhận mail 1 lần (best-effort, KHÔNG bao giờ throw). Chỉ được
+        // gọi khi vòng GetCode ĐẦU (150-180s) đã hết mà vẫn chưa có mã. Gốc rễ v41 sai:
+        // chờ cứng 10s rồi bấm vô điều kiện → mã về sớm vẫn bị bấm resend. v42 sửa bằng
+        // GetCode-first ở HandleConfirmationCode. Resend là HAI nút liên tiếp đúng như
+        // gmailus.py get_otp_from_funotp (lần poll 3 bấm ảnh RE1 reeee1.png, ngủ 6.5s,
+        // bấm ảnh RE2 re22222.png, ngủ 1.5s) và đúng như test live của user: bấm
+        // "I didn’t get the code" xong phải bấm TIẾP "Resend confirmation code" thì FB
+        // mới gọi lại mã — v41 chỉ bấm nút đầu nên resend KHÔNG chạy. Cổng sang đây:
+        // giữa 2 nút ~3s (python 6.5s) và sau nút 2 nghỉ 8s rồi GetCode lần 2 poll
+        // tiếp 150-180s. Bait đã bấm resend riêng ở Agreement() → nút có thể đã biến
+        // mất → click timeout 5s, ghi log bỏ qua rồi đi tiếp — vô hại.
         private async Task TryResendMailCodeAsync()
         {
             try
             {
                 AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
-                    $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Chưa thấy mã sau ~10s — bấm gửi lại mã");
-                bool clicked = _client.ElementWithAttributes("//*[@text=\"I didn’t get the code\"]", 5);
-                if (clicked)
+                    $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Hết vòng chờ đầu vẫn chưa có mã — bấm gửi lại (2 nút)");
+                bool clickedFirst = _client.ElementWithAttributes("//*[@text=\"I didn’t get the code\"]", 5);
+                if (!clickedFirst)
+                {
+                    AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Không thấy nút \"I didn’t get the code\" (màn hình khác / Bait đã bấm trước đó) — bỏ qua resend");
+                    return;
+                }
+
+                AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
+                    $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Đã bấm nút 1 \"I didn’t get the code\"");
+                await DelayMessageAsync(3, _account.Status, 2);
+
+                // Nút 2 bắt buộc — không có nó FB KHÔNG gọi lại mã (test live của user).
+                bool clickedSecond = _client.ElementWithAttributes("//*[@text=\"Resend confirmation code\"]", 5);
+                if (clickedSecond)
                 {
                     await DelayMessageAsync(8, _account.Status, 2);
                     AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
-                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Đã bấm gửi lại mã — chờ mã mới");
+                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Đã bấm nút 2 \"Resend confirmation code\" — chờ mã mới");
                 }
                 else
                 {
                     AutoAndroid.DeviceChangeLog.Write(_client.Device?.Serial ?? "?",
-                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Không thấy nút gửi lại (màn hình khác / Bait đã bấm trước đó) — bỏ qua");
+                        $"[{AutoAndroid.DeviceChangeLog.BuildTag}] [REGFB-RESEND] Không thấy nút 2 \"Resend confirmation code\" — chờ mã như cũ");
                 }
             }
             catch
